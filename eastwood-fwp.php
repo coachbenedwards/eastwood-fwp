@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.1.2
+ * Version: 2.1.3
  * Author: Eastwood CFC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1185,7 +1185,7 @@ add_action( 'wp_enqueue_scripts', 'ew_matches_assets', 20 );
  *     table, pasted once at Settings → Eastwood FWP.
  * ------------------------------------------------------------------ */
 
-const EW_FWP_VERSION = '2.1.2';
+const EW_FWP_VERSION = '2.1.3';
 const EW_FWP_REPO    = 'coachbenedwards/eastwood-fwp';
 const EW_FWP_BRANCH  = 'main';
 
@@ -1314,4 +1314,80 @@ add_action( 'rest_api_init', function () {
 			);
 		},
 	) );
+} );
+
+/* ------------------------------------------------------------------
+ * The News landing page.
+ *
+ * The captured theme already ships a complete news listing in
+ * archive.php — hero, category tabs, three-column grid, pagination —
+ * and its own navigation points at /eastwood-news/. Nothing renders
+ * there, because that URL belongs to no page.
+ *
+ * The obvious fix is Settings -> Reading, but naming a Posts page
+ * forces a static front page too, and this theme has no front-page.php,
+ * so the home page would fall back to the plain page template and lose
+ * its whole layout.
+ *
+ * So the URL is routed straight to the listing instead. No theme
+ * change, no front-page change, and the listing stays the theme's.
+ * ------------------------------------------------------------------ */
+
+const EW_NEWS_SLUG  = 'eastwood-news';
+const EW_NEWS_RULES = '1';
+
+add_action( 'init', function () {
+	add_rewrite_rule( '^' . EW_NEWS_SLUG . '/?$', 'index.php?ew_news=1', 'top' );
+	add_rewrite_rule(
+		'^' . EW_NEWS_SLUG . '/page/([0-9]{1,})/?$',
+		'index.php?ew_news=1&paged=$matches[1]',
+		'top'
+	);
+
+	// Rewrite rules are cached in an option. A plugin update does not fire
+	// the activation hook, so flush once per rule version instead.
+	if ( get_option( 'ew_news_rules' ) !== EW_NEWS_RULES ) {
+		flush_rewrite_rules( false );
+		update_option( 'ew_news_rules', EW_NEWS_RULES );
+	}
+}, 20 );
+
+add_filter( 'query_vars', function ( $vars ) {
+	$vars[] = 'ew_news';
+	return $vars;
+} );
+
+add_action( 'pre_get_posts', function ( $q ) {
+	if ( is_admin() || ! $q->is_main_query() || ! $q->get( 'ew_news' ) ) {
+		return;
+	}
+
+	$q->set( 'post_type', 'post' );
+	$q->set( 'post_status', 'publish' );
+	$q->set( 'ignore_sticky_posts', true );
+
+	// Tell WordPress this is the posts index rather than a missing page,
+	// which keeps the theme's "All" tab highlighted and lets
+	// the_posts_pagination() build /eastwood-news/page/2/ correctly.
+	$q->is_home     = true;
+	$q->is_archive  = false;
+	$q->is_page     = false;
+	$q->is_singular = false;
+	$q->is_404      = false;
+} );
+
+add_filter( 'template_include', function ( $template ) {
+	if ( ! get_query_var( 'ew_news' ) ) {
+		return $template;
+	}
+	$found = locate_template( array( 'archive.php', 'home.php', 'index.php' ) );
+	return $found ? $found : $template;
+} );
+
+// Without this the browser tab reads "Eastwood Football Club" alone.
+add_filter( 'pre_get_document_title', function ( $title ) {
+	if ( get_query_var( 'ew_news' ) ) {
+		return 'News — ' . get_bloginfo( 'name' );
+	}
+	return $title;
 } );
