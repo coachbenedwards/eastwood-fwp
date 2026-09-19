@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.1.1
+ * Version: 2.1.2
  * Author: Eastwood CFC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1185,7 +1185,7 @@ add_action( 'wp_enqueue_scripts', 'ew_matches_assets', 20 );
  *     table, pasted once at Settings → Eastwood FWP.
  * ------------------------------------------------------------------ */
 
-const EW_FWP_VERSION = '2.1.1';
+const EW_FWP_VERSION = '2.1.2';
 const EW_FWP_REPO    = 'coachbenedwards/eastwood-fwp';
 const EW_FWP_BRANCH  = 'main';
 
@@ -1197,8 +1197,14 @@ const EW_FWP_BRANCH  = 'main';
  * is not — it comes back as a firewall error page.
  */
 function ew_fwp_remote_info() {
+	// A forced check must actually re-check. This is tested here rather than
+	// on admin_init, because core runs the forced update check on
+	// load-update-core.php, which fires first — clearing the cache later is
+	// always one page load too late.
+	$forced = isset( $_GET['force-check'] );
+
 	$cached = get_transient( 'ew_fwp_remote' );
-	if ( false !== $cached ) {
+	if ( ! $forced && false !== $cached ) {
 		return $cached;
 	}
 
@@ -1216,19 +1222,28 @@ function ew_fwp_remote_info() {
 		}
 	}
 
-	// Cached either way: a failed check must not hammer GitHub on every load.
-	set_transient( 'ew_fwp_remote', $info, 6 * HOUR_IN_SECONDS );
+	// Cached either way so a failure cannot hammer GitHub — but a failure is
+	// cached briefly, not for six hours. Caching an empty result for a whole
+	// working day means one blip hides every release until tomorrow.
+	set_transient( 'ew_fwp_remote', $info, empty( $info ) ? 5 * MINUTE_IN_SECONDS : 6 * HOUR_IN_SECONDS );
 	return $info;
 }
 
 add_filter( 'pre_set_site_transient_update_plugins', function ( $transient ) {
-	if ( empty( $transient->checked ) ) {
-		return $transient;
+	if ( ! is_object( $transient ) ) {
+		$transient = new stdClass();
 	}
 
+	// Deliberately NOT guarding on empty( $transient->checked ). That guard is
+	// in most updater tutorials and it is why they silently never fire: core
+	// does not always populate `checked` before this filter runs.
 	$info = ew_fwp_remote_info();
 	if ( empty( $info['version'] ) ) {
 		return $transient;
+	}
+
+	if ( ! isset( $transient->response ) || ! is_array( $transient->response ) ) {
+		$transient->response = array();
 	}
 
 	if ( version_compare( $info['version'], EW_FWP_VERSION, '>' ) ) {
@@ -1267,9 +1282,36 @@ add_filter( 'upgrader_source_selection', function ( $source, $remote_source, $up
 	return $source;
 }, 10, 4 );
 
-// "Check again" should actually re-check, not read our six-hour cache.
-add_action( 'admin_init', function () {
-	if ( isset( $_GET['force-check'] ) && current_user_can( 'update_plugins' ) ) {
-		delete_transient( 'ew_fwp_remote' );
-	}
+/**
+ * Update-channel status, for when the update does not appear.
+ *
+ * Read-only and admin-only. Reports what the site can actually see, so the
+ * next attempt is a measurement rather than a guess.
+ */
+add_action( 'rest_api_init', function () {
+	register_rest_route( 'eastwood/v1', '/update-status', array(
+		'methods'             => 'GET',
+		'permission_callback' => function () { return current_user_can( 'update_plugins' ); },
+		'callback'            => function () {
+			$url = 'https://raw.githubusercontent.com/' . EW_FWP_REPO . '/' . EW_FWP_BRANCH . '/plugin.json';
+			$res = wp_remote_get( $url, array( 'timeout' => 15 ) );
+
+			$fetch = is_wp_error( $res )
+				? array( 'ok' => false, 'error' => $res->get_error_message() )
+				: array( 'ok' => true, 'http' => (int) wp_remote_retrieve_response_code( $res ),
+					'body' => substr( wp_remote_retrieve_body( $res ), 0, 300 ) );
+
+			$site = get_site_transient( 'update_plugins' );
+			$me   = plugin_basename( __FILE__ );
+
+			return array(
+				'installed_version' => EW_FWP_VERSION,
+				'plugin_basename'   => $me,
+				'live_fetch'        => $fetch,
+				'cached_remote'     => get_transient( 'ew_fwp_remote' ),
+				'offered_update'    => isset( $site->response[ $me ] ) ? $site->response[ $me ] : null,
+				'core_checked_me'   => isset( $site->checked[ $me ] ) ? $site->checked[ $me ] : null,
+			);
+		},
+	) );
 } );
