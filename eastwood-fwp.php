@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.3.1
+ * Version: 2.3.2
  * Author: Eastwood CFC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1461,7 +1461,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  *     table, pasted once at Settings → Eastwood FWP.
  * ------------------------------------------------------------------ */
 
-const EW_FWP_VERSION = '2.3.1';
+const EW_FWP_VERSION = '2.3.2';
 const EW_FWP_REPO    = 'coachbenedwards/eastwood-fwp';
 const EW_FWP_BRANCH  = 'main';
 
@@ -1473,10 +1473,16 @@ const EW_FWP_BRANCH  = 'main';
  * is not — it comes back as a firewall error page.
  */
 function ew_fwp_remote_info() {
-	// A forced check must actually re-check. This is tested here rather than
-	// on admin_init, because core runs the forced update check on
-	// load-update-core.php, which fires first — clearing the cache later is
-	// always one page load too late.
+	// A forced check must actually re-check. Reading $_GET here rather than
+	// clearing on admin_init, because core runs the forced check on
+	// load-update-core.php, which fires first.
+	//
+	// $_GET alone is not enough, though. Core often runs the plugin check in
+	// a separate wp-cron loopback request, which carries no query string at
+	// all, so a forced check from the updates screen would quietly read this
+	// cache and report "up to date" against a stale version. The
+	// delete_site_transient_update_plugins hook below is the reliable half:
+	// whenever core drops its own update cache, ours goes with it.
 	$forced = isset( $_GET['force-check'] );
 
 	$cached = get_transient( 'ew_fwp_remote' );
@@ -1499,11 +1505,26 @@ function ew_fwp_remote_info() {
 	}
 
 	// Cached either way so a failure cannot hammer GitHub — but a failure is
-	// cached briefly, not for six hours. Caching an empty result for a whole
-	// working day means one blip hides every release until tomorrow.
-	set_transient( 'ew_fwp_remote', $info, empty( $info ) ? 5 * MINUTE_IN_SECONDS : 6 * HOUR_IN_SECONDS );
+	// cached briefly. Caching an empty result for a whole working day means
+	// one blip hides every release until tomorrow. An hour on the happy path
+	// keeps us well inside anyone's idea of polite for a CDN-served file and
+	// means a push shows up on its own without anybody forcing anything.
+	set_transient( 'ew_fwp_remote', $info, empty( $info ) ? 5 * MINUTE_IN_SECONDS : HOUR_IN_SECONDS );
 	return $info;
 }
+
+// Core drops its own update cache whenever a check is forced, and again
+// after an install. Ours has to go at the same moment or the next check
+// reads a stale version and reports the site up to date when it is not.
+add_action( 'delete_site_transient_update_plugins', function () {
+	delete_transient( 'ew_fwp_remote' );
+} );
+
+add_action( 'upgrader_process_complete', function ( $upgrader, $extra ) {
+	if ( isset( $extra['type'] ) && 'plugin' === $extra['type'] ) {
+		delete_transient( 'ew_fwp_remote' );
+	}
+}, 10, 2 );
 
 add_filter( 'pre_set_site_transient_update_plugins', function ( $transient ) {
 	if ( ! is_object( $transient ) ) {
