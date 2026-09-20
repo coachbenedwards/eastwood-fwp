@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.1.3
+ * Version: 2.3.0
  * Author: Eastwood CFC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -949,7 +949,7 @@ function ew_rewrite_markup( $html ) {
 		$html
 	);
 
-	return $html;
+	return ew_rewrite_nav( $html );
 }
 
 add_action( 'template_redirect', function () {
@@ -1168,6 +1168,282 @@ JS;
 add_action( 'wp_enqueue_scripts', 'ew_matches_assets', 20 );
 
 /* ------------------------------------------------------------------
+ * Teams and Squad.
+ *
+ * Two shortcodes:
+ *
+ *   [eastwood_teams]  the club's full team list, grouped as the club
+ *                     groups it. Static, because no feed carries it.
+ *   [eastwood_squad]  the first-team squad, built live from the
+ *                     Football Web Pages appearances and goalscorers
+ *                     feeds through our own proxy.
+ *
+ * There is no squad endpoint at Football Web Pages. What exists is a
+ * per-player appearance record, which is better: it is maintained by
+ * the league rather than by us, and a player appears on the page the
+ * moment he plays. The cost is that it lists who HAS played, not who
+ * is registered, and it carries no positions, photographs or dates of
+ * birth. The page says so rather than pretending otherwise.
+ * ------------------------------------------------------------------ */
+
+/**
+ * Every Eastwood team, in the club's own grouping.
+ *
+ * Taken from the club's Pitchero site, which is still the system of
+ * record for the junior sides. `pitchero` is the team id there.
+ * When a side's fixtures move onto this site, drop its id and give it
+ * a `url` instead; ew_teams_link() will follow whichever is set.
+ */
+function ew_teams_roster() {
+	return array(
+		'Senior Men' => array(
+			array( 'name' => '1st Team',         'pitchero' => 140091, 'url' => '/eastwood-squad/' ),
+			array( 'name' => 'U21',              'pitchero' => 188320 ),
+			array( 'name' => 'Academy',          'pitchero' => 166249 ),
+			array( 'name' => 'Development Team', 'pitchero' => 286212 ),
+			array( 'name' => 'Veterans',         'pitchero' => 153743 ),
+		),
+		'Junior' => array(
+			array( 'name' => 'U18 Red',          'pitchero' => 159508 ),
+			array( 'name' => 'U18 White',        'pitchero' => 207019 ),
+			array( 'name' => 'U16',              'pitchero' => 207018 ),
+			array( 'name' => 'U15 Red',          'pitchero' => 159510 ),
+			array( 'name' => 'U15 Gold',         'pitchero' => 186922 ),
+			array( 'name' => 'U14 Black',        'pitchero' => 207015 ),
+			array( 'name' => 'U13 Aces',         'pitchero' => 207017 ),
+			array( 'name' => 'U13 Black',        'pitchero' => 207022 ),
+			array( 'name' => 'U13 Red',          'pitchero' => 159507 ),
+			array( 'name' => 'U13 Badgers',      'pitchero' => 207016 ),
+			array( 'name' => 'U12 Red',          'pitchero' => 207023 ),
+			array( 'name' => 'U12 Cosmos',       'pitchero' => 195413 ),
+			array( 'name' => 'U11 Gold',         'pitchero' => 186921 ),
+			array( 'name' => 'U11 Black Sunday', 'pitchero' => 207020 ),
+			array( 'name' => 'U10 Red',          'pitchero' => 207025 ),
+			array( 'name' => 'U10 Black',        'pitchero' => 207024 ),
+			array( 'name' => 'U9 Aces',          'pitchero' => 197464 ),
+			array( 'name' => 'U9 Saturday',      'pitchero' => 195415 ),
+			array( 'name' => 'U8 Sunday',        'pitchero' => 207030 ),
+			array( 'name' => 'U7 Red',           'pitchero' => 207027 ),
+			array( 'name' => 'U7 Badgers',       'pitchero' => 207028 ),
+			array( 'name' => 'U7 Panthers',      'pitchero' => 207029 ),
+		),
+		'Mini' => array(
+			array( 'name' => 'Soccer School',    'pitchero' => 167688 ),
+		),
+		'Ladies and Girls' => array(
+			array( 'name' => "Under 12's",       'pitchero' => 293703 ),
+		),
+	);
+}
+
+/**
+ * Where a team card points, and whether that destination is ours.
+ * Returns array( url, is_external ).
+ */
+function ew_teams_link( $team ) {
+	if ( ! empty( $team['url'] ) ) {
+		return array( $team['url'], false );
+	}
+	if ( ! empty( $team['pitchero'] ) ) {
+		return array( 'https://www.eastwoodcfc.co.uk/teams/' . (int) $team['pitchero'], true );
+	}
+	return array( '', false );
+}
+
+function ew_teams_shortcode() {
+	ob_start();
+	?>
+<div class="ew-teams-index">
+	<?php foreach ( ew_teams_roster() as $group => $teams ) : ?>
+	<section class="ew-tm-group">
+		<h2 class="ew-tm-head"><?php echo esc_html( $group ); ?><span><?php echo count( $teams ); ?></span></h2>
+		<div class="ew-tm-grid">
+			<?php
+			foreach ( $teams as $team ) :
+				list( $url, $external ) = ew_teams_link( $team );
+				$tag = $url ? 'a' : 'div';
+				?>
+			<<?php echo $tag; ?> class="ew-tm-card<?php echo $external ? ' is-external' : ''; ?>"
+				<?php if ( $url ) : ?>href="<?php echo esc_url( $url ); ?>"<?php endif; ?>
+				<?php if ( $external ) : ?>target="_blank" rel="noopener"<?php endif; ?>>
+				<span class="ew-tm-name"><?php echo esc_html( $team['name'] ); ?></span>
+				<?php if ( $external ) : ?><span class="ew-tm-note">on Pitchero</span><?php endif; ?>
+			</<?php echo $tag; ?>>
+			<?php endforeach; ?>
+		</div>
+	</section>
+	<?php endforeach; ?>
+	<p class="ew-credit">Junior, mini and girls' teams still keep their fixtures and contact details on the club's
+		Pitchero pages while those sections are moved across.</p>
+</div>
+	<?php
+	return trim( ob_get_clean() );
+}
+add_shortcode( 'eastwood_teams', 'ew_teams_shortcode' );
+
+function ew_squad_shortcode() {
+	ob_start();
+	?>
+<div class="ew-squad" data-team="<?php echo esc_attr( EW_TEAM ); ?>">
+	<div class="ew-sq-top"><p class="ew-loading">Loading the squad…</p></div>
+	<div class="ew-sq-body"></div>
+	<p class="ew-credit">Appearances, goals and cards supplied by Football Web Pages and updated as the league
+		records each match. The list covers every player who has featured for the first team this season.</p>
+</div>
+	<?php
+	return trim( ob_get_clean() );
+}
+add_shortcode( 'eastwood_squad', 'ew_squad_shortcode' );
+
+function ew_teams_assets() {
+	if ( ! is_singular() ) { return; }
+	$post = get_post();
+	if ( ! $post ) { return; }
+	$content = (string) $post->post_content;
+	$teams   = has_shortcode( $content, 'eastwood_teams' );
+	$squad   = has_shortcode( $content, 'eastwood_squad' );
+	if ( ! $teams && ! $squad ) { return; }
+
+	$css = '
+.ew-teams-index,.ew-squad{max-width:1100px;margin:0 auto;padding:0 16px 56px;
+ font-family:"Instrument Sans",system-ui,sans-serif;color:#111}
+.ew-teams-index *,.ew-squad *{box-sizing:border-box}
+.ew-tm-group{margin:0 0 40px}
+.ew-tm-head{font-family:Anton,"Instrument Sans",sans-serif;font-size:20px;letter-spacing:.05em;
+ text-transform:uppercase;color:#111;margin:0 0 16px;padding:0 0 10px;border-bottom:2px solid #e3e3e3;
+ display:flex;align-items:center;gap:12px}
+.ew-tm-head span{font-family:"Instrument Sans",sans-serif;font-size:12px;letter-spacing:0;font-weight:600;
+ color:#6b6b6b;background:#f3f3f3;border-radius:10px;padding:2px 9px;text-transform:none}
+.ew-tm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
+.ew-tm-card{display:flex;flex-direction:column;justify-content:center;gap:3px;min-height:64px;
+ background:#fff;border:1px solid #e6e6e6;border-left:3px solid #CC0000;border-radius:4px;
+ padding:12px 16px;text-decoration:none;color:#111;transition:border-color .15s,box-shadow .15s}
+a.ew-tm-card:hover{border-color:#CC0000;box-shadow:0 2px 10px rgba(0,0,0,.07)}
+.ew-tm-card.is-external{border-left-color:#c9c9c9}
+a.ew-tm-card.is-external:hover{border-color:#b5b5b5;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+.ew-tm-name{font-weight:600;font-size:15px}
+.ew-tm-note{font-size:11px;color:#8a8a8a}
+.ew-sq-lead{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;margin:0 0 32px}
+.ew-sq-star{background:#fff;border:1px solid #e6e6e6;border-top:3px solid #CC0000;border-radius:4px;padding:18px 20px}
+.ew-sq-star b{display:block;font-family:Anton,sans-serif;font-size:40px;line-height:1;color:#CC0000}
+.ew-sq-star em{display:block;font-style:normal;font-weight:600;font-size:16px;margin:8px 0 2px}
+.ew-sq-star i{display:block;font-style:normal;font-size:12px;color:#8a8a8a}
+.ew-sq-sub{font-family:Anton,sans-serif;font-size:15px;letter-spacing:.08em;text-transform:uppercase;
+ color:#6b6b6b;margin:0 0 10px}
+.ew-sq-table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e6e6e6;
+ border-radius:4px;overflow:hidden}
+.ew-sq-table th{background:#f3f3f3;font-family:Anton,sans-serif;font-size:12px;letter-spacing:.06em;
+ text-transform:uppercase;color:#6b6b6b;font-weight:400;padding:12px 8px;text-align:center}
+.ew-sq-table th.ewc-who,.ew-sq-table td.ewc-who{text-align:left}
+/* Same trap as the matches table: the editor stylesheet marks a dark td
+   border !important inside .tiptap, so ours has to be !important too. */
+.ew-squad .ew-sq-table td,.ew-squad .ew-sq-table th{border:0 !important}
+.ew-squad .ew-sq-table tbody td{border-top:1px solid #efefef !important}
+.ew-sq-table td{padding:11px 8px;text-align:center;font-size:14px;background:transparent;color:#111}
+.ew-sq-table td.ewc-shirt{font-family:Anton,sans-serif;font-size:16px;color:#6b6b6b;width:52px}
+.ew-sq-table td.ewc-who{font-weight:600}
+.ew-sq-table td.ewc-gls{font-weight:700}
+.ew-sq-armband{display:inline-block;margin-left:7px;font-size:10px;font-weight:700;letter-spacing:.06em;
+ color:#CC0000;border:1px solid #CC0000;border-radius:3px;padding:1px 4px;vertical-align:1px}
+@media(max-width:720px){
+ .ew-sq-table th.ewc-hide,.ew-sq-table td.ewc-hide{display:none}
+ .ew-tm-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+}';
+
+	$js = <<<'JS'
+(function(){
+var root=document.querySelector('.ew-squad');
+if(!root){return;}
+var top=root.querySelector('.ew-sq-top'),body=root.querySelector('.ew-sq-body');
+
+function esc(s){var d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
+function name(p){return ((p['first-name']||'')+' '+(p['last-name']||'')).trim();}
+function fail(msg){top.innerHTML='<p class="ew-loading">'+msg+'</p>';body.innerHTML='';}
+
+function build(apps,gls){
+ var players=(apps.players)||[];
+ if(!players.length){return fail('No appearances have been recorded yet this season.');}
+
+ var goals={};
+ ((gls&&gls.players)||[]).forEach(function(p){goals[p.id]=(p.goals||[]).length;});
+
+ var rows=players.map(function(p){
+  var a=p.appearances||[];
+  // Shirt numbers are per match at this level, not fixed squad numbers,
+  // so show the one worn most often and say so on the page.
+  var tally={},best=null;
+  a.forEach(function(x){
+   if(!x.shirt){return;}
+   tally[x.shirt]=(tally[x.shirt]||0)+1;
+   if(best===null||tally[x.shirt]>tally[best]){best=x.shirt;}
+  });
+  return {
+   name:name(p),
+   shirt:best,
+   apps:a.length,
+   goals:goals[p.id]||0,
+   cards:a.filter(function(x){return x.cautioned;}).length,
+   capt:a.filter(function(x){return x.captain;}).length
+  };
+ });
+
+ var scorers=rows.slice().filter(function(r){return r.goals>0;})
+   .sort(function(x,y){return y.goals-x.goals;}).slice(0,3);
+
+ top.innerHTML=scorers.length
+  ? '<div class="ew-sq-lead">'+scorers.map(function(r){
+      return '<div class="ew-sq-star"><b>'+r.goals+'</b><em>'+esc(r.name)+'</em>'
+           +'<i>'+r.goals+(r.goals===1?' goal':' goals')+' in '+r.apps
+           +(r.apps===1?' appearance':' appearances')+'</i></div>';
+    }).join('')+'</div>'
+  : '';
+
+ rows.sort(function(x,y){
+  if(y.apps!==x.apps){return y.apps-x.apps;}
+  return x.name<y.name?-1:1;
+ });
+
+ body.innerHTML='<h3 class="ew-sq-sub">First-team squad</h3>'
+  +'<table class="ew-sq-table"><thead><tr>'
+  +'<th>#</th><th class="ewc-who">Player</th><th>Apps</th><th>Goals</th>'
+  +'<th class="ewc-hide">Yellow</th></tr></thead><tbody>'
+  +rows.map(function(r){
+    return '<tr>'
+     +'<td class="ewc-shirt">'+(r.shirt||'&ndash;')+'</td>'
+     +'<td class="ewc-who">'+esc(r.name)
+     +(r.capt?'<span class="ew-sq-armband" title="Has captained the side">C</span>':'')+'</td>'
+     +'<td>'+r.apps+'</td>'
+     +'<td class="ewc-gls">'+(r.goals||'&ndash;')+'</td>'
+     +'<td class="ewc-hide">'+(r.cards||'&ndash;')+'</td>'
+     +'</tr>';
+  }).join('')
+  +'</tbody></table>'
+  +'<p class="ew-key" style="margin-top:14px">Shirt numbers are the number each player has worn most often.'
+  +' <span class="ew-sq-armband">C</span> marks a player who has captained the side.</p>';
+}
+
+Promise.all([
+ fetch('/wp-json/eastwood/v1/fwp?endpoint=appearances').then(function(r){return r.json();}),
+ fetch('/wp-json/eastwood/v1/fwp?endpoint=goalscorers').then(function(r){return r.json();})
+]).then(function(d){
+ build(d[0].appearances||{},d[1].goalscorers||{});
+}).catch(function(){fail('Couldn\'t load the squad just now. Please try again shortly.');});
+})();
+JS;
+
+	wp_register_style( 'eastwood-teams', false );
+	wp_enqueue_style( 'eastwood-teams' );
+	wp_add_inline_style( 'eastwood-teams', $css );
+
+	if ( $squad ) {
+		wp_register_script( 'eastwood-teams', false, array(), null, true );
+		wp_enqueue_script( 'eastwood-teams' );
+		wp_add_inline_script( 'eastwood-teams', $js );
+	}
+}
+add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
+
+/* ------------------------------------------------------------------
  * Updates.
  *
  * The host sits behind a firewall that rejects any POST body containing
@@ -1185,7 +1461,7 @@ add_action( 'wp_enqueue_scripts', 'ew_matches_assets', 20 );
  *     table, pasted once at Settings → Eastwood FWP.
  * ------------------------------------------------------------------ */
 
-const EW_FWP_VERSION = '2.1.3';
+const EW_FWP_VERSION = '2.3.0';
 const EW_FWP_REPO    = 'coachbenedwards/eastwood-fwp';
 const EW_FWP_BRANCH  = 'main';
 
@@ -1391,3 +1667,448 @@ add_filter( 'pre_get_document_title', function ( $title ) {
 	}
 	return $title;
 } );
+
+/* ------------------------------------------------------------------
+ * Pages the plugin owns.
+ *
+ * The navigation shipped with the replica points at slugs that had no
+ * page behind them, so half the menu returned 404. Rather than ask
+ * somebody to hand-create pages in wp-admin and paste shortcodes into
+ * them, the plugin creates its own and keeps their content current.
+ *
+ * Idempotent: a page is created only when its slug is free, and its
+ * content is refreshed only while it still matches what we last put
+ * there. The moment somebody edits a page by hand, we leave it alone.
+ * ------------------------------------------------------------------ */
+
+const EW_PAGES_V = '2';
+
+function ew_owned_pages() {
+	return array(
+		'eastwood-teams' => array(
+			'title'   => 'Teams',
+			'content' => '[eastwood_teams]',
+		),
+		'eastwood-squad' => array(
+			'title'   => 'First Team Squad',
+			'content' => '[eastwood_squad]',
+		),
+		'eastwood-tv' => array(
+			'title'   => 'Eastwood TV',
+			'content' => '[eastwood_tv]',
+		),
+		'academy' => array(
+			'title'   => 'Academy',
+			'content' => ew_academy_content(),
+		),
+	);
+}
+
+function ew_install_pages() {
+	$owned = ew_owned_pages();
+	$state = (array) get_option( 'ew_owned_pages', array() );
+
+	foreach ( $owned as $slug => $spec ) {
+		$existing = get_page_by_path( $slug );
+
+		if ( ! $existing ) {
+			$id = wp_insert_post( array(
+				'post_type'    => 'page',
+				'post_status'  => 'publish',
+				'post_name'    => $slug,
+				'post_title'   => $spec['title'],
+				'post_content' => $spec['content'],
+			) );
+			if ( ! is_wp_error( $id ) ) {
+				$state[ $slug ] = array( 'id' => $id, 'hash' => md5( $spec['content'] ) );
+			}
+			continue;
+		}
+
+		// Ours to update only while nobody has touched it.
+		$known = isset( $state[ $slug ]['hash'] ) ? $state[ $slug ]['hash'] : '';
+		if ( $known && md5( $existing->post_content ) === $known
+			&& $existing->post_content !== $spec['content'] ) {
+			wp_update_post( array( 'ID' => $existing->ID, 'post_content' => $spec['content'] ) );
+		}
+		if ( ! isset( $state[ $slug ] ) ) {
+			$state[ $slug ] = array( 'id' => $existing->ID, 'hash' => md5( $existing->post_content ) );
+		} else {
+			$state[ $slug ]['hash'] = md5( $spec['content'] );
+		}
+	}
+
+	update_option( 'ew_owned_pages', $state );
+}
+
+add_action( 'init', function () {
+	if ( get_option( 'ew_pages_v' ) === EW_PAGES_V . '-' . EW_FWP_VERSION ) {
+		return;
+	}
+	ew_install_pages();
+	update_option( 'ew_pages_v', EW_PAGES_V . '-' . EW_FWP_VERSION );
+}, 30 );
+
+/* ------------------------------------------------------------------
+ * Eastwood TV.
+ *
+ * The club already publishes everything this section needs: 271 videos
+ * on its own YouTube channel, including the weekly "This Is Eastwood"
+ * documentary and match highlights for every game. So Eastwood TV is
+ * not a new content commitment, it is a shop window onto work that is
+ * already being made.
+ *
+ * The channel's RSS feed carries the fifteen most recent uploads with
+ * ids, titles and dates and needs no API key, so that is what we read.
+ * Fetched server-side because the feed sends no CORS headers, and
+ * cached, because it changes a few times a week at most.
+ * ------------------------------------------------------------------ */
+
+const EW_TV_CHANNEL = 'UCoEcO7-tgzIswpU_VDBUtAg';
+const EW_TV_HANDLE  = 'eastwoodfootballclub';
+
+/**
+ * The latest uploads, newest first.
+ * Each entry: id, title, published (unix), series.
+ */
+function ew_tv_feed() {
+	$cached = get_transient( 'ew_tv_feed' );
+	if ( false !== $cached ) {
+		return $cached;
+	}
+
+	$res = wp_remote_get(
+		'https://www.youtube.com/feeds/videos.xml?channel_id=' . EW_TV_CHANNEL,
+		array( 'timeout' => 8 )
+	);
+
+	$videos = array();
+	if ( ! is_wp_error( $res ) && 200 === (int) wp_remote_retrieve_response_code( $res ) ) {
+		$prev = libxml_use_internal_errors( true );
+		$xml  = simplexml_load_string( (string) wp_remote_retrieve_body( $res ) );
+		libxml_clear_errors();
+		libxml_use_internal_errors( $prev );
+
+		if ( $xml ) {
+			foreach ( $xml->entry as $entry ) {
+				$yt = $entry->children( 'http://www.youtube.com/xml/schemas/2015' );
+				$id = isset( $yt->videoId ) ? (string) $yt->videoId : '';
+				if ( '' === $id ) { continue; }
+
+				$title = ew_tv_clean_title( (string) $entry->title );
+				$videos[] = array(
+					'id'        => $id,
+					'title'     => $title,
+					'published' => strtotime( (string) $entry->published ),
+					'series'    => ew_tv_series( $title ),
+				);
+			}
+		}
+	}
+
+	// A short cache on failure so a blip doesn't leave the page empty for hours.
+	set_transient( 'ew_tv_feed', $videos, empty( $videos ) ? 5 * MINUTE_IN_SECONDS : 2 * HOUR_IN_SECONDS );
+	return $videos;
+}
+
+/**
+ * Feed titles carry the social caption: line breaks, hashtags, emoji.
+ * Only the first line is the title.
+ */
+function ew_tv_clean_title( $title ) {
+	$title = trim( (string) $title );
+	$parts = preg_split( '/\R/u', $title );
+	$title = trim( (string) $parts[0] );
+	$title = preg_replace( '/\s*#\w+/u', '', $title );
+	return trim( $title );
+}
+
+function ew_tv_series( $title ) {
+	if ( stripos( $title, 'this is eastwood' ) !== false ) { return 'documentary'; }
+	if ( stripos( $title, 'highlights' ) !== false )       { return 'highlights'; }
+	return 'clips';
+}
+
+function ew_tv_shortcode() {
+	$videos = ew_tv_feed();
+
+	ob_start();
+
+	if ( empty( $videos ) ) {
+		?>
+<div class="ew-tv">
+	<p class="ew-loading">Eastwood TV is having trouble reaching the channel just now.
+		You can watch everything at <a href="https://www.youtube.com/@<?php echo esc_attr( EW_TV_HANDLE ); ?>"
+		target="_blank" rel="noopener">youtube.com/@<?php echo esc_html( EW_TV_HANDLE ); ?></a>.</p>
+</div>
+		<?php
+		return trim( ob_get_clean() );
+	}
+
+	$hero = $videos[0];
+	foreach ( $videos as $v ) {
+		if ( 'documentary' === $v['series'] ) { $hero = $v; break; }
+	}
+
+	$groups = array(
+		'documentary' => array( 'This Is Eastwood', 'The club\'s own documentary series, a new episode every Thursday.' ),
+		'highlights'  => array( 'Match highlights', 'Every goal from every game, usually up within a day or two.' ),
+		'clips'       => array( 'More from the club', '' ),
+	);
+	?>
+<div class="ew-tv">
+	<section class="ew-tv-hero">
+		<div class="ew-tv-player">
+			<iframe src="https://www.youtube-nocookie.com/embed/<?php echo esc_attr( $hero['id'] ); ?>"
+				title="<?php echo esc_attr( $hero['title'] ); ?>" loading="lazy" allowfullscreen
+				allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+				referrerpolicy="strict-origin-when-cross-origin"></iframe>
+		</div>
+		<div class="ew-tv-heroText">
+			<span class="ew-tv-kicker">Latest episode</span>
+			<h2><?php echo esc_html( $hero['title'] ); ?></h2>
+			<p><?php echo esc_html( date_i18n( 'j F Y', $hero['published'] ) ); ?></p>
+		</div>
+	</section>
+
+	<?php
+	foreach ( $groups as $key => $meta ) :
+		$list = array_values( array_filter( $videos, function ( $v ) use ( $key, $hero ) {
+			return $v['series'] === $key && $v['id'] !== $hero['id'];
+		} ) );
+		if ( empty( $list ) ) { continue; }
+		?>
+	<section class="ew-tv-row">
+		<h3 class="ew-tv-rowHead"><?php echo esc_html( $meta[0] ); ?></h3>
+		<?php if ( $meta[1] ) : ?><p class="ew-tv-rowSub"><?php echo esc_html( $meta[1] ); ?></p><?php endif; ?>
+		<div class="ew-tv-grid">
+			<?php foreach ( $list as $v ) : ?>
+			<a class="ew-tv-card" href="https://www.youtube.com/watch?v=<?php echo esc_attr( $v['id'] ); ?>"
+				target="_blank" rel="noopener">
+				<span class="ew-tv-thumb">
+					<img src="https://i.ytimg.com/vi/<?php echo esc_attr( $v['id'] ); ?>/hqdefault.jpg"
+						alt="" loading="lazy" width="480" height="360">
+					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+				</span>
+				<span class="ew-tv-title"><?php echo esc_html( $v['title'] ); ?></span>
+				<span class="ew-tv-date"><?php echo esc_html( date_i18n( 'j M Y', $v['published'] ) ); ?></span>
+			</a>
+			<?php endforeach; ?>
+		</div>
+	</section>
+	<?php endforeach; ?>
+
+	<p class="ew-credit">Eastwood TV shows the most recent uploads from the club's YouTube channel.
+		The full archive is <a href="https://www.youtube.com/@<?php echo esc_attr( EW_TV_HANDLE ); ?>/videos"
+		target="_blank" rel="noopener">on YouTube</a>.</p>
+</div>
+	<?php
+	return trim( ob_get_clean() );
+}
+add_shortcode( 'eastwood_tv', 'ew_tv_shortcode' );
+
+function ew_tv_assets() {
+	if ( ! is_singular() ) { return; }
+	$post = get_post();
+	if ( ! $post || ! has_shortcode( (string) $post->post_content, 'eastwood_tv' ) ) { return; }
+
+	$css = '
+.ew-tv{max-width:1100px;margin:0 auto;padding:0 16px 56px;font-family:"Instrument Sans",system-ui,sans-serif;color:#111}
+.ew-tv *{box-sizing:border-box}
+.ew-tv-hero{margin:0 0 44px}
+.ew-tv-player{position:relative;padding-top:56.25%;background:#000;border-radius:4px;overflow:hidden}
+.ew-tv-player iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.ew-tv-heroText{padding:18px 2px 0}
+.ew-tv-kicker{display:inline-block;font-family:Anton,sans-serif;font-size:12px;letter-spacing:.1em;
+ text-transform:uppercase;color:#CC0000;margin:0 0 8px}
+.ew-tv-heroText h2{font-family:Anton,"Instrument Sans",sans-serif;font-size:30px;line-height:1.1;
+ letter-spacing:.01em;margin:0 0 6px;color:#111}
+.ew-tv-heroText p{margin:0;font-size:13px;color:#8a8a8a}
+.ew-tv-row{margin:0 0 44px}
+.ew-tv-rowHead{font-family:Anton,"Instrument Sans",sans-serif;font-size:20px;letter-spacing:.05em;
+ text-transform:uppercase;margin:0 0 4px;color:#111}
+.ew-tv-rowSub{margin:0 0 16px;font-size:14px;color:#6b6b6b}
+.ew-tv-rowHead+.ew-tv-grid{margin-top:16px}
+.ew-tv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:18px}
+.ew-tv-card{display:block;text-decoration:none;color:#111}
+.ew-tv-thumb{position:relative;display:block;border-radius:4px;overflow:hidden;background:#111;aspect-ratio:16/9}
+.ew-tv-thumb img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .25s,opacity .2s}
+.ew-tv-card:hover .ew-tv-thumb img{transform:scale(1.04);opacity:.85}
+.ew-tv-thumb svg{position:absolute;left:50%;top:50%;width:46px;height:46px;transform:translate(-50%,-50%);
+ fill:#fff;filter:drop-shadow(0 2px 8px rgba(0,0,0,.6));transition:fill .2s}
+.ew-tv-card:hover .ew-tv-thumb svg{fill:#CC0000}
+.ew-tv-title{display:block;margin:10px 0 3px;font-weight:600;font-size:15px;line-height:1.35}
+.ew-tv-card:hover .ew-tv-title{color:#CC0000}
+.ew-tv-date{display:block;font-size:12px;color:#8a8a8a}
+@media(max-width:720px){
+ .ew-tv-heroText h2{font-size:23px}
+ .ew-tv-grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px}
+ .ew-tv-title{font-size:14px}
+}';
+
+	wp_register_style( 'eastwood-tv', false );
+	wp_enqueue_style( 'eastwood-tv' );
+	wp_add_inline_style( 'eastwood-tv', $css );
+}
+add_action( 'wp_enqueue_scripts', 'ew_tv_assets', 20 );
+
+/* ------------------------------------------------------------------
+ * Navigation.
+ *
+ * Five items in the captured navigation — Eastwood TV, Shop,
+ * Sponsorship, Pitch Hire and Academy — were exported as dead links:
+ * href="#" with the click cancelled. They are hard-coded in the
+ * theme's header.php rather than coming from a WordPress menu, so
+ * rather than redeploy the theme (a separate and much slower channel)
+ * we repoint them in the same output-buffer pass that already fixes
+ * the icons, the sponsor logos and the social links.
+ *
+ * When the theme is next rebuilt these belong in header.php properly
+ * and this can go.
+ * ------------------------------------------------------------------ */
+
+function ew_nav_destinations() {
+	return array(
+		'EASTWOOD TV' => home_url( '/eastwood-tv/' ),
+		'Shop'        => 'https://www.clubwebshop.com/a-z/clubs/eastwoodcfc/',
+		'Academy'     => home_url( '/academy/' ),
+		// Sponsorship and Pitch Hire stay dead until their pages exist.
+		// A dead link is honest; a menu item that 404s is a bug.
+	);
+}
+
+function ew_rewrite_nav( $html ) {
+	$map = ew_nav_destinations();
+
+	return preg_replace_callback(
+		'#<a\b([^>]*\bhref="\#"[^>]*)>(.*?)</a>#s',
+		function ( $m ) use ( $map ) {
+			// The label sits in a <span> or <p> inside the anchor.
+			$label = trim( wp_strip_all_tags( $m[2] ) );
+
+			// The crest was exported as a dead link too. Clicking a club
+			// badge should always go home.
+			if ( '' === $label && false !== strpos( $m[2], '/ew-badges/' ) ) {
+				$attrs = preg_replace( '#\shref="\#"#', ' href="' . esc_url( home_url( '/' ) ) . '"', $m[1], 1 );
+				$attrs = preg_replace( '#\sonclick="return false"#', '', $attrs );
+				return '<a' . $attrs . '>' . $m[2] . '</a>';
+			}
+
+			if ( ! isset( $map[ $label ] ) ) {
+				return $m[0];
+			}
+
+			$attrs = $m[1];
+			$attrs = preg_replace( '#\shref="\#"#', ' href="' . esc_url( $map[ $label ] ) . '"', $attrs, 1 );
+			$attrs = preg_replace( '#\sonclick="return false"#', '', $attrs );
+
+			// The shop is somebody else's storefront.
+			if ( 0 !== strpos( $map[ $label ], home_url() ) && false === strpos( $attrs, 'target=' ) ) {
+				$attrs .= ' target="_blank" rel="noopener"';
+			}
+
+			return '<a' . $attrs . '>' . $m[2] . '</a>';
+		},
+		$html
+	);
+}
+
+/* ------------------------------------------------------------------
+ * Editorial pages.
+ *
+ * Pages that are prose rather than a feed get a wrapper class instead
+ * of a shortcode, so the words stay in the editor where somebody at
+ * the club can change them without touching this plugin. The styling
+ * loads whenever that wrapper appears.
+ * ------------------------------------------------------------------ */
+
+function ew_prose_assets() {
+	if ( ! is_singular() ) { return; }
+	$post = get_post();
+	if ( ! $post || false === strpos( (string) $post->post_content, 'ew-prose' ) ) { return; }
+
+	$css = '
+.ew-prose{max-width:820px;margin:0 auto;padding:0 16px 56px;
+ font-family:"Instrument Sans",system-ui,sans-serif;color:#111}
+.ew-prose *{box-sizing:border-box}
+.ew-prose .ew-lede{font-size:19px;line-height:1.55;color:#333;margin:0 0 28px}
+.ew-prose h2{font-family:Anton,"Instrument Sans",sans-serif;font-size:22px;letter-spacing:.04em;
+ text-transform:uppercase;margin:40px 0 14px;padding:0 0 10px;border-bottom:2px solid #e3e3e3}
+.ew-prose p{font-size:16px;line-height:1.65;margin:0 0 16px}
+.ew-prose ul{margin:0 0 20px;padding-left:20px}
+.ew-prose li{font-size:16px;line-height:1.6;margin:0 0 8px}
+.ew-prose .ew-people{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin:0 0 20px}
+.ew-prose .ew-person{background:#fff;border:1px solid #e6e6e6;border-left:3px solid #CC0000;
+ border-radius:4px;padding:14px 16px}
+.ew-prose .ew-person b{display:block;font-size:15px}
+.ew-prose .ew-person span{font-size:12px;color:#8a8a8a}
+.ew-prose .ew-cta{background:#111;color:#fff;border-radius:4px;padding:26px 28px;margin:36px 0 0}
+.ew-prose .ew-cta h3{font-family:Anton,"Instrument Sans",sans-serif;font-size:20px;letter-spacing:.05em;
+ text-transform:uppercase;margin:0 0 8px;color:#fff}
+.ew-prose .ew-cta p{color:#d6d6d6;margin:0 0 4px;font-size:15px}
+.ew-prose .ew-cta a{color:#fff;font-weight:600}
+@media(max-width:720px){
+ .ew-prose .ew-lede{font-size:17px}
+ .ew-prose h2{font-size:19px}
+}';
+
+	wp_register_style( 'eastwood-prose', false );
+	wp_enqueue_style( 'eastwood-prose' );
+	wp_add_inline_style( 'eastwood-prose', $css );
+}
+add_action( 'wp_enqueue_scripts', 'ew_prose_assets', 20 );
+
+/**
+ * The Academy page as first published.
+ *
+ * Every fact here comes from the club's own Academy page on Pitchero
+ * and its contact page. Nothing is invented: where the club has not
+ * published a detail — entry requirements, fees, term dates — the page
+ * asks people to get in touch rather than guessing on the club's
+ * behalf. Once somebody edits this page in wp-admin the plugin stops
+ * touching it.
+ */
+function ew_academy_content() {
+	return <<<'HTML'
+<div class="ew-prose">
+
+<p class="ew-lede">Eastwood runs a full-time football academy at Coronation Park: an elite programme
+for UK and international students that combines intensive football development with a full-time
+education.</p>
+
+<p>Players train and are coached as full-time footballers while studying for a BTEC Level 3
+qualification alongside it. The aim is straightforward — to give young players a serious environment
+to develop in, and a qualification behind them whatever happens next.</p>
+
+<p>The Academy sits inside the senior side of the club, not the junior section. Academy players train
+at Coronation Park, the same ground the first team plays at.</p>
+
+<h2>Coaching and teaching staff</h2>
+
+<div class="ew-people">
+	<div class="ew-person"><b>Lewis McGugan</b><span>Head Coach</span></div>
+	<div class="ew-person"><b>John Cole</b><span>Coach</span></div>
+	<div class="ew-person"><b>Lynden Joyce</b><span>Coach</span></div>
+	<div class="ew-person"><b>Adam Fawcett</b><span>Tutor</span></div>
+</div>
+
+<h2>Trials</h2>
+
+<p>The Academy recruits through open trials at Coronation Park, most recently in July. Trial dates for
+the next intake are announced on the club's channels and here — if you would like to be told when the
+next one is set, call the club and ask to be added to the list.</p>
+
+<h2>Getting in touch</h2>
+
+<p>For entry requirements, fees, term dates and anything else about the programme, speak to the club
+directly. We would rather answer your question properly than publish a page of generalities.</p>
+
+<div class="ew-cta">
+	<h3>Enquire about the Academy</h3>
+	<p>Eastwood Football Club, Coronation Park, Chewton Street, Eastwood, Nottinghamshire NG16 3HB</p>
+	<p><a href="tel:+441773432414">01773 432414</a></p>
+</div>
+
+</div>
+HTML;
+}
