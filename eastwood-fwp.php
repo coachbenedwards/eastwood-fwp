@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.5.0
+ * Version: 2.6.0
  * Author: Eastwood CFC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1461,7 +1461,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  *     table, pasted once at Settings → Eastwood FWP.
  * ------------------------------------------------------------------ */
 
-const EW_FWP_VERSION = '2.5.0';
+const EW_FWP_VERSION = '2.6.0';
 const EW_FWP_REPO    = 'coachbenedwards/eastwood-fwp';
 const EW_FWP_BRANCH  = 'main';
 
@@ -2561,3 +2561,381 @@ function ew_history_assets() {
 	wp_add_inline_style( 'eastwood-history', $css );
 }
 add_action( 'wp_enqueue_scripts', 'ew_history_assets', 22 );
+
+/* ------------------------------------------------------------------
+ * The front page.
+ *
+ * The homepage the clone left behind was a hero and a news grid, and
+ * the hero did not work: I hand-wrote home.php using Nottingham
+ * Forest's Tailwind class names after the stylesheet had been pruned
+ * to only the classes present in the captured HTML, so min-h-[420px],
+ * text-clear and the stacking context the negative z-index relies on
+ * were never in the CSS. The featured image loaded and then painted
+ * behind the section's own opaque background. A club's front page was
+ * a headline over eight hundred pixels of grey.
+ *
+ * Rebuilt here rather than patched, for two reasons. The front page of
+ * a football club should open with the football — when the next game
+ * is, how the last one went, where the club sits — and none of that
+ * was on it. And this ships through the update channel, where a theme
+ * change means the slow base64 route.
+ *
+ * Everything below carries its own CSS. Nothing depends on a utility
+ * class surviving a prune. That is the actual lesson from the bug.
+ * ------------------------------------------------------------------ */
+
+/**
+ * Server-side read of a Football Web Pages endpoint, cached.
+ * The front page should not wait on a network round trip, and it
+ * should render for a crawler that runs no JavaScript.
+ */
+function ew_fwp_fetch( $endpoint, $args = array() ) {
+	$args = array_merge( array( 'team' => EW_TEAM ), $args );
+	$url  = add_query_arg( $args, 'https://api.footballwebpages.co.uk/v2/' . $endpoint . '.json' );
+	$key  = 'ewhome_' . md5( $url );
+
+	$hit = get_transient( $key );
+	if ( false !== $hit ) {
+		return $hit;
+	}
+
+	$res = wp_remote_get( $url, array(
+		'timeout' => 8,
+		'headers' => array( 'FWP-API-Key' => (string) get_option( 'ew_fwp_key', '' ) ),
+	) );
+
+	$data = array();
+	if ( ! is_wp_error( $res ) && 200 === (int) wp_remote_retrieve_response_code( $res ) ) {
+		$decoded = json_decode( wp_remote_retrieve_body( $res ), true );
+		if ( is_array( $decoded ) ) {
+			$data = $decoded;
+		}
+	}
+
+	set_transient( $key, $data, empty( $data ) ? 2 * MINUTE_IN_SECONDS : 10 * MINUTE_IN_SECONDS );
+	return $data;
+}
+
+/**
+ * EW_BADGE_V is a JavaScript global, not a PHP constant, so compute the
+ * same stamp here — newest crest mtime — rather than leaving the first
+ * server-rendered paint uncached-busted and waiting for the script.
+ */
+function ew_home_badge( $id ) {
+	static $v = null;
+	if ( null === $v ) {
+		$newest = 0;
+		foreach ( (array) glob( ew_badge_dir() . '*.png' ) as $file ) {
+			$newest = max( $newest, (int) filemtime( $file ) );
+		}
+		$v = $newest ? '?v=' . $newest : '';
+	}
+	return content_url( '/uploads/ew-badges/' . (int) $id . '.png' ) . $v;
+}
+
+function ew_home_played( $m ) {
+	return ! empty( $m['status']['short'] ) && 'FT' === $m['status']['short'];
+}
+
+/** One side of a fixture: crest, name, and whether it is us. */
+function ew_home_side( $team, $score = null ) {
+	$us = (int) ( $team['id'] ?? 0 ) === (int) EW_TEAM;
+	ob_start();
+	?>
+<span class="ewh-side<?php echo $us ? ' is-us' : ''; ?>">
+	<img src="<?php echo esc_url( ew_home_badge( $team['id'] ?? 0 ) ); ?>" alt=""
+		onerror="this.style.visibility='hidden'">
+	<span class="ewh-name"><?php echo esc_html( $team['name'] ?? '' ); ?></span>
+	<?php if ( null !== $score ) : ?><span class="ewh-score"><?php echo esc_html( $score ); ?></span><?php endif; ?>
+</span>
+	<?php
+	return ob_get_clean();
+}
+
+function ew_home_football() {
+	$fx  = ew_fwp_fetch( 'fixtures-results' );
+	$all = (array) ( $fx['fixtures-results']['matches'] ?? array() );
+	if ( empty( $all ) ) {
+		return '';
+	}
+
+	$played = array_values( array_filter( $all, 'ew_home_played' ) );
+	$todo   = array_values( array_filter( $all, function ( $m ) { return ! ew_home_played( $m ); } ) );
+	usort( $played, function ( $a, $b ) { return strcmp( $b['date'], $a['date'] ); } );
+	usort( $todo,   function ( $a, $b ) { return strcmp( $a['date'], $b['date'] ); } );
+
+	$next = $todo[0]   ?? null;
+	$last = $played[0] ?? null;
+
+	// Our row in the table, for the position panel.
+	$lt  = ew_fwp_fetch( 'league-table' );
+	$row = null;
+	foreach ( (array) ( $lt['league-table']['teams'] ?? array() ) as $t ) {
+		if ( (int) ( $t['id'] ?? 0 ) === (int) EW_TEAM ) { $row = $t; break; }
+	}
+
+	ob_start();
+	?>
+<section class="ewh-football">
+	<div class="ewh-wrap">
+
+		<?php if ( $next ) :
+			$home = (int) ( $next['home-team']['id'] ?? 0 ) === (int) EW_TEAM;
+			$ts   = strtotime( $next['date'] );
+			?>
+		<a class="ewh-panel ewh-next" href="<?php echo esc_url( home_url( '/eastwood-matches/' ) ); ?>">
+			<span class="ewh-kicker">Next match<?php echo $home ? ' · Home' : ' · Away'; ?></span>
+			<div class="ewh-fixture">
+				<?php
+				echo ew_home_side( $next['home-team'] ); // phpcs:ignore
+				echo '<span class="ewh-v">v</span>';
+				echo ew_home_side( $next['away-team'] ); // phpcs:ignore
+				?>
+			</div>
+			<span class="ewh-when">
+				<b><?php echo esc_html( date_i18n( 'D j M', $ts ) ); ?></b>
+				<?php echo esc_html( ! empty( $next['time'] ) ? substr( $next['time'], 0, 5 ) : '' ); ?>
+				<?php if ( ! empty( $next['competition']['name'] ) ) : ?>
+				<i><?php echo esc_html( $next['competition']['name'] ); ?></i>
+				<?php endif; ?>
+			</span>
+		</a>
+		<?php endif; ?>
+
+		<?php if ( $last ) : $ts = strtotime( $last['date'] ); ?>
+		<a class="ewh-panel ewh-last" href="<?php echo esc_url( home_url( '/eastwood-matches/#results' ) ); ?>">
+			<span class="ewh-kicker">Last result</span>
+			<div class="ewh-fixture">
+				<?php
+				echo ew_home_side( $last['home-team'], $last['home-team']['score'] ?? '' ); // phpcs:ignore
+				echo '<span class="ewh-v">&ndash;</span>';
+				echo ew_home_side( $last['away-team'], $last['away-team']['score'] ?? '' ); // phpcs:ignore
+				?>
+			</div>
+			<span class="ewh-when">
+				<b><?php echo esc_html( date_i18n( 'D j M', $ts ) ); ?></b>
+				<?php if ( ! empty( $last['attendance'] ) ) : ?>
+				Att <?php echo esc_html( number_format_i18n( $last['attendance'] ) ); ?>
+				<?php endif; ?>
+			</span>
+		</a>
+		<?php endif; ?>
+
+		<?php if ( $row ) : $a = (array) ( $row['all-matches'] ?? array() ); ?>
+		<a class="ewh-panel ewh-pos" href="<?php echo esc_url( home_url( '/eastwood-matches/#table' ) ); ?>">
+			<span class="ewh-kicker">League</span>
+			<span class="ewh-posn"><?php echo esc_html( $row['position'] ?? '' ); ?><sup><?php
+				echo esc_html( ew_home_ordinal( (int) ( $row['position'] ?? 0 ) ) ); ?></sup></span>
+			<span class="ewh-when">
+				<b><?php echo esc_html( $row['total-points'] ?? '' ); ?> pts</b>
+				<?php echo esc_html( $a['played'] ?? '' ); ?> played
+				<i>United Counties Premier North</i>
+			</span>
+		</a>
+		<?php endif; ?>
+
+	</div>
+</section>
+	<?php
+	return ob_get_clean();
+}
+
+function ew_home_ordinal( $n ) {
+	if ( $n % 100 >= 11 && $n % 100 <= 13 ) { return 'th'; }
+	switch ( $n % 10 ) {
+		case 1: return 'st';
+		case 2: return 'nd';
+		case 3: return 'rd';
+	}
+	return 'th';
+}
+
+/** The lead news story, with an image treatment that actually paints. */
+function ew_home_lead() {
+	$posts = get_posts( array( 'numberposts' => 4 ) );
+	if ( empty( $posts ) ) {
+		return '';
+	}
+	$lead = array_shift( $posts );
+
+	ob_start();
+	?>
+<section class="ewh-news">
+	<div class="ewh-wrap">
+		<h2 class="ewh-head">Latest news <a href="<?php echo esc_url( home_url( '/eastwood-news/' ) ); ?>">All news</a></h2>
+		<div class="ewh-newsGrid">
+			<a class="ewh-lead" href="<?php echo esc_url( get_permalink( $lead ) ); ?>">
+				<?php if ( has_post_thumbnail( $lead ) ) : ?>
+				<img src="<?php echo esc_url( get_the_post_thumbnail_url( $lead, 'full' ) ); ?>" alt="">
+				<?php endif; ?>
+				<span class="ewh-leadText">
+					<b><?php echo esc_html( get_the_title( $lead ) ); ?></b>
+					<i><?php
+						$c = get_the_category( $lead->ID );
+						echo esc_html( $c ? $c[0]->name : '' );
+						echo ' · ' . esc_html( human_time_diff( get_the_time( 'U', $lead ), current_time( 'timestamp' ) ) ) . ' ago';
+					?></i>
+				</span>
+			</a>
+			<div class="ewh-rest">
+				<?php foreach ( $posts as $p ) : ?>
+				<a class="ewh-item" href="<?php echo esc_url( get_permalink( $p ) ); ?>">
+					<?php if ( has_post_thumbnail( $p ) ) : ?>
+					<img src="<?php echo esc_url( get_the_post_thumbnail_url( $p, 'medium' ) ); ?>" alt="">
+					<?php endif; ?>
+					<span>
+						<b><?php echo esc_html( get_the_title( $p ) ); ?></b>
+						<i><?php echo esc_html( human_time_diff( get_the_time( 'U', $p ), current_time( 'timestamp' ) ) ); ?> ago</i>
+					</span>
+				</a>
+				<?php endforeach; ?>
+			</div>
+		</div>
+	</div>
+</section>
+	<?php
+	return ob_get_clean();
+}
+
+/** The newest documentary episode, or failing that the newest upload. */
+function ew_home_video() {
+	$videos = function_exists( 'ew_tv_feed' ) ? ew_tv_feed() : array();
+	if ( empty( $videos ) ) {
+		return '';
+	}
+	$pick = $videos[0];
+	foreach ( $videos as $v ) {
+		if ( 'documentary' === $v['series'] ) { $pick = $v; break; }
+	}
+
+	ob_start();
+	?>
+<section class="ewh-video">
+	<div class="ewh-wrap">
+		<h2 class="ewh-head">Eastwood TV <a href="<?php echo esc_url( home_url( '/eastwood-tv/' ) ); ?>">All video</a></h2>
+		<a class="ewh-videoCard" href="https://www.youtube.com/watch?v=<?php echo esc_attr( $pick['id'] ); ?>"
+			target="_blank" rel="noopener">
+			<span class="ewh-videoThumb">
+				<img src="https://i.ytimg.com/vi/<?php echo esc_attr( $pick['id'] ); ?>/maxresdefault.jpg"
+					alt="" loading="lazy"
+					onerror="this.src='https://i.ytimg.com/vi/<?php echo esc_attr( $pick['id'] ); ?>/hqdefault.jpg'">
+				<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+			</span>
+			<span class="ewh-videoText">
+				<b><?php echo esc_html( $pick['title'] ); ?></b>
+				<i><?php echo esc_html( date_i18n( 'j F Y', $pick['published'] ) ); ?></i>
+			</span>
+		</a>
+	</div>
+</section>
+	<?php
+	return ob_get_clean();
+}
+
+function ew_home_css() {
+	return '
+.ewh-wrap{max-width:1180px;margin:0 auto;padding:0 16px}
+.ewh-football,.ewh-news,.ewh-video{font-family:"Instrument Sans",system-ui,sans-serif;color:#111}
+.ewh-football *,.ewh-news *,.ewh-video *{box-sizing:border-box}
+.ewh-football{background:#111;padding:26px 0 30px}
+.ewh-football .ewh-wrap{display:grid;grid-template-columns:1.35fr 1.35fr 1fr;gap:10px}
+.ewh-panel{display:flex;flex-direction:column;gap:12px;background:#17171a;border-radius:5px;
+ padding:18px 20px;text-decoration:none;color:#fff;border-top:3px solid #CC0000;
+ transition:background .15s}
+.ewh-panel:hover{background:#1f1f24}
+.ewh-pos{border-top-color:#3a3a42}
+.ewh-kicker{font-family:Anton,"Instrument Sans",sans-serif;font-size:11px;letter-spacing:.12em;
+ text-transform:uppercase;color:#CC0000}
+.ewh-pos .ewh-kicker{color:#9a9aa3}
+.ewh-fixture{display:flex;flex-direction:column;gap:8px;flex:1;justify-content:center}
+.ewh-side{display:flex;align-items:center;gap:10px}
+.ewh-side img{width:26px;height:26px;object-fit:contain;flex:none}
+.ewh-name{font-size:15px;font-weight:600;color:#ededf0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ewh-side.is-us .ewh-name{color:#fff}
+.ewh-score{margin-left:auto;font-family:Anton,sans-serif;font-size:20px;color:#fff}
+.ewh-v{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#5d5d66;padding-left:36px}
+.ewh-when{font-size:12px;color:#9a9aa3;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.ewh-when b{font-family:Anton,sans-serif;font-size:14px;letter-spacing:.03em;color:#fff}
+.ewh-when i{font-style:normal;color:#5d5d66;width:100%}
+.ewh-posn{font-family:Anton,"Instrument Sans",sans-serif;font-size:56px;line-height:.9;color:#fff;flex:1;
+ display:flex;align-items:center}
+.ewh-posn sup{font-size:20px;vertical-align:super;line-height:1}
+.ewh-news,.ewh-video{padding:40px 0 0}
+.ewh-video{padding-bottom:56px}
+.ewh-head{font-family:Anton,"Instrument Sans",sans-serif;font-size:22px;letter-spacing:.05em;
+ text-transform:uppercase;margin:0 0 18px;display:flex;align-items:baseline;gap:16px;color:#111}
+.ewh-head a{font-family:"Instrument Sans",sans-serif;font-size:13px;letter-spacing:0;text-transform:none;
+ color:#CC0000;text-decoration:none;margin-left:auto;font-weight:600}
+.ewh-head a:hover{text-decoration:underline}
+.ewh-newsGrid{display:grid;grid-template-columns:1.6fr 1fr;gap:16px}
+.ewh-lead{position:relative;display:block;min-height:400px;border-radius:5px;overflow:hidden;
+ background:#111;text-decoration:none}
+.ewh-lead img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+ transition:transform .4s}
+.ewh-lead:hover img{transform:scale(1.03)}
+.ewh-lead::after{content:"";position:absolute;inset:0;
+ background:linear-gradient(to top,rgba(0,0,0,.82) 0%,rgba(0,0,0,.35) 45%,rgba(0,0,0,0) 75%)}
+.ewh-leadText{position:absolute;left:0;right:0;bottom:0;z-index:2;display:block;padding:24px}
+.ewh-leadText b{display:block;font-family:Anton,"Instrument Sans",sans-serif;font-size:30px;
+ line-height:1.08;color:#fff;margin:0 0 7px}
+.ewh-leadText i{font-style:normal;font-size:12px;color:#d6d6d6}
+.ewh-rest{display:flex;flex-direction:column;gap:10px}
+.ewh-item{display:flex;gap:14px;align-items:center;background:#fff;border:1px solid #e6e6e6;
+ border-radius:5px;overflow:hidden;text-decoration:none;color:#111;flex:1;min-height:0;
+ transition:border-color .15s,box-shadow .15s}
+.ewh-item:hover{border-color:#CC0000;box-shadow:0 2px 10px rgba(0,0,0,.07)}
+.ewh-item img{width:118px;height:100%;min-height:92px;object-fit:cover;flex:none}
+.ewh-item span{padding:12px 14px 12px 0;min-width:0}
+.ewh-item b{display:block;font-size:15px;line-height:1.3;margin:0 0 4px}
+.ewh-item i{font-style:normal;font-size:12px;color:#8a8a8a}
+.ewh-videoCard{display:grid;grid-template-columns:1.6fr 1fr;gap:20px;align-items:center;
+ text-decoration:none;color:#111}
+.ewh-videoThumb{position:relative;display:block;border-radius:5px;overflow:hidden;background:#111;
+ aspect-ratio:16/9}
+.ewh-videoThumb img{width:100%;height:100%;object-fit:cover;display:block;transition:opacity .2s}
+.ewh-videoCard:hover .ewh-videoThumb img{opacity:.85}
+.ewh-videoThumb svg{position:absolute;left:50%;top:50%;width:62px;height:62px;
+ transform:translate(-50%,-50%);fill:#fff;filter:drop-shadow(0 2px 10px rgba(0,0,0,.6))}
+.ewh-videoCard:hover .ewh-videoThumb svg{fill:#CC0000}
+.ewh-videoText b{display:block;font-family:Anton,"Instrument Sans",sans-serif;font-size:26px;
+ line-height:1.1;margin:0 0 8px}
+.ewh-videoText i{font-style:normal;font-size:13px;color:#8a8a8a}
+@media(max-width:1000px){
+ .ewh-football .ewh-wrap{grid-template-columns:1fr 1fr}
+ .ewh-pos{grid-column:1/-1;flex-direction:row;align-items:center;gap:18px}
+ .ewh-posn{flex:none;font-size:40px}
+ .ewh-newsGrid,.ewh-videoCard{grid-template-columns:1fr}
+ .ewh-lead{min-height:300px}
+}
+@media(max-width:640px){
+ .ewh-football .ewh-wrap{grid-template-columns:1fr}
+ .ewh-leadText b{font-size:23px}
+ .ewh-videoText b{font-size:20px}
+ .ewh-item img{width:96px}
+}';
+}
+
+/**
+ * Take over the front page.
+ *
+ * Rendered here rather than from a theme template so it ships with the
+ * plugin through the update channel. Priority 5 so the output-buffer
+ * rewrite registered at priority 1 is already in place and still runs
+ * over what we print.
+ */
+add_action( 'template_redirect', function () {
+	if ( is_admin() || ! is_front_page() || is_feed() || is_embed() ) {
+		return;
+	}
+
+	add_action( 'wp_head', function () {
+		echo '<style id="ew-home">' . ew_home_css() . '</style>';
+	}, 20 );
+
+	get_header();
+	echo ew_home_football(); // phpcs:ignore WordPress.Security.EscapeOutput
+	echo ew_home_lead();     // phpcs:ignore WordPress.Security.EscapeOutput
+	echo ew_home_video();    // phpcs:ignore WordPress.Security.EscapeOutput
+	get_footer();
+	exit;
+}, 5 );
