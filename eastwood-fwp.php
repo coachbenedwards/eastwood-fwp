@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.3.0
+ * Version: 2.3.1
  * Author: Eastwood CFC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1461,7 +1461,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  *     table, pasted once at Settings → Eastwood FWP.
  * ------------------------------------------------------------------ */
 
-const EW_FWP_VERSION = '2.3.0';
+const EW_FWP_VERSION = '2.3.1';
 const EW_FWP_REPO    = 'coachbenedwards/eastwood-fwp';
 const EW_FWP_BRANCH  = 'main';
 
@@ -1681,7 +1681,7 @@ add_filter( 'pre_get_document_title', function ( $title ) {
  * there. The moment somebody edits a page by hand, we leave it alone.
  * ------------------------------------------------------------------ */
 
-const EW_PAGES_V = '2';
+const EW_PAGES_V = '3';
 
 function ew_owned_pages() {
 	return array(
@@ -2072,16 +2072,11 @@ function ew_academy_content() {
 	return <<<'HTML'
 <div class="ew-prose">
 
-<p class="ew-lede">Eastwood runs a full-time football academy at Coronation Park: an elite programme
-for UK and international students that combines intensive football development with a full-time
-education.</p>
+<p class="ew-lede">Eastwood runs a full-time football academy at Coronation Park: an elite programme for UK and international students that combines intensive football development with a full-time education.</p>
 
-<p>Players train and are coached as full-time footballers while studying for a BTEC Level 3
-qualification alongside it. The aim is straightforward — to give young players a serious environment
-to develop in, and a qualification behind them whatever happens next.</p>
+<p>Players train and are coached as full-time footballers while studying for a BTEC Level 3 qualification alongside it. The aim is straightforward — to give young players a serious environment to develop in, and a qualification behind them whatever happens next.</p>
 
-<p>The Academy sits inside the senior side of the club, not the junior section. Academy players train
-at Coronation Park, the same ground the first team plays at.</p>
+<p>The Academy sits inside the senior side of the club, not the junior section. Academy players train at Coronation Park, the same ground the first team plays at.</p>
 
 <h2>Coaching and teaching staff</h2>
 
@@ -2094,14 +2089,11 @@ at Coronation Park, the same ground the first team plays at.</p>
 
 <h2>Trials</h2>
 
-<p>The Academy recruits through open trials at Coronation Park, most recently in July. Trial dates for
-the next intake are announced on the club's channels and here — if you would like to be told when the
-next one is set, call the club and ask to be added to the list.</p>
+<p>The Academy recruits through open trials at Coronation Park, most recently in July. Trial dates for the next intake are announced on the club's channels and here — if you would like to be told when the next one is set, call the club and ask to be added to the list.</p>
 
 <h2>Getting in touch</h2>
 
-<p>For entry requirements, fees, term dates and anything else about the programme, speak to the club
-directly. We would rather answer your question properly than publish a page of generalities.</p>
+<p>For entry requirements, fees, term dates and anything else about the programme, speak to the club directly. We would rather answer your question properly than publish a page of generalities.</p>
 
 <div class="ew-cta">
 	<h3>Enquire about the Academy</h3>
