@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.7.0
+ * Version: 2.7.1
  * Author: Eastwood CFC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1463,7 +1463,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  *     table, pasted once at Settings → Eastwood FWP.
  * ------------------------------------------------------------------ */
 
-const EW_FWP_VERSION = '2.7.0';
+const EW_FWP_VERSION = '2.7.1';
 const EW_FWP_REPO    = 'coachbenedwards/eastwood-fwp';
 const EW_FWP_BRANCH  = 'main';
 
@@ -1704,7 +1704,7 @@ add_filter( 'pre_get_document_title', function ( $title ) {
  * there. The moment somebody edits a page by hand, we leave it alone.
  * ------------------------------------------------------------------ */
 
-const EW_PAGES_V = '6';
+const EW_PAGES_V = '7';
 
 function ew_owned_pages() {
 	return array(
@@ -1773,6 +1773,20 @@ function ew_install_pages() {
 
 	foreach ( $owned as $slug => $spec ) {
 		$existing = get_page_by_path( $slug );
+
+		// WordPress creates a draft Privacy Policy page on install. It matches
+		// by slug, so the check below would skip creation and leave the URL
+		// 404ing. An unpublished placeholder is ours to take over.
+		if ( $existing && in_array( $existing->post_status, array( 'draft', 'auto-draft', 'pending' ), true ) ) {
+			wp_update_post( array(
+				'ID'           => $existing->ID,
+				'post_status'  => 'publish',
+				'post_title'   => $spec['title'],
+				'post_content' => $spec['content'],
+			) );
+			$state[ $slug ] = array( 'id' => $existing->ID, 'hash' => md5( $spec['content'] ) );
+			continue;
+		}
 
 		if ( ! $existing ) {
 			$id = wp_insert_post( array(
@@ -2853,6 +2867,12 @@ function ew_home_css() {
  * over what we print.
  */
 add_action( 'template_redirect', function () {
+	// A /match/<id>/ request sets no post type, so WordPress calls it the home
+	// query and is_front_page() is true. Without this guard the front page
+	// renders and exits before the match centre ever runs.
+	if ( get_query_var( 'ew_match' ) ) {
+		return;
+	}
 	if ( is_admin() || ! is_front_page() || is_feed() || is_embed() ) {
 		return;
 	}
@@ -3162,8 +3182,19 @@ add_action( 'template_redirect', function () {
 
 	$m = ew_match_data( $id );
 	if ( empty( $m ) ) {
+		// Falling through here lands on the home query, which renders the front
+		// page with a 200. Make it a real 404.
+		global $wp_query;
+		$wp_query->set_404();
 		status_header( 404 );
-		return; // Let the theme's 404 handle an id the feed does not know.
+		nocache_headers();
+		get_header();
+		echo '<div class="ewm"><div class="ewm-wrap"><p class="ewm-back" style="margin:60px 0">'
+			. 'We have no record of that match. '
+			. '<a href="' . esc_url( home_url( '/eastwood-matches/' ) ) . '">All fixtures and results</a>'
+			. '</p></div></div>';
+		get_footer();
+		exit;
 	}
 
 	$title = trim( ( $m['home-team']['name'] ?? '' ) . ' v ' . ( $m['away-team']['name'] ?? '' ) );
@@ -3215,8 +3246,7 @@ function ew_contact_content() {
 	<div class="ew-person"><b>Ben Edwards</b><span>Chair and Club Owner</span></div>
 	<div class="ew-person"><b>Stephen Kirkham</b><span>Managing Director</span></div>
 	<div class="ew-person"><b>Zander Shayler</b><span>Secretary, Fixture Secretary and Director of Operations</span></div>
-	<div class="ew-person"><b>Sarah Robertson-Staples</b><span>Treasurer</span></div>
-	<div class="ew-person"><b>Graham Laverick</b><span>Safeguarding Officer</span></div>
+	<div class="ew-person"><b>Sarah Robertson-Staples</b><span>Treasurer and Safeguarding Officer</span></div>
 </div>
 
 <p>Everything reaches us at <a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> — hospitality and
@@ -3277,8 +3307,8 @@ than any result, and everyone at the club shares that responsibility.</p>
 
 <h2>Raising a concern with the club</h2>
 
-<p>Our Safeguarding Officer is <b>Graham Laverick</b>. Any concern about a child's welfare, about the behaviour
-of an adult at the club, or about anything that does not feel right, should go to him.</p>
+<p>Our Safeguarding Officer is <b>Sarah Robertson-Staples</b>. Any concern about a child's welfare, about the
+behaviour of an adult at the club, or about anything that does not feel right, should go to her.</p>
 
 <div class="ew-cta">
 	<h3>Contact the Safeguarding Officer</h3>
