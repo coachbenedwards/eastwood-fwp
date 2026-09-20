@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.3.2
+ * Version: 2.4.0
  * Author: Eastwood CFC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1461,7 +1461,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  *     table, pasted once at Settings → Eastwood FWP.
  * ------------------------------------------------------------------ */
 
-const EW_FWP_VERSION = '2.3.2';
+const EW_FWP_VERSION = '2.4.0';
 const EW_FWP_REPO    = 'coachbenedwards/eastwood-fwp';
 const EW_FWP_BRANCH  = 'main';
 
@@ -1702,7 +1702,7 @@ add_filter( 'pre_get_document_title', function ( $title ) {
  * there. The moment somebody edits a page by hand, we leave it alone.
  * ------------------------------------------------------------------ */
 
-const EW_PAGES_V = '3';
+const EW_PAGES_V = '4';
 
 function ew_owned_pages() {
 	return array(
@@ -1721,6 +1721,22 @@ function ew_owned_pages() {
 		'academy' => array(
 			'title'   => 'Academy',
 			'content' => ew_academy_content(),
+		),
+		'eastwood-tickets' => array(
+			'title'   => 'Matchday',
+			'content' => ew_matchday_content(),
+		),
+		'eastwood-hospitality' => array(
+			'title'   => 'The Venue',
+			'content' => ew_venue_content(),
+		),
+		'pitch-hire' => array(
+			'title'   => 'Pitch Hire',
+			'content' => ew_pitchhire_content(),
+		),
+		'sponsorship' => array(
+			'title'   => 'Sponsorship',
+			'content' => ew_sponsorship_content(),
 		),
 	);
 }
@@ -1991,10 +2007,12 @@ add_action( 'wp_enqueue_scripts', 'ew_tv_assets', 20 );
 function ew_nav_destinations() {
 	return array(
 		'EASTWOOD TV' => home_url( '/eastwood-tv/' ),
-		'Shop'        => 'https://www.clubwebshop.com/a-z/clubs/eastwoodcfc/',
+		// The club's real storefront. The clubwebshop.com link in the old
+		// footer only lands on that supplier's generic home page.
+		'Shop'        => 'https://fanaticsteamwearnottingham.co.uk/collections/eastwood-cfc',
+		'Sponsorship' => home_url( '/sponsorship/' ),
+		'Pitch Hire'  => home_url( '/pitch-hire/' ),
 		'Academy'     => home_url( '/academy/' ),
-		// Sponsorship and Pitch Hire stay dead until their pages exist.
-		// A dead link is honest; a menu item that 404s is a bug.
 	);
 }
 
@@ -2125,3 +2143,310 @@ function ew_academy_content() {
 </div>
 HTML;
 }
+
+/* ------------------------------------------------------------------
+ * Commercial and supporter pages.
+ *
+ * Matchday, The Venue, Pitch Hire and Sponsorship. The words come from
+ * the club's own Pitchero pages, which turned out to carry nearly all
+ * of this already — prices, the accessible-supporters policy, the
+ * events list, the 3G hire terms.
+ *
+ * Three things were corrected on the way across, deliberately:
+ *
+ *  - The ticket prices were published under a 2024/25 heading. They
+ *    are carried over as current on Ben's instruction, to be confirmed
+ *    with Steve and Zander at the next team meeting.
+ *  - The 3G hire rules contained "Long Eaton United will eject any
+ *    persons breaching these rules" — another club's terms, pasted in
+ *    and never corrected. It says Eastwood here.
+ *  - The full 3G rules run to nine thousand characters of prohibitions.
+ *    The page carries what a hirer needs to know and offers the rest on
+ *    request, rather than opening with a wall of NO.
+ * ------------------------------------------------------------------ */
+
+/**
+ * A live read on the gate, for the sponsorship page. Real numbers beat
+ * adjectives when you are asking somebody for money.
+ */
+function ew_gate_shortcode() {
+	$res = wp_remote_get(
+		'https://api.footballwebpages.co.uk/v2/attendances.json?team=' . EW_TEAM,
+		array( 'timeout' => 8, 'headers' => array( 'FWP-API-Key' => (string) get_option( 'ew_fwp_key', '' ) ) )
+	);
+
+	$gates = array();
+	if ( ! is_wp_error( $res ) && 200 === (int) wp_remote_retrieve_response_code( $res ) ) {
+		$data = json_decode( wp_remote_retrieve_body( $res ), true );
+		foreach ( (array) ( $data['attendances']['matches'] ?? array() ) as $m ) {
+			// Home games only: an away gate is somebody else's audience.
+			if ( (int) ( $m['home-team']['id'] ?? 0 ) === (int) EW_TEAM && ! empty( $m['attendance'] ) ) {
+				$gates[] = (int) $m['attendance'];
+			}
+		}
+	}
+
+	if ( count( $gates ) < 2 ) {
+		return '';
+	}
+
+	$avg  = (int) round( array_sum( $gates ) / count( $gates ) );
+	$best = max( $gates );
+
+	ob_start();
+	?>
+<div class="ew-gate">
+	<div class="ew-gate-stat"><b><?php echo esc_html( number_format_i18n( $avg ) ); ?></b><span>average home gate</span></div>
+	<div class="ew-gate-stat"><b><?php echo esc_html( number_format_i18n( $best ) ); ?></b><span>best this season</span></div>
+	<div class="ew-gate-stat"><b><?php echo esc_html( count( $gates ) ); ?></b><span>home games played</span></div>
+</div>
+	<?php
+	return trim( ob_get_clean() );
+}
+add_shortcode( 'eastwood_gate', 'ew_gate_shortcode' );
+
+/**
+ * The current sponsor wall, from the roster the plugin already keeps.
+ */
+function ew_sponsors_shortcode() {
+	$roster = ew_sponsor_roster();
+	if ( empty( $roster ) ) {
+		return '';
+	}
+
+	ob_start();
+	?>
+<div class="ew-wall">
+	<?php foreach ( $roster as $slug => $s ) :
+		list( $name, $tier, $link ) = $s;
+		$tag = $link ? 'a' : 'div';
+		?>
+	<<?php echo $tag; ?> class="ew-wall-item"<?php if ( $link ) : ?> href="<?php echo esc_url( $link ); ?>"
+		target="_blank" rel="noopener"<?php endif; ?>>
+		<img src="<?php echo esc_url( ew_sponsor_url( $slug ) ); ?>" alt="<?php echo esc_attr( $name ); ?>" loading="lazy">
+		<span class="ew-wall-name"><?php echo esc_html( $name ); ?></span>
+		<span class="ew-wall-tier"><?php echo esc_html( $tier ); ?></span>
+	</<?php echo $tag; ?>>
+	<?php endforeach; ?>
+</div>
+	<?php
+	return trim( ob_get_clean() );
+}
+add_shortcode( 'eastwood_sponsors', 'ew_sponsors_shortcode' );
+
+function ew_matchday_content() {
+	return <<<'HTML'
+<div class="ew-prose">
+
+<p class="ew-lede">Eastwood play at Coronation Park on Chewton Street. Pay on the gate, park on site for nothing, and under-16s get in free with an adult.</p>
+
+<h2>First team, league matches</h2>
+
+<div class="ew-prices">
+	<div class="ew-price"><b>£7.00</b><span>Adults</span></div>
+	<div class="ew-price"><b>£5.00</b><span>Concessions, 65 and over</span></div>
+	<div class="ew-price"><b>£5.00</b><span>Students, with valid ID</span></div>
+	<div class="ew-price"><b>Free</b><span>Under 16s, with an adult</span></div>
+</div>
+
+<p>Parking on site is free unless we say otherwise for a particular fixture.</p>
+
+<h2>U21 matches</h2>
+
+<div class="ew-prices">
+	<div class="ew-price"><b>£3.00</b><span>Adults</span></div>
+	<div class="ew-price"><b>£2.00</b><span>Concessions</span></div>
+	<div class="ew-price"><b>Free</b><span>Under 14s</span></div>
+</div>
+
+<p>U21 matches are free to season ticket holders.</p>
+
+<h2>Season tickets</h2>
+
+<p>A season ticket covers every first team home league game. It can be paid in full or across three monthly instalments.</p>
+
+<div class="ew-prices">
+	<div class="ew-price"><b>£105</b><span>Adults, 16 to 65</span></div>
+	<div class="ew-price"><b>£75</b><span>Concessions, 65 and over</span></div>
+	<div class="ew-price"><b>£75</b><span>Students, with valid ID</span></div>
+	<div class="ew-price"><b>Free</b><span>Under 16s, with an adult</span></div>
+</div>
+
+<p>Under-3s come in free with a paying adult and are not issued a season ticket. Season tickets cover league games only, run from August to the end of the following June, and are not transferable. Ask us for a copy of the full terms.</p>
+
+<h2>Disabled supporters</h2>
+
+<p>The clubhouse is reached by a ramp at the entrance to the main building. There are four spaces at pitch level in front of the Main Stand for wheelchair users, for home and away supporters alike, with helpers able to sit alongside or stand at the fence. Supporters with specific access needs who are able to walk can sit pitch side in the first few rows of the Main Stand. There are two accessible toilets at the ground.</p>
+
+<p>Please ring ahead on 01773 432414 if you need a particular space reserved, or an accessible parking space — those are first come, first served and must be booked in advance. There are always staff about who can help.</p>
+
+<p>Accessible tickets, by the match or by the season, are available to supporters receiving any of the following: the middle or higher rate of Disability Living Allowance, Attendance Allowance, Severe Disablement Allowance, a War Disabled Pension, a Certificate of Visual Impairment, or enhanced Personal Independence Payment. Bring the letter or certificate to the Pitchside Bar &amp; Lounge — evidence is needed once a year.</p>
+
+<p>Anyone qualifying gets the reduced rate and a free enabler ticket. The enabler is responsible for the supporter they accompany and should stay with them throughout; an enabler arriving without them needs to upgrade at the bar before kick-off.</p>
+
+<p>If something about your visit could have been better, tell us. We would rather hear it.</p>
+
+<h2>Match day hospitality</h2>
+
+<p>Hospitality is available for every home game in the Pitchside Bar &amp; Lounge. It usually includes admission, a reserved parking space, a team sheet, and food before the game and at half time.</p>
+
+<div class="ew-cta">
+	<h3>Book hospitality or ask about tickets</h3>
+	<p><a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
+</div>
+
+</div>
+HTML;
+}
+
+function ew_venue_content() {
+	return <<<'HTML'
+<div class="ew-prose">
+
+<p class="ew-lede">TheVenue@Eastwood is the club's function room at Coronation Park — a licensed bar, a dance floor, a large dining area and a car park, available for hire whatever the occasion.</p>
+
+<h2>What's here</h2>
+
+<ul>
+	<li>Dance floor</li>
+	<li>Licensed bar</li>
+	<li>Large dining area</li>
+	<li>Large car park</li>
+	<li>Flexible buffets — anything from chip cobs to a three-course meal, built around what you want</li>
+	<li>Friendly service</li>
+</ul>
+
+<h2>What people hold here</h2>
+
+<p>Birthdays, christenings, engagement parties, baby showers, wedding receptions, wakes and funerals, retirement parties, charity events, live entertainment, school reunions, football parties, exercise classes, meetings and conferences.</p>
+
+<h2>The Pitchside Bar</h2>
+
+<p>Separately from the main room, the Pitchside Bar suits smaller bookings — lectures, meetings, conferences, and gatherings that don't need a dance floor.</p>
+
+<h2>Also available</h2>
+
+<p>The floodlit all-weather 3G pitch can be hired alongside the Pitchside Bar and changing rooms, which is what makes this work for a football party or a company tournament as easily as a birthday.</p>
+
+<div class="ew-cta">
+	<h3>Talk to us about your event</h3>
+	<p>Tell us what you have in mind and we will work out whether we can do it properly.</p>
+	<p><a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
+</div>
+
+</div>
+HTML;
+}
+
+function ew_pitchhire_content() {
+	return <<<'HTML'
+<div class="ew-prose">
+
+<p class="ew-lede">A floodlit, all-weather 3G pitch at Coronation Park, available all year round — and there is usually plenty of space in the diary.</p>
+
+<p>The 3G represents a serious investment by Eastwood CFC, the Premier League and the FA. Built properly and looked after, the surface has a life of at least ten years, which is why the rules below matter.</p>
+
+<h2>Booking</h2>
+
+<p>Call 01773 432414 or email info@eastwoodcfc.co.uk and tell us what you need and when. Changing rooms and the Pitchside Bar can be hired alongside the pitch.</p>
+
+<p>Bookings are honoured unless a rearranged Eastwood home game lands on a slot you have already booked. If that happens you get a credit and first refusal on a new date.</p>
+
+<h2>Using the pitch</h2>
+
+<ul>
+	<li><b>Footwear:</b> moulded rubber studs only, coaches included. No flat soles, no metal studs, blades or spikes, and no astroboots. Boots must be clean — there are scrubbers in the spectator area and outside the entrance gate. Nobody goes on the pitch in the wrong footwear.</li>
+	<li><b>Drinks:</b> bottled water only on the playing surface. No soft or fruit-based drinks.</li>
+	<li><b>No food</b> on the surface, and please keep food and drink out of the spectator area.</li>
+	<li><b>No chewing gum.</b></li>
+	<li><b>No smoking or vaping</b> anywhere inside the green perimeter fencing. That is the law, not a house rule.</li>
+	<li><b>No spectators</b> on the playing surface.</li>
+	<li><b>No vehicles</b> on the 3G under any circumstances.</li>
+	<li><b>Goals:</b> ask a staff member for an induction first. All goals are wheeled and must be raised onto all their wheels and moved by four people. Put them back where you found them.</li>
+	<li><b>Finish on time</b> and leave the pitch clear of litter.</li>
+</ul>
+
+<p>Floodlights are automatic and switch off at closing time. The surface is rated for football and general sport, fitness and recreation — if you are unsure whether what you have planned is covered, ask us before the booking starts.</p>
+
+<h2>Safety</h2>
+
+<p>We do not provide first aid cover for hirers, so you need your own arrangements and a way to call the emergency services. There is a first aid box behind the bar and a defibrillator on the wall behind the dugouts. Any accident anywhere on the site must be reported to Eastwood CFC. Hirers play at their own risk.</p>
+
+<p>Alcohol is permitted on site but not on or inside the 3G pitches without written permission for an event. Drugs are not permitted anywhere, and anyone breaching either will be ejected — drug incidents are reported to the police. Dogs are not allowed on the site, other than assistance dogs, which are not permitted on the playing surface.</p>
+
+<p>These sit alongside our general terms and conditions of hire, which we will send you with your booking. Whoever makes the booking is responsible for everyone who comes with them.</p>
+
+<div class="ew-cta">
+	<h3>Check availability</h3>
+	<p><a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
+</div>
+
+</div>
+HTML;
+}
+
+function ew_sponsorship_content() {
+	return <<<'HTML'
+<div class="ew-prose">
+
+<p class="ew-lede">Eastwood is a community club with a real crowd, a growing media output and a list of local businesses already behind it. If you want your name in front of that, talk to us.</p>
+
+[eastwood_gate]
+
+<h2>What sponsors get</h2>
+
+<p>It depends what you want, which is why there is no price list here. Shirts, stands, matchballs, the perimeter, the 3G, the documentary — the club has a lot of surfaces and we would rather build something that fits your business than sell you a tier.</p>
+
+<p>What is worth knowing before you call: every home game is filmed, every goal ends up on the club's YouTube channel, and the weekly documentary series follows the first team through the season. That audience travels a long way past the people who come through the turnstile.</p>
+
+<h2>Match day hospitality</h2>
+
+<p>The simplest way in. Hospitality runs for every home game in the Pitchside Bar &amp; Lounge, and typically includes admission, a reserved parking space, a team sheet, and food before the game and at half time. It works as well for taking clients as it does for a day out.</p>
+
+<h2>Who already backs us</h2>
+
+[eastwood_sponsors]
+
+<div class="ew-cta">
+	<h3>Start a conversation</h3>
+	<p>Tell us about your business and what you are trying to get out of it. We will come back with something specific.</p>
+	<p><a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
+</div>
+
+</div>
+HTML;
+}
+
+function ew_commercial_assets() {
+	if ( ! is_singular() ) { return; }
+	$post = get_post();
+	if ( ! $post ) { return; }
+	$c = (string) $post->post_content;
+	if ( false === strpos( $c, 'ew-prose' ) ) { return; }
+
+	$css = '
+.ew-prose .ew-prices{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin:0 0 20px}
+.ew-prose .ew-price{background:#fff;border:1px solid #e6e6e6;border-top:3px solid #CC0000;border-radius:4px;padding:16px 18px}
+.ew-prose .ew-price b{display:block;font-family:Anton,"Instrument Sans",sans-serif;font-size:30px;line-height:1;color:#111}
+.ew-prose .ew-price span{display:block;margin-top:6px;font-size:13px;color:#6b6b6b;line-height:1.35}
+.ew-gate{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:0 0 28px}
+.ew-gate-stat{background:#111;border-radius:4px;padding:18px 20px}
+.ew-gate-stat b{display:block;font-family:Anton,"Instrument Sans",sans-serif;font-size:34px;line-height:1;color:#fff}
+.ew-gate-stat span{display:block;margin-top:5px;font-size:12px;color:#9a9a9a}
+.ew-wall{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin:0 0 24px}
+.ew-wall-item{display:block;background:#fff;border:1px solid #e6e6e6;border-radius:4px;padding:16px 14px;
+ text-align:center;text-decoration:none;color:#111;transition:border-color .15s,box-shadow .15s}
+a.ew-wall-item:hover{border-color:#CC0000;box-shadow:0 2px 10px rgba(0,0,0,.07)}
+.ew-wall-item img{display:block;width:100%;height:58px;object-fit:contain;margin:0 auto 10px}
+.ew-wall-name{display:block;font-weight:600;font-size:13px;line-height:1.3}
+.ew-wall-tier{display:block;margin-top:2px;font-size:11px;color:#8a8a8a}
+@media(max-width:720px){
+ .ew-prose .ew-price b{font-size:26px}
+ .ew-wall{grid-template-columns:repeat(auto-fill,minmax(125px,1fr))}
+}';
+
+	wp_register_style( 'eastwood-commercial', false );
+	wp_enqueue_style( 'eastwood-commercial' );
+	wp_add_inline_style( 'eastwood-commercial', $css );
+}
+add_action( 'wp_enqueue_scripts', 'ew_commercial_assets', 21 );
