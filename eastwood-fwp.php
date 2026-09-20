@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.6.0
+ * Version: 2.7.0
  * Author: Eastwood CFC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1012,6 +1012,8 @@ function ew_matches_assets() {
 .ew-month:first-child{margin-top:0}
 .ew-match{display:grid;grid-template-columns:96px 1fr auto;gap:16px;align-items:center;
  background:#fff;border:1px solid #e6e6e6;border-radius:4px;padding:14px 18px;margin-bottom:8px}
+.ew-match{text-decoration:none;color:inherit;transition:border-color .15s,box-shadow .15s}
+a.ew-match:hover{border-color:#CC0000;box-shadow:0 2px 10px rgba(0,0,0,.07)}
 .ew-match.is-home{border-left:3px solid #CC0000}
 .ew-when{font-size:13px;line-height:1.35;color:#6b6b6b}
 .ew-when strong{display:block;font-size:15px;color:#111}
@@ -1091,12 +1093,12 @@ function renderMatches(list,showScore){
   var mid=showScore
     ? '<span class="ew-score">'+esc(home.score)+' &ndash; '+esc(away.score)+'</span>'
     : '<span class="ew-ko">'+esc(m.time?m.time.slice(0,5):'')+'</span>';
-  out+='<div class="ew-match'+(home.id===US?' is-home':'')+'">'
+  out+='<a class="ew-match'+(home.id===US?' is-home':'')+'" href="/match/'+encodeURIComponent(m.id)+'/">'
      +'<div class="ew-when"><strong>'+esc(n.date)+'</strong>'+esc(n.day)+'</div>'
      +'<div class="ew-teams">'+side(home,'ewc-home')+mid+side(away,'ewc-away')+'</div>'
      +'<div class="ew-meta">'+esc(m.venue||'')
      +(m.attendance?'<br>Att '+esc(m.attendance):'')+'</div>'
-     +'</div>';
+     +'</a>';
  });
  return out;
 }
@@ -1461,7 +1463,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  *     table, pasted once at Settings → Eastwood FWP.
  * ------------------------------------------------------------------ */
 
-const EW_FWP_VERSION = '2.6.0';
+const EW_FWP_VERSION = '2.7.0';
 const EW_FWP_REPO    = 'coachbenedwards/eastwood-fwp';
 const EW_FWP_BRANCH  = 'main';
 
@@ -1702,7 +1704,7 @@ add_filter( 'pre_get_document_title', function ( $title ) {
  * there. The moment somebody edits a page by hand, we leave it alone.
  * ------------------------------------------------------------------ */
 
-const EW_PAGES_V = '5';
+const EW_PAGES_V = '6';
 
 function ew_owned_pages() {
 	return array(
@@ -1741,6 +1743,26 @@ function ew_owned_pages() {
 		'club-history' => array(
 			'title'   => 'Club History',
 			'content' => ew_history_content(),
+		),
+		'contact' => array(
+			'title'   => 'Contact us',
+			'content' => ew_contact_content(),
+		),
+		'company-details' => array(
+			'title'   => 'Company Details',
+			'content' => ew_company_content(),
+		),
+		'safeguarding' => array(
+			'title'   => 'Safeguarding',
+			'content' => ew_safeguarding_content(),
+		),
+		'privacy-policy' => array(
+			'title'   => 'Privacy Policy',
+			'content' => ew_privacy_content(),
+		),
+		'terms' => array(
+			'title'   => 'Terms',
+			'content' => ew_terms_content(),
 		),
 	);
 }
@@ -2017,6 +2039,13 @@ function ew_nav_destinations() {
 		'Sponsorship' => home_url( '/sponsorship/' ),
 		'Pitch Hire'  => home_url( '/pitch-hire/' ),
 		'Academy'     => home_url( '/academy/' ),
+
+		// The footer row, dead on every page of the site until now.
+		'Contact us'      => home_url( '/contact/' ),
+		'Company Details' => home_url( '/company-details/' ),
+		'Safeguarding'    => home_url( '/safeguarding/' ),
+		'Privacy Policy'  => home_url( '/privacy-policy/' ),
+		'Terms'           => home_url( '/terms/' ),
 	);
 }
 
@@ -2028,6 +2057,21 @@ function ew_rewrite_nav( $html ) {
 		function ( $m ) use ( $map ) {
 			// The label sits in a <span> or <p> inside the anchor.
 			$label = trim( wp_strip_all_tags( $m[2] ) );
+
+			// A sponsor's logo with nowhere to go. The header strip and the
+			// footer wall are both wrapped like this, and a sponsor is
+			// paying for the click.
+			if ( '' === $label ) {
+				$sponsor = ew_sponsor_link_for_markup( $m[2] );
+				if ( $sponsor ) {
+					$attrs = preg_replace( '#\shref="\#"#', ' href="' . esc_url( $sponsor ) . '"', $m[1], 1 );
+					$attrs = preg_replace( '#\sonclick="return false"#', '', $attrs );
+					if ( false === strpos( $attrs, 'target=' ) ) {
+						$attrs .= ' target="_blank" rel="noopener"';
+					}
+					return '<a' . $attrs . '>' . $m[2] . '</a>';
+				}
+			}
 
 			// The crest was exported as a dead link too. Clicking a club
 			// badge should always go home.
@@ -2052,7 +2096,7 @@ function ew_rewrite_nav( $html ) {
 
 			return '<a' . $attrs . '>' . $m[2] . '</a>';
 		},
-		$html
+		ew_footer_add_history( $html )
 	);
 }
 
@@ -2101,52 +2145,6 @@ function ew_prose_assets() {
 }
 add_action( 'wp_enqueue_scripts', 'ew_prose_assets', 20 );
 
-/**
- * The Academy page as first published.
- *
- * Every fact here comes from the club's own Academy page on Pitchero
- * and its contact page. Nothing is invented: where the club has not
- * published a detail — entry requirements, fees, term dates — the page
- * asks people to get in touch rather than guessing on the club's
- * behalf. Once somebody edits this page in wp-admin the plugin stops
- * touching it.
- */
-function ew_academy_content() {
-	return <<<'HTML'
-<div class="ew-prose">
-
-<p class="ew-lede">Eastwood runs a full-time football academy at Coronation Park: an elite programme for UK and international students that combines intensive football development with a full-time education.</p>
-
-<p>Players train and are coached as full-time footballers while studying for a BTEC Level 3 qualification alongside it. The aim is straightforward — to give young players a serious environment to develop in, and a qualification behind them whatever happens next.</p>
-
-<p>The Academy sits inside the senior side of the club, not the junior section. Academy players train at Coronation Park, the same ground the first team plays at.</p>
-
-<h2>Coaching and teaching staff</h2>
-
-<div class="ew-people">
-	<div class="ew-person"><b>Lewis McGugan</b><span>Head Coach</span></div>
-	<div class="ew-person"><b>John Cole</b><span>Coach</span></div>
-	<div class="ew-person"><b>Lynden Joyce</b><span>Coach</span></div>
-	<div class="ew-person"><b>Adam Fawcett</b><span>Tutor</span></div>
-</div>
-
-<h2>Trials</h2>
-
-<p>The Academy recruits through open trials at Coronation Park, most recently in July. Trial dates for the next intake are announced on the club's channels and here — if you would like to be told when the next one is set, call the club and ask to be added to the list.</p>
-
-<h2>Getting in touch</h2>
-
-<p>For entry requirements, fees, term dates and anything else about the programme, speak to the club directly. We would rather answer your question properly than publish a page of generalities.</p>
-
-<div class="ew-cta">
-	<h3>Enquire about the Academy</h3>
-	<p>Eastwood Football Club, Coronation Park, Chewton Street, Eastwood, Nottinghamshire NG16 3HB</p>
-	<p><a href="tel:+441773432414">01773 432414</a></p>
-</div>
-
-</div>
-HTML;
-}
 
 /* ------------------------------------------------------------------
  * Commercial and supporter pages.
@@ -2303,44 +2301,6 @@ function ew_matchday_content() {
 HTML;
 }
 
-function ew_venue_content() {
-	return <<<'HTML'
-<div class="ew-prose">
-
-<p class="ew-lede">TheVenue@Eastwood is the club's function room at Coronation Park — a licensed bar, a dance floor, a large dining area and a car park, available for hire whatever the occasion.</p>
-
-<h2>What's here</h2>
-
-<ul>
-	<li>Dance floor</li>
-	<li>Licensed bar</li>
-	<li>Large dining area</li>
-	<li>Large car park</li>
-	<li>Flexible buffets — anything from chip cobs to a three-course meal, built around what you want</li>
-	<li>Friendly service</li>
-</ul>
-
-<h2>What people hold here</h2>
-
-<p>Birthdays, christenings, engagement parties, baby showers, wedding receptions, wakes and funerals, retirement parties, charity events, live entertainment, school reunions, football parties, exercise classes, meetings and conferences.</p>
-
-<h2>The Pitchside Bar</h2>
-
-<p>Separately from the main room, the Pitchside Bar suits smaller bookings — lectures, meetings, conferences, and gatherings that don't need a dance floor.</p>
-
-<h2>Also available</h2>
-
-<p>The floodlit all-weather 3G pitch can be hired alongside the Pitchside Bar and changing rooms, which is what makes this work for a football party or a company tournament as easily as a birthday.</p>
-
-<div class="ew-cta">
-	<h3>Talk to us about your event</h3>
-	<p>Tell us what you have in mind and we will work out whether we can do it properly.</p>
-	<p><a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
-</div>
-
-</div>
-HTML;
-}
 
 function ew_pitchhire_content() {
 	return <<<'HTML'
@@ -2389,37 +2349,6 @@ function ew_pitchhire_content() {
 HTML;
 }
 
-function ew_sponsorship_content() {
-	return <<<'HTML'
-<div class="ew-prose">
-
-<p class="ew-lede">Eastwood is a community club with a real crowd, a growing media output and a list of local businesses already behind it. If you want your name in front of that, talk to us.</p>
-
-[eastwood_gate]
-
-<h2>What sponsors get</h2>
-
-<p>It depends what you want, which is why there is no price list here. Shirts, stands, matchballs, the perimeter, the 3G, the documentary — the club has a lot of surfaces and we would rather build something that fits your business than sell you a tier.</p>
-
-<p>What is worth knowing before you call: every home game is filmed, every goal ends up on the club's YouTube channel, and the weekly documentary series follows the first team through the season. That audience travels a long way past the people who come through the turnstile.</p>
-
-<h2>Match day hospitality</h2>
-
-<p>The simplest way in. Hospitality runs for every home game in the Pitchside Bar &amp; Lounge, and typically includes admission, a reserved parking space, a team sheet, and food before the game and at half time. It works as well for taking clients as it does for a day out.</p>
-
-<h2>Who already backs us</h2>
-
-[eastwood_sponsors]
-
-<div class="ew-cta">
-	<h3>Start a conversation</h3>
-	<p>Tell us about your business and what you are trying to get out of it. We will come back with something specific.</p>
-	<p><a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
-</div>
-
-</div>
-HTML;
-}
 
 function ew_commercial_assets() {
 	if ( ! is_singular() ) { return; }
@@ -2939,3 +2868,737 @@ add_action( 'template_redirect', function () {
 	get_footer();
 	exit;
 }, 5 );
+
+/* ------------------------------------------------------------------
+ * The match centre.
+ *
+ * Fixtures and results were dead ends: the feed carries line-ups,
+ * goalscorers with minutes, red cards, the referee and the gate for
+ * every match, and none of it was reachable. One page per match at
+ * /match/<id>/, rendered server-side and linked from the fixtures and
+ * results tabs.
+ *
+ * The feed records who came on and who they replaced, but marks no
+ * yellow cards at this level, so the page shows what exists and does
+ * not invent a bookings section.
+ * ------------------------------------------------------------------ */
+
+const EW_MATCH_SLUG  = 'match';
+const EW_MATCH_RULES = '1';
+
+add_action( 'init', function () {
+	add_rewrite_rule( '^' . EW_MATCH_SLUG . '/([0-9]{1,})/?$', 'index.php?ew_match=$matches[1]', 'top' );
+	if ( get_option( 'ew_match_rules' ) !== EW_MATCH_RULES ) {
+		flush_rewrite_rules( false );
+		update_option( 'ew_match_rules', EW_MATCH_RULES );
+	}
+}, 21 );
+
+add_filter( 'query_vars', function ( $vars ) {
+	$vars[] = 'ew_match';
+	return $vars;
+} );
+
+function ew_match_data( $id ) {
+	$id = (int) $id;
+	if ( ! $id ) {
+		return array();
+	}
+	$d = ew_fwp_fetch( 'match', array( 'match' => $id ) );
+	unset( $d['team'] );
+	return (array) ( $d['match'] ?? array() );
+}
+
+/** Starters, then those who came on, then the unused bench. */
+function ew_match_lineup( $side ) {
+	$on = $started = $bench = array();
+	foreach ( (array) ( $side['line-up'] ?? array() ) as $p ) {
+		if ( isset( $p['substitution'] ) )      { $on[] = $p; }
+		elseif ( (int) ( $p['sort'] ?? 99 ) <= 11 ) { $started[] = $p; }
+		else                                    { $bench[] = $p; }
+	}
+	return array( $started, $on, $bench );
+}
+
+function ew_match_name( $p ) {
+	$pl = $p['player'] ?? array();
+	return trim( ( $pl['first-name'] ?? '' ) . ' ' . ( $pl['last-name'] ?? '' ) );
+}
+
+function ew_match_player_row( $p, $goals ) {
+	$name = ew_match_name( $p );
+	$mine = array();
+	foreach ( $goals as $g ) {
+		if ( ew_match_name( $g ) === $name && isset( $g['minute'] ) ) {
+			$mine[] = (int) $g['minute'] . "'";
+		}
+	}
+	ob_start();
+	?>
+<li class="ewm-player">
+	<span class="ewm-shirt"><?php echo esc_html( $p['shirt'] ?? '' ); ?></span>
+	<span class="ewm-pname"><?php echo esc_html( $name ); ?><?php
+		if ( ! empty( $p['captain'] ) ) : ?><b class="ewm-capt">C</b><?php endif; ?></span>
+	<span class="ewm-marks">
+		<?php if ( $mine ) : ?><i class="ewm-goal" title="Goal"><?php
+			echo esc_html( implode( ' ', $mine ) ); ?></i><?php endif; ?>
+		<?php if ( isset( $p['sent-off'] ) ) : ?><i class="ewm-red" title="Sent off"><?php
+			echo esc_html( (int) $p['sent-off']['minute'] ); ?>'</i><?php endif; ?>
+		<?php if ( isset( $p['substitution'] ) ) : ?><i class="ewm-sub" title="Came on for <?php
+			echo esc_attr( ew_match_name( $p['substitution']['replaced'] ?? array() ) ); ?>">&#9650; <?php
+			echo esc_html( (int) $p['substitution']['minute'] ); ?>'</i><?php endif; ?>
+	</span>
+</li>
+	<?php
+	return ob_get_clean();
+}
+
+function ew_match_side_column( $side, $label ) {
+	list( $started, $on, $bench ) = ew_match_lineup( $side );
+	$goals = (array) ( $side['goals'] ?? array() );
+
+	ob_start();
+	?>
+<div class="ewm-col">
+	<h3 class="ewm-colHead">
+		<img src="<?php echo esc_url( ew_home_badge( $side['id'] ?? 0 ) ); ?>" alt=""
+			onerror="this.style.visibility='hidden'">
+		<?php echo esc_html( $side['name'] ?? '' ); ?>
+		<span><?php echo esc_html( $label ); ?></span>
+	</h3>
+
+	<?php if ( $started ) : ?>
+	<ul class="ewm-list">
+		<?php foreach ( $started as $p ) { echo ew_match_player_row( $p, $goals ); } // phpcs:ignore ?>
+	</ul>
+	<?php endif; ?>
+
+	<?php if ( $on ) : ?>
+	<p class="ewm-sub-head">Substitutes used</p>
+	<ul class="ewm-list">
+		<?php foreach ( $on as $p ) { echo ew_match_player_row( $p, $goals ); } // phpcs:ignore ?>
+	</ul>
+	<?php endif; ?>
+
+	<?php if ( $bench ) : ?>
+	<p class="ewm-sub-head">Unused</p>
+	<ul class="ewm-list ewm-dim">
+		<?php foreach ( $bench as $p ) { echo ew_match_player_row( $p, $goals ); } // phpcs:ignore ?>
+	</ul>
+	<?php endif; ?>
+</div>
+	<?php
+	return ob_get_clean();
+}
+
+function ew_match_markup( $m ) {
+	$home = (array) ( $m['home-team'] ?? array() );
+	$away = (array) ( $m['away-team'] ?? array() );
+	$done = ! empty( $m['status']['short'] ) && 'FT' === $m['status']['short'];
+	$ts   = strtotime( $m['date'] ?? '' );
+
+	ob_start();
+	?>
+<div class="ewm">
+	<section class="ewm-head">
+		<div class="ewm-wrap">
+			<span class="ewm-comp"><?php echo esc_html( $m['competition']['name'] ?? '' ); ?></span>
+			<div class="ewm-score">
+				<span class="ewm-team">
+					<img src="<?php echo esc_url( ew_home_badge( $home['id'] ?? 0 ) ); ?>" alt=""
+						onerror="this.style.visibility='hidden'">
+					<b><?php echo esc_html( $home['name'] ?? '' ); ?></b>
+				</span>
+				<span class="ewm-nums">
+					<?php if ( $done ) : ?>
+					<?php echo esc_html( $home['score'] ?? '' ); ?><i>&ndash;</i><?php echo esc_html( $away['score'] ?? '' ); ?>
+					<?php else : ?>
+					<?php echo esc_html( ! empty( $m['time'] ) ? substr( $m['time'], 0, 5 ) : 'v' ); ?>
+					<?php endif; ?>
+				</span>
+				<span class="ewm-team ewm-right">
+					<img src="<?php echo esc_url( ew_home_badge( $away['id'] ?? 0 ) ); ?>" alt=""
+						onerror="this.style.visibility='hidden'">
+					<b><?php echo esc_html( $away['name'] ?? '' ); ?></b>
+				</span>
+			</div>
+			<p class="ewm-meta">
+				<?php echo esc_html( $ts ? date_i18n( 'l j F Y', $ts ) : '' ); ?>
+				<?php if ( ! empty( $m['venue'] ) ) : ?>· <?php echo esc_html( $m['venue'] ); ?><?php endif; ?>
+				<?php if ( $done && isset( $home['half-time-score'] ) ) : ?>
+				· HT <?php echo esc_html( (int) $home['half-time-score'] ); ?>&ndash;<?php
+					echo esc_html( (int) ( $away['half-time-score'] ?? 0 ) ); ?>
+				<?php endif; ?>
+				<?php if ( ! empty( $m['attendance'] ) ) : ?>· Att <?php
+					echo esc_html( number_format_i18n( $m['attendance'] ) ); ?><?php endif; ?>
+				<?php if ( ! empty( $m['referee'] ) ) : ?>· Referee <?php
+					echo esc_html( $m['referee'] ); ?><?php endif; ?>
+			</p>
+		</div>
+	</section>
+
+	<?php
+	$goals = array_merge(
+		array_map( function ( $g ) { return array( 'g' => $g, 'side' => 'home' ); }, (array) ( $home['goals'] ?? array() ) ),
+		array_map( function ( $g ) { return array( 'g' => $g, 'side' => 'away' ); }, (array) ( $away['goals'] ?? array() ) )
+	);
+	usort( $goals, function ( $a, $b ) { return (int) ( $a['g']['minute'] ?? 0 ) - (int) ( $b['g']['minute'] ?? 0 ); } );
+	if ( $goals ) :
+	?>
+	<section class="ewm-goals">
+		<div class="ewm-wrap">
+			<h2 class="ewm-h2">Goals</h2>
+			<ol class="ewm-goalList">
+				<?php foreach ( $goals as $row ) : ?>
+				<li class="ewm-goalRow is-<?php echo esc_attr( $row['side'] ); ?>">
+					<span class="ewm-min"><?php echo esc_html( (int) ( $row['g']['minute'] ?? 0 ) ); ?>'</span>
+					<span class="ewm-scorer"><?php echo esc_html( ew_match_name( $row['g'] ) ); ?></span>
+					<span class="ewm-for"><?php echo esc_html(
+						'home' === $row['side'] ? ( $home['name'] ?? '' ) : ( $away['name'] ?? '' ) ); ?></span>
+				</li>
+				<?php endforeach; ?>
+			</ol>
+		</div>
+	</section>
+	<?php endif; ?>
+
+	<?php if ( ! empty( $home['line-up'] ) || ! empty( $away['line-up'] ) ) : ?>
+	<section class="ewm-teams">
+		<div class="ewm-wrap">
+			<h2 class="ewm-h2">Line-ups</h2>
+			<div class="ewm-cols">
+				<?php
+				echo ew_match_side_column( $home, 'Home' ); // phpcs:ignore
+				echo ew_match_side_column( $away, 'Away' ); // phpcs:ignore
+				?>
+			</div>
+			<p class="ewm-key">
+				<i class="ewm-goal">40'</i> goal
+				<i class="ewm-sub">&#9650;</i> came on
+				<i class="ewm-red">1'</i> sent off
+				<b class="ewm-capt">C</b> captain
+			</p>
+		</div>
+	</section>
+	<?php endif; ?>
+
+	<div class="ewm-wrap">
+		<p class="ewm-back"><a href="<?php echo esc_url( home_url( '/eastwood-matches/' ) ); ?>">All fixtures and results</a></p>
+		<p class="ewm-credit">Match detail supplied by Football Web Pages.</p>
+	</div>
+</div>
+	<?php
+	return ob_get_clean();
+}
+
+function ew_match_css() {
+	return '
+.ewm{font-family:"Instrument Sans",system-ui,sans-serif;color:#111}
+.ewm *{box-sizing:border-box}
+.ewm-wrap{max-width:900px;margin:0 auto;padding:0 16px}
+.ewm-head{background:#111;color:#fff;padding:30px 0 26px;margin:0 0 34px}
+.ewm-comp{display:block;text-align:center;font-family:Anton,"Instrument Sans",sans-serif;font-size:11px;
+ letter-spacing:.12em;text-transform:uppercase;color:#CC0000;margin:0 0 18px}
+.ewm-score{display:grid;grid-template-columns:1fr auto 1fr;gap:18px;align-items:center}
+.ewm-team{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
+.ewm-team img{width:64px;height:64px;object-fit:contain}
+.ewm-team b{font-size:17px;font-weight:600;color:#fff}
+.ewm-nums{font-family:Anton,"Instrument Sans",sans-serif;font-size:46px;line-height:1;color:#fff;white-space:nowrap}
+.ewm-nums i{font-style:normal;color:#5d5d66;padding:0 8px}
+.ewm-meta{text-align:center;margin:20px 0 0;font-size:13px;color:#9a9aa3}
+.ewm-h2{font-family:Anton,"Instrument Sans",sans-serif;font-size:19px;letter-spacing:.06em;
+ text-transform:uppercase;margin:0 0 16px;color:#111}
+.ewm-goals{margin:0 0 38px}
+.ewm-goalList{list-style:none;margin:0;padding:0;border:1px solid #e6e6e6;border-radius:5px;background:#fff}
+.ewm-goalRow{display:grid;grid-template-columns:56px 1fr auto;gap:14px;align-items:center;
+ padding:11px 16px;border-top:1px solid #efefef;font-size:15px}
+.ewm-goalRow:first-child{border-top:0}
+.ewm-min{font-family:Anton,sans-serif;font-size:15px;color:#6b6b6b}
+.ewm-scorer{font-weight:600}
+.ewm-for{font-size:12px;color:#8a8a8a}
+.ewm-goalRow.is-home .ewm-min{color:#CC0000}
+.ewm-teams{margin:0 0 30px}
+.ewm-cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.ewm-col{background:#fff;border:1px solid #e6e6e6;border-radius:5px;padding:16px 18px}
+.ewm-colHead{display:flex;align-items:center;gap:10px;margin:0 0 14px;padding:0 0 12px;
+ border-bottom:1px solid #efefef;font-size:15px;font-weight:700}
+.ewm-colHead img{width:26px;height:26px;object-fit:contain}
+.ewm-colHead span{margin-left:auto;font-size:10px;font-weight:400;letter-spacing:.08em;
+ text-transform:uppercase;color:#9a9aa3}
+.ewm-list{list-style:none;margin:0 0 6px;padding:0}
+.ewm-player{display:grid;grid-template-columns:26px 1fr auto;gap:10px;align-items:baseline;padding:5px 0;font-size:14px}
+.ewm-shirt{font-family:Anton,sans-serif;font-size:13px;color:#9a9aa3;text-align:right}
+.ewm-pname{font-weight:500}
+.ewm-dim .ewm-pname{color:#8a8a8a;font-weight:400}
+.ewm-marks{display:flex;gap:6px;white-space:nowrap}
+.ewm-capt{display:inline-block;margin-left:6px;font-size:9px;font-weight:700;letter-spacing:.06em;
+ color:#6b6b6b;border:1px solid #c9c9c9;border-radius:3px;padding:0 3px;vertical-align:1px}
+.ewm-goal,.ewm-sub,.ewm-red{font-style:normal;font-size:11px;border-radius:3px;padding:1px 5px}
+.ewm-goal{background:#CC0000;color:#fff;font-weight:700}
+.ewm-sub{background:#f1f1f1;color:#6b6b6b}
+.ewm-red{background:#111;color:#fff;font-weight:700}
+.ewm-sub-head{margin:14px 0 6px;font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:#9a9aa3}
+.ewm-key{margin:16px 2px 0;font-size:12px;color:#8a8a8a;display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+.ewm-key i,.ewm-key b{margin-right:5px}
+.ewm-back{margin:0 0 6px}
+.ewm-back a{color:#CC0000;font-weight:600;text-decoration:none}
+.ewm-back a:hover{text-decoration:underline}
+.ewm-credit{margin:0 0 56px;font-size:12px;color:#8a8a8a}
+@media(max-width:720px){
+ .ewm-cols{grid-template-columns:1fr}
+ .ewm-nums{font-size:34px}
+ .ewm-team img{width:48px;height:48px}
+ .ewm-team b{font-size:14px}
+ .ewm-goalRow{grid-template-columns:44px 1fr;gap:10px}
+ .ewm-for{grid-column:2;font-size:11px}
+}';
+}
+
+add_action( 'template_redirect', function () {
+	$id = (int) get_query_var( 'ew_match' );
+	if ( ! $id || is_admin() ) {
+		return;
+	}
+
+	$m = ew_match_data( $id );
+	if ( empty( $m ) ) {
+		status_header( 404 );
+		return; // Let the theme's 404 handle an id the feed does not know.
+	}
+
+	$title = trim( ( $m['home-team']['name'] ?? '' ) . ' v ' . ( $m['away-team']['name'] ?? '' ) );
+
+	add_filter( 'pre_get_document_title', function () use ( $title ) {
+		return $title . ' — ' . get_bloginfo( 'name' );
+	} );
+	add_action( 'wp_head', function () {
+		echo '<style id="ew-match">' . ew_match_css() . '</style>';
+	}, 20 );
+
+	get_header();
+	echo ew_match_markup( $m ); // phpcs:ignore WordPress.Security.EscapeOutput
+	get_footer();
+	exit;
+}, 6 );
+
+/* ------------------------------------------------------------------
+ * The footer pages.
+ *
+ * Privacy Policy, Terms, Company Details, Contact us and Safeguarding
+ * were dead links on every page of the site. Written here from what is
+ * actually true of this club and this website rather than pasted from
+ * a template: the privacy page describes what this site really does
+ * (no accounts, no analytics beyond the host's own logs, YouTube
+ * embeds on two pages), and the safeguarding page names the club's
+ * own officer.
+ *
+ * The privacy and terms pages are written in plain English and are
+ * honest about the site's behaviour, but they have not been read by a
+ * solicitor, and the safeguarding page should be checked against the
+ * county FA's current guidance. Both are flagged to Ben.
+ * ------------------------------------------------------------------ */
+
+function ew_contact_content() {
+	return <<<'HTML'
+<div class="ew-prose">
+
+<p class="ew-lede">Eastwood Football Club, Coronation Park, Chewton Street, Eastwood, Nottinghamshire NG16 3HB.</p>
+
+<div class="ew-cta">
+	<h3>Get in touch</h3>
+	<p><a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
+</div>
+
+<h2>Who's who</h2>
+
+<div class="ew-people">
+	<div class="ew-person"><b>Ben Edwards</b><span>Chair and Club Owner</span></div>
+	<div class="ew-person"><b>Stephen Kirkham</b><span>Managing Director</span></div>
+	<div class="ew-person"><b>Zander Shayler</b><span>Secretary, Fixture Secretary and Director of Operations</span></div>
+	<div class="ew-person"><b>Sarah Robertson-Staples</b><span>Treasurer</span></div>
+	<div class="ew-person"><b>Graham Laverick</b><span>Safeguarding Officer</span></div>
+</div>
+
+<p>Everything reaches us at <a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> — hospitality and
+tickets, venue and pitch hire, sponsorship, junior and youth team enquiries, academy places, and anything about
+working here.</p>
+
+<h2>Finding us</h2>
+
+<p>Coronation Park is on Chewton Street in Eastwood, Nottinghamshire, NG16 3HB. Parking on site is free unless
+we say otherwise for a particular fixture.</p>
+
+<p>The nearest station is Langley Mill, about a mile and a half away — roughly half an hour on foot, or there are
+taxis outside the station and at the rank in the town centre.</p>
+
+</div>
+HTML;
+}
+
+function ew_company_content() {
+	return <<<'HTML'
+<div class="ew-prose">
+
+<p class="ew-lede">Eastwood Community Football Club CIC is a community interest company registered in England and
+Wales, company number 09196902.</p>
+
+<h2>Registered details</h2>
+
+<ul>
+	<li><b>Registered name:</b> Eastwood Community Football Club CIC</li>
+	<li><b>Company number:</b> 09196902</li>
+	<li><b>Registered office:</b> Coronation Park, Chewton Street, Eastwood, Nottinghamshire NG16 3HB</li>
+	<li><b>Contact:</b> <a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a>, 01773 432414</li>
+</ul>
+
+<h2>What a community interest company means</h2>
+
+<p>A CIC is a company that exists to benefit a community rather than to enrich shareholders. Its assets are
+locked to that purpose: they cannot simply be taken out of the business. For Eastwood that community is the town
+and the people who play, coach, volunteer and watch here.</p>
+
+<p>Twenty-nine teams run out of Coronation Park across senior, junior, mini and girls' football. The first team
+is the part most people see, but it is a small share of what the ground does in a given week.</p>
+
+</div>
+HTML;
+}
+
+function ew_safeguarding_content() {
+	return <<<'HTML'
+<div class="ew-prose">
+
+<p class="ew-lede">Eastwood runs football for hundreds of children every week. Keeping them safe matters more
+than any result, and everyone at the club shares that responsibility.</p>
+
+<h2>If a child is at immediate risk</h2>
+
+<p><b>Call 999.</b> Do not wait to report it to the club first. Tell us afterwards so we can act on our side.</p>
+
+<h2>Raising a concern with the club</h2>
+
+<p>Our Safeguarding Officer is <b>Graham Laverick</b>. Any concern about a child's welfare, about the behaviour
+of an adult at the club, or about anything that does not feel right, should go to him.</p>
+
+<div class="ew-cta">
+	<h3>Contact the Safeguarding Officer</h3>
+	<p>Mark it for the attention of the Safeguarding Officer.</p>
+	<p><a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
+</div>
+
+<p>You do not need to be certain, and you do not need proof. If something is worrying you, tell us. It is our job
+to look into it, not yours to be sure first.</p>
+
+<h2>Outside the club</h2>
+
+<p>You can always go outside the club, and sometimes you should — particularly if your concern is about how the
+club itself has handled something.</p>
+
+<ul>
+	<li><b>NSPCC Helpline</b> — 0808 800 5000, for adults worried about a child.</li>
+	<li><b>Childline</b> — 0800 1111, free and confidential, for anyone under 19.</li>
+	<li><b>Nottinghamshire FA</b> — the county FA's Designated Safeguarding Officer handles concerns about
+		clubs, coaches and officials in the county.</li>
+	<li><b>The Football Association</b> — the FA's safeguarding team oversees safeguarding across the game.</li>
+</ul>
+
+<h2>What we expect of everyone here</h2>
+
+<p>Coaches, volunteers and staff working with children at Eastwood hold an in-date FA DBS check and are expected
+to follow the FA's Respect Code of Conduct. That applies to parents and spectators on the touchline as much as it
+does to the people in the dugout.</p>
+
+<p>Photography and filming at the ground: the club films matches for highlights and for its documentary series.
+If you would prefer your child not to appear, tell us and we will work around it.</p>
+
+</div>
+HTML;
+}
+
+function ew_privacy_content() {
+	return <<<'HTML'
+<div class="ew-prose">
+
+<p class="ew-lede">This page explains what this website does with information about you. It is deliberately
+specific to this site rather than a general template.</p>
+
+<h2>What this site collects</h2>
+
+<p>You can read every page of this website without giving us anything. There are no accounts, no sign-up, no
+newsletter form and no shop checkout on this site.</p>
+
+<p>Like any website, our host records standard server logs — the address you connected from, the page you asked
+for, the time, and what browser you used. These are used to keep the site running and secure.</p>
+
+<h2>Things on this site that come from elsewhere</h2>
+
+<ul>
+	<li><b>Video.</b> The Eastwood TV page and the front page embed video from YouTube. We use YouTube's
+		privacy-enhanced embed, which does not set advertising cookies until you press play. Once you play a
+		video, YouTube's own terms and privacy policy apply.</li>
+	<li><b>Fixtures, results, tables and squad data</b> come from Football Web Pages. Your browser does not
+		contact them directly — this site fetches the data and serves it to you.</li>
+	<li><b>The club shop</b> is run by a separate supplier on their own website. Once you follow that link you
+		are on their site, under their terms.</li>
+	<li><b>Sponsor links</b> take you to sponsors' own websites, which we do not control.</li>
+</ul>
+
+<h2>What we do not do</h2>
+
+<p>We do not sell or share your information. We do not run advertising trackers on this site. We do not build a
+profile of you.</p>
+
+<h2>If you contact us</h2>
+
+<p>When you email or call us, we keep what you send for as long as we need it to deal with your enquiry and to
+keep a record of club business. We do not add you to a mailing list because you asked a question.</p>
+
+<h2>Your rights</h2>
+
+<p>Under UK data protection law you can ask us what information we hold about you, ask us to correct it, or ask
+us to delete it. Write to <a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> and we will respond
+within a month. If you are not satisfied with how we have handled it, you can complain to the Information
+Commissioner's Office at ico.org.uk.</p>
+
+<p>Eastwood Community Football Club CIC, company number 09196902, Coronation Park, Chewton Street, Eastwood,
+Nottinghamshire NG16 3HB, is the data controller.</p>
+
+</div>
+HTML;
+}
+
+function ew_terms_content() {
+	return <<<'HTML'
+<div class="ew-prose">
+
+<p class="ew-lede">The short version: this is the club's own website, we try to keep it accurate, and some of what
+is on it comes from other people.</p>
+
+<h2>Using this site</h2>
+
+<p>You are welcome to read, link to and share anything here. The words, photographs, crest and club marks belong
+to Eastwood Community Football Club CIC or to the photographers who took them, and should not be reused
+commercially without asking us first.</p>
+
+<h2>Accuracy</h2>
+
+<p>We keep this site as accurate as we can, but things change. Kick-off times move, fixtures are rearranged and
+prices are reviewed. Nothing on this site is a guarantee, and for anything that matters — travelling to a game,
+booking the pitch, turning up for a trial — check with us first on 01773 432414 or
+<a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a>.</p>
+
+<h2>Match data</h2>
+
+<p>Fixtures, results, league tables, appearances and goalscorers are supplied by Football Web Pages and are
+updated as the league records them. Where their records and ours differ, the league's own record is the one that
+counts.</p>
+
+<h2>Other people's sites</h2>
+
+<p>This site links out to the club shop, to our sponsors, to YouTube and to Pitchero, where some of our junior
+sections still keep their fixtures. We are not responsible for what is on those sites or what they do with your
+information.</p>
+
+<h2>Tickets, hire and hospitality</h2>
+
+<p>Prices shown here are for information. Bookings for pitch hire, the function room and match day hospitality
+are confirmed by us directly, and the terms we send with your booking are the ones that apply.</p>
+
+<h2>Getting in touch</h2>
+
+<p>If something on this site is wrong, tell us and we will fix it:
+<a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a>.</p>
+
+</div>
+HTML;
+}
+
+/* ------------------------------------------------------------------
+ * Wiring up the last dead links, and the content from the club's own
+ * brochures.
+ *
+ * Thirteen anchors in the header and footer wrapped a sponsor's logo
+ * and went nowhere. The logos were localised weeks ago; nobody had
+ * given them a destination. Sponsors pay for that click.
+ *
+ * The five footer links get their pages, and Club History — which had
+ * no home in the navigation — is added beside them.
+ * ------------------------------------------------------------------ */
+
+/**
+ * A sponsor's click-through, found from the local logo filename.
+ * The header sponsor strip and the footer wall both use these.
+ */
+function ew_sponsor_link_for_markup( $html ) {
+	if ( ! preg_match( '#/ew-sponsors/([a-z0-9\-]+)\.png#', $html, $m ) ) {
+		return '';
+	}
+	$roster = ew_sponsor_roster();
+	return isset( $roster[ $m[1] ][2] ) ? (string) $roster[ $m[1] ][2] : '';
+}
+
+/**
+ * Club History has no label of its own in the captured footer, so it
+ * is added next to Contact us rather than left unreachable.
+ */
+function ew_footer_add_history( $html ) {
+	$needle = 'Contact us</a>';
+	$pos    = strpos( $html, $needle );
+	if ( false === $pos ) {
+		return $html;
+	}
+
+	// Reuse the surrounding anchor's own classes so it matches its neighbours.
+	$open = strrpos( substr( $html, 0, $pos ), '<a ' );
+	if ( false === $open ) {
+		return $html;
+	}
+	$anchor = substr( $html, $open, ( $pos + strlen( $needle ) ) - $open );
+	$extra  = str_replace( 'Contact us</a>', 'Club History</a>', $anchor );
+	$extra  = preg_replace( '#\shref="[^"]*"#', ' href="' . esc_url( home_url( '/club-history/' ) ) . '"', $extra, 1 );
+	$extra  = preg_replace( '#\sonclick="return false"#', '', $extra );
+
+	return substr_replace( $html, $anchor . $extra, $open, strlen( $anchor ) );
+}
+
+function ew_sponsorship_content() {
+	return <<<'HTML'
+<div class="ew-prose">
+
+<p class="ew-lede">Coronation Park is open twelve hours a day, seven days a week, with an average footfall of
+3,500 to 4,000 people every week. If you want your name in front of that, talk to us.</p>
+
+[eastwood_gate]
+
+<p>Those gate figures are the first team's home league crowd. The wider number above is the ground itself —
+junior and youth sides, the academy, the 3G, the bar and the function room. Most of the people who come through
+Coronation Park in a given week are not here for a first team match.</p>
+
+<h2>What we offer</h2>
+
+<p><b>Matchday sponsorship.</b> Be the exclusive sponsor of a selected fixture, with your branding around the
+stadium, in the clubhouse and on promotional material, recognition in match announcements, and ten premium seats
+with gold package hospitality in The Venue.</p>
+
+<p><b>Tournament sponsorship.</b> Our annual tournaments run across multiple days, with your logo on banners,
+trophies and promotional material.</p>
+
+<p><b>Website and social media.</b> Your logo on this site and across the club's channels — including a YouTube
+channel that publishes every goal, every week, and a documentary series following the first team through the
+season.</p>
+
+<p><b>Community events.</b> Fundraisers, coaching clinics and awards evenings, where the audience is the town
+rather than the terrace.</p>
+
+<p>Programme advertising, player tunnel branding and fan experiences come up too. Packages are built around what
+you are trying to achieve and what you have to spend, which is why there is no price list on this page.</p>
+
+<h2>Why here</h2>
+
+<p>Eastwood is a community club, and sponsoring one puts your name alongside something the town actually cares
+about rather than buying an impression. You get visibility on kit, signage, this site and our channels; access to
+players, families and supporters who turn up week after week; and a room full of other local businesses at our
+events.</p>
+
+<h2>Who already backs us</h2>
+
+[eastwood_sponsors]
+
+<div class="ew-cta">
+	<h3>Start a conversation</h3>
+	<p>Tell us about your business and what you want out of it, and we will come back with something specific
+		rather than a tier.</p>
+	<p><a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
+</div>
+
+</div>
+HTML;
+}
+
+function ew_venue_content() {
+	return <<<'HTML'
+<div class="ew-prose">
+
+<p class="ew-lede">TheVenue@Eastwood is the club's function room at Coronation Park — a licensed bar, a dance
+floor, a large dining area and a car park, available for hire whatever the occasion.</p>
+
+<h2>What's here</h2>
+
+<ul>
+	<li>Dance floor</li>
+	<li>Licensed bar</li>
+	<li>Large dining area</li>
+	<li>Large car park</li>
+	<li>Flexible buffets — anything from chip cobs to a three-course meal, built around what you want</li>
+	<li>Friendly service</li>
+</ul>
+
+<h2>What people hold here</h2>
+
+<p>Birthdays, christenings, engagement parties, baby showers, wedding receptions, wakes and funerals, retirement
+parties, charity events, live entertainment, school reunions, football parties, exercise classes, meetings and
+conferences.</p>
+
+<h2>Weddings</h2>
+
+<p>We host wedding receptions, and we have a brochure that covers what a wedding here looks like — the room, the
+food, and how we work with you on the day. Ask us for a copy and we will send it over.</p>
+
+<h2>The Pitchside Bar</h2>
+
+<p>Separately from the main room, the Pitchside Bar suits smaller bookings — lectures, meetings, conferences, and
+gatherings that don't need a dance floor.</p>
+
+<h2>Also available</h2>
+
+<p>The floodlit all-weather 3G pitch can be hired alongside the Pitchside Bar and changing rooms, which is what
+makes this work for a football party or a company tournament as easily as a birthday.</p>
+
+<div class="ew-cta">
+	<h3>Talk to us about your event</h3>
+	<p>Tell us what you have in mind and we will work out whether we can do it properly.</p>
+	<p><a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
+</div>
+
+</div>
+HTML;
+}
+
+function ew_academy_content() {
+	return <<<'HTML'
+<div class="ew-prose">
+
+<p class="ew-lede">Eastwood runs a full-time football academy at Coronation Park: an elite programme for UK and international students that combines intensive football development with a full-time education.</p>
+
+<p>Players train and are coached as full-time footballers while studying for a BTEC Level 3 qualification alongside it. The aim is straightforward — to give young players a serious environment to develop in, and a qualification behind them whatever happens next.</p>
+
+<p>The Academy sits inside the senior side of the club, not the junior section. Academy players train at Coronation Park, the same ground the first team plays at, and the club has its own full-time coaching and teaching staff rather than borrowing them from elsewhere.</p>
+
+<h2>Coaching and teaching staff</h2>
+
+<div class="ew-people">
+	<div class="ew-person"><b>Lewis McGugan</b><span>Head Coach</span></div>
+	<div class="ew-person"><b>John Cole</b><span>Coach</span></div>
+	<div class="ew-person"><b>Lynden Joyce</b><span>Coach</span></div>
+	<div class="ew-person"><b>Adam Fawcett</b><span>Tutor</span></div>
+</div>
+
+<h2>Trials</h2>
+
+<p>The Academy recruits through open trials at Coronation Park, most recently in July. Trial dates for the next intake are announced on the club's channels and here — if you would like to be told when the next one is set, call the club and ask to be added to the list.</p>
+
+<h2>Finding out more</h2>
+
+<p>We have a full Academy brochure covering the programme, the education side and what a week looks like. Ask us and we will send it to you.</p>
+
+<p>For entry requirements, fees, term dates and anything else, speak to the club directly. We would rather answer your question properly than publish a page of generalities.</p>
+
+<div class="ew-cta">
+	<h3>Enquire about the Academy</h3>
+	<p>Eastwood Football Club, Coronation Park, Chewton Street, Eastwood, Nottinghamshire NG16 3HB</p>
+	<p><a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
+</div>
+
+</div>
+HTML;
+}
