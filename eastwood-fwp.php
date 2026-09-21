@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.9.0
+ * Version: 2.9.2
  * Author: Eastwood CFC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1010,22 +1010,24 @@ function ew_matches_assets() {
 .ew-month{font-family:Anton,sans-serif;font-size:15px;letter-spacing:.08em;text-transform:uppercase;
  color:#6b6b6b;margin:28px 0 10px}
 .ew-month:first-child{margin-top:0}
-.ew-match{display:grid;grid-template-columns:96px 1fr auto;gap:16px;align-items:center;
+.ew-match{display:grid;grid-template-columns:92px minmax(0,1fr) 190px;gap:16px;align-items:center;
  background:#fff;border:1px solid #e6e6e6;border-radius:4px;padding:14px 18px;margin-bottom:8px}
 .ew-match{text-decoration:none;color:inherit;transition:border-color .15s,box-shadow .15s}
 a.ew-match:hover{border-color:#CC0000;box-shadow:0 2px 10px rgba(0,0,0,.07)}
 .ew-match.is-home{border-left:3px solid #CC0000}
 .ew-when{font-size:13px;line-height:1.35;color:#6b6b6b}
 .ew-when strong{display:block;font-size:15px;color:#111}
-.ew-teams{display:flex;align-items:center;gap:12px;min-width:0}
-.ew-side{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.ew-teams{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+ align-items:center;gap:12px;min-width:0}
+.ew-side{display:flex;align-items:center;gap:10px;min-width:0}
 .ew-side.ewc-away{flex-direction:row-reverse;text-align:right}
 .ew-side img{width:34px;height:34px;object-fit:contain;flex:none}
 .ew-side span{font-weight:600;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ew-side.ewc-us span{color:#CC0000}
 .ew-score{font-family:Anton,sans-serif;font-size:22px;letter-spacing:.05em;white-space:nowrap;padding:0 4px}
 .ew-ko{font-family:Anton,sans-serif;font-size:16px;color:#6b6b6b;white-space:nowrap;padding:0 4px}
-.ew-meta{font-size:12px;color:#8a8a8a;text-align:right;white-space:nowrap}
+.ew-meta{font-size:12px;line-height:1.35;color:#8a8a8a;text-align:right;
+ overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .ew-table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e6e6e6;border-radius:4px;overflow:hidden}
 .ew-table th{background:#f3f3f3;font-family:Anton,sans-serif;font-size:12px;letter-spacing:.06em;
  text-transform:uppercase;color:#6b6b6b;font-weight:400;padding:12px 8px;text-align:center}
@@ -1053,7 +1055,7 @@ a.ew-match:hover{border-color:#CC0000;box-shadow:0 2px 10px rgba(0,0,0,.07)}
 .ew-credit{margin:32px 0 0;font-size:12px;color:#8a8a8a}
 @media(max-width:720px){
  .ew-match{grid-template-columns:1fr;gap:10px}
- .ew-meta{text-align:left}
+ .ew-meta{text-align:left;-webkit-line-clamp:none;display:block}
  .ew-side span{font-size:14px}
  .ew-table th.ewc-hide,.ew-table td.ewc-hide{display:none}
 }';
@@ -1461,7 +1463,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  *     table, pasted once at Settings → Eastwood FWP.
  * ------------------------------------------------------------------ */
 
-const EW_FWP_VERSION = '2.9.0';
+const EW_FWP_VERSION = '2.9.2';
 const EW_FWP_REPO    = 'coachbenedwards/eastwood-fwp';
 const EW_FWP_BRANCH  = 'main';
 
@@ -2900,7 +2902,13 @@ add_action( 'template_redirect', function () {
 
 	get_header();
 
-	if ( function_exists( 'ew_home_capture_markup' ) ) {
+	// The captured replica is NOT fit to serve. Restored on 21 Sep it put
+	// Nottingham Forest's own press-conference videos — their manager, their
+	// crest, Forest TV branding — live on this club's front page, with a black
+	// void where the hero image had been stripped and news cards with no
+	// images at all. Off until the Forest blocks are replaced with Eastwood
+	// ones and the imagery actually resolves.
+	if ( false && function_exists( 'ew_home_capture_markup' ) ) {
 		// The replica page. Its news cards are filled live by the theme's
 		// fillNews(), its carousels mounted by mountCarousels(), and the
 		// output-buffer rewrite cleans out what the clone left behind.
