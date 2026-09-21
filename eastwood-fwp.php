@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.8.1
+ * Version: 2.9.0
  * Author: Eastwood CFC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1461,7 +1461,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  *     table, pasted once at Settings → Eastwood FWP.
  * ------------------------------------------------------------------ */
 
-const EW_FWP_VERSION = '2.8.1';
+const EW_FWP_VERSION = '2.9.0';
 const EW_FWP_REPO    = 'coachbenedwards/eastwood-fwp';
 const EW_FWP_BRANCH  = 'main';
 
@@ -2885,14 +2885,37 @@ add_action( 'template_redirect', function () {
 		return;
 	}
 
+	// The captured replica front page — Forest's structure, Eastwood's
+	// content — is the brief. It lives in its own file because it is 120KB
+	// of markup, and it ships in the same repo so the updater installs it
+	// alongside this one.
+	$capture = __DIR__ . '/home-template.php';
+	if ( file_exists( $capture ) ) {
+		require_once $capture;
+	}
+
 	add_action( 'wp_head', function () {
 		echo '<style id="ew-home">' . ew_home_css() . '</style>';
 	}, 20 );
 
 	get_header();
-	echo ew_home_football(); // phpcs:ignore WordPress.Security.EscapeOutput
-	echo ew_home_lead();     // phpcs:ignore WordPress.Security.EscapeOutput
-	echo ew_home_video();    // phpcs:ignore WordPress.Security.EscapeOutput
+
+	if ( function_exists( 'ew_home_capture_markup' ) ) {
+		// The replica page. Its news cards are filled live by the theme's
+		// fillNews(), its carousels mounted by mountCarousels(), and the
+		// output-buffer rewrite cleans out what the clone left behind.
+		echo ew_home_capture_markup(); // phpcs:ignore WordPress.Security.EscapeOutput
+
+		// The one thing the capture cannot carry: today's fixture, result
+		// and league position. Appended rather than replacing anything.
+		echo ew_home_football(); // phpcs:ignore WordPress.Security.EscapeOutput
+	} else {
+		// Fallback if the template file did not install.
+		echo ew_home_football(); // phpcs:ignore WordPress.Security.EscapeOutput
+		echo ew_home_lead();     // phpcs:ignore WordPress.Security.EscapeOutput
+		echo ew_home_video();    // phpcs:ignore WordPress.Security.EscapeOutput
+	}
+
 	get_footer();
 	exit;
 }, 5 );
