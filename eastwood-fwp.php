@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.9.2
+ * Version: 2.9.3
  * Author: Eastwood CFC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1463,7 +1463,24 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  *     table, pasted once at Settings → Eastwood FWP.
  * ------------------------------------------------------------------ */
 
-const EW_FWP_VERSION = '2.9.2';
+const EW_FWP_VERSION = '2.9.3';
+
+/*
+ * Parts loader.
+ *
+ * Every new section of this site has so far meant editing this one 185KB
+ * file, which can only reach the site through a push from a terminal on
+ * Ben's Mac. Anything dropped into parts/ in the same repo is loaded here
+ * instead, so a new block is a new small file and nothing else has to move.
+ *
+ * Load order is alphabetical, before anything below runs, so a part can
+ * define functions this file's hooks call and vice versa — both are loaded
+ * before WordPress fires 'init'.
+ */
+foreach ( (array) glob( __DIR__ . '/parts/*.php' ) as $ew_part ) {
+	require_once $ew_part;
+}
+
 const EW_FWP_REPO    = 'coachbenedwards/eastwood-fwp';
 const EW_FWP_BRANCH  = 'main';
 
@@ -2878,7 +2895,7 @@ add_action( 'template_redirect', function () {
 	//
 	// One list, checked in one place. Anything routed by a query var goes in
 	// it at the moment the route is written, not after somebody notices.
-	foreach ( array( 'ew_news', 'ew_match', 'ew_team' ) as $ew_route ) {
+	foreach ( array( 'ew_news', 'ew_match', 'ew_team', 'ew_preview' ) as $ew_route ) {
 		if ( get_query_var( $ew_route ) ) {
 			return;
 		}
