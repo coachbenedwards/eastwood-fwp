@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.10.0
+ * Version: 2.10.1
  * Author: Eastwood CFC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1463,7 +1463,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  *     table, pasted once at Settings → Eastwood FWP.
  * ------------------------------------------------------------------ */
 
-const EW_FWP_VERSION = '2.10.0';
+const EW_FWP_VERSION = '2.10.1';
 
 /*
  * Parts loader.
@@ -1478,6 +1478,18 @@ const EW_FWP_VERSION = '2.10.0';
  * before WordPress fires 'init'.
  */
 foreach ( (array) glob( __DIR__ . '/parts/*.php' ) as $ew_part ) {
+	// A page template is not a part. Templates render a page; running one at
+	// plugin load calls get_header() before WordPress is ready and takes the
+	// site down with a fatal on every request — which is exactly what 2.10.0
+	// did. Templates live at the plugin root and are named template-*.php;
+	// this check is the second line of defence if one is ever misfiled.
+	if ( 0 === strpos( basename( $ew_part ), 'template-' ) ) {
+		continue;
+	}
+	$ew_head = (string) file_get_contents( $ew_part, false, null, 0, 1024 );
+	if ( false !== stripos( $ew_head, 'Template Name:' ) ) {
+		continue;
+	}
 	require_once $ew_part;
 }
 
@@ -1721,16 +1733,10 @@ add_filter( 'pre_get_document_title', function ( $title ) {
  * there. The moment somebody edits a page by hand, we leave it alone.
  * ------------------------------------------------------------------ */
 
-const EW_PAGES_V = '8';
+const EW_PAGES_V = '9';
 
 function ew_owned_pages() {
-	return array(
-		'home-preview' => array(
-			'title'    => 'Homepage (new design)',
-			'content'  => ew_home_preview_content(),
-			'template' => EW_HOME_TPL,
-			'noindex'  => true,
-		),
+	$pages = array(
 		'eastwood-teams' => array(
 			'title'   => 'Teams',
 			'content' => '[eastwood_teams]',
@@ -1788,6 +1794,20 @@ function ew_owned_pages() {
 			'content' => ew_terms_content(),
 		),
 	);
+
+	// Guarded: this page's content and template live in parts/home-blocks.php.
+	// If that file is ever missing, the rest of the site must still install and
+	// run — an unguarded reference here is a fatal on every request.
+	if ( function_exists( 'ew_home_preview_content' ) && defined( 'EW_HOME_TPL' ) ) {
+		$pages['home-preview'] = array(
+			'title'    => 'Homepage (new design)',
+			'content'  => ew_home_preview_content(),
+			'template' => EW_HOME_TPL,
+			'noindex'  => true,
+		);
+	}
+
+	return $pages;
 }
 
 function ew_install_pages() {

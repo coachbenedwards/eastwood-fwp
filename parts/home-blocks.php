@@ -52,7 +52,10 @@ add_filter( 'template_include', function ( $template ) {
 	if ( get_page_template_slug( get_queried_object_id() ) !== EW_HOME_TPL ) {
 		return $template;
 	}
-	$file = __DIR__ . '/tpl-fullwidth.php';
+	// NOT in parts/. Everything in parts/ is require'd at plugin load, and a
+	// page template run at plugin load calls get_header() before WordPress
+	// is ready — which took the whole site down on 2.10.0.
+	$file = dirname( __DIR__ ) . '/template-fullwidth.php';
 	return file_exists( $file ) ? $file : $template;
 }, 20 );
 
