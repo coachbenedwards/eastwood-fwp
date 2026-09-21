@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.8.0
+ * Version: 2.8.1
  * Author: Eastwood CFC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1461,7 +1461,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  *     table, pasted once at Settings → Eastwood FWP.
  * ------------------------------------------------------------------ */
 
-const EW_FWP_VERSION = '2.8.0';
+const EW_FWP_VERSION = '2.8.1';
 const EW_FWP_REPO    = 'coachbenedwards/eastwood-fwp';
 const EW_FWP_BRANCH  = 'main';
 
@@ -2869,11 +2869,17 @@ function ew_home_css() {
  * over what we print.
  */
 add_action( 'template_redirect', function () {
-	// A /match/<id>/ request sets no post type, so WordPress calls it the home
-	// query and is_front_page() is true. Without this guard the front page
-	// renders and exits before the match centre ever runs.
-	if ( get_query_var( 'ew_match' ) ) {
-		return;
+	// Every custom route here sets no post type, so WordPress calls it the home
+	// query and is_front_page() comes back true. Without this guard the front
+	// page renders and exits before the real handler runs — which is exactly
+	// what happened to /eastwood-news/ when this takeover was added.
+	//
+	// One list, checked in one place. Anything routed by a query var goes in
+	// it at the moment the route is written, not after somebody notices.
+	foreach ( array( 'ew_news', 'ew_match', 'ew_team' ) as $ew_route ) {
+		if ( get_query_var( $ew_route ) ) {
+			return;
+		}
 	}
 	if ( is_admin() || ! is_front_page() || is_feed() || is_embed() ) {
 		return;
