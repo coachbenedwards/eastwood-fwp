@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.7.1
+ * Version: 2.8.0
  * Author: Eastwood CFC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1201,7 +1201,7 @@ function ew_teams_roster() {
 		'Senior Men' => array(
 			array( 'name' => '1st Team',         'pitchero' => 140091, 'url' => '/eastwood-squad/' ),
 			array( 'name' => 'U21',              'pitchero' => 188320 ),
-			array( 'name' => 'Academy',          'pitchero' => 166249 ),
+			array( 'name' => 'Academy',          'pitchero' => 166249 ),  // page: /teams/academy/
 			array( 'name' => 'Development Team', 'pitchero' => 286212 ),
 			array( 'name' => 'Veterans',         'pitchero' => 153743 ),
 		),
@@ -1243,13 +1243,13 @@ function ew_teams_roster() {
  * Returns array( url, is_external ).
  */
 function ew_teams_link( $team ) {
+	// Every side has a page on this site. The pitchero id stays in the roster
+	// as a reference for anyone migrating content across, but nothing links
+	// out to it: the club's website is the club's website.
 	if ( ! empty( $team['url'] ) ) {
 		return array( $team['url'], false );
 	}
-	if ( ! empty( $team['pitchero'] ) ) {
-		return array( 'https://www.eastwoodcfc.co.uk/teams/' . (int) $team['pitchero'], true );
-	}
-	return array( '', false );
+	return array( home_url( '/teams/' . ew_team_slug( $team['name'] ) . '/' ), false );
 }
 
 function ew_teams_shortcode() {
@@ -1265,18 +1265,16 @@ function ew_teams_shortcode() {
 				list( $url, $external ) = ew_teams_link( $team );
 				$tag = $url ? 'a' : 'div';
 				?>
-			<<?php echo $tag; ?> class="ew-tm-card<?php echo $external ? ' is-external' : ''; ?>"
-				<?php if ( $url ) : ?>href="<?php echo esc_url( $url ); ?>"<?php endif; ?>
-				<?php if ( $external ) : ?>target="_blank" rel="noopener"<?php endif; ?>>
+			<<?php echo $tag; ?> class="ew-tm-card"
+				<?php if ( $url ) : ?>href="<?php echo esc_url( $url ); ?>"<?php endif; ?>>
 				<span class="ew-tm-name"><?php echo esc_html( $team['name'] ); ?></span>
-				<?php if ( $external ) : ?><span class="ew-tm-note">on Pitchero</span><?php endif; ?>
 			</<?php echo $tag; ?>>
 			<?php endforeach; ?>
 		</div>
 	</section>
 	<?php endforeach; ?>
-	<p class="ew-credit">Junior, mini and girls' teams still keep their fixtures and contact details on the club's
-		Pitchero pages while those sections are moved across.</p>
+	<p class="ew-credit">Twenty-nine teams play out of Coronation Park. New players are welcome across every
+		section &mdash; <a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a>.</p>
 </div>
 	<?php
 	return trim( ob_get_clean() );
@@ -1463,7 +1461,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  *     table, pasted once at Settings → Eastwood FWP.
  * ------------------------------------------------------------------ */
 
-const EW_FWP_VERSION = '2.7.1';
+const EW_FWP_VERSION = '2.8.0';
 const EW_FWP_REPO    = 'coachbenedwards/eastwood-fwp';
 const EW_FWP_BRANCH  = 'main';
 
@@ -2123,12 +2121,8 @@ function ew_rewrite_nav( $html ) {
  * loads whenever that wrapper appears.
  * ------------------------------------------------------------------ */
 
-function ew_prose_assets() {
-	if ( ! is_singular() ) { return; }
-	$post = get_post();
-	if ( ! $post || false === strpos( (string) $post->post_content, 'ew-prose' ) ) { return; }
-
-	$css = '
+function ew_prose_css_inline() {
+	return '
 .ew-prose{max-width:820px;margin:0 auto;padding:0 16px 56px;
  font-family:"Instrument Sans",system-ui,sans-serif;color:#111}
 .ew-prose *{box-sizing:border-box}
@@ -2152,6 +2146,14 @@ function ew_prose_assets() {
  .ew-prose .ew-lede{font-size:17px}
  .ew-prose h2{font-size:19px}
 }';
+}
+
+function ew_prose_assets() {
+	if ( ! is_singular() ) { return; }
+	$post = get_post();
+	if ( ! $post || false === strpos( (string) $post->post_content, 'ew-prose' ) ) { return; }
+
+	$css = ew_prose_css_inline();
 
 	wp_register_style( 'eastwood-prose', false );
 	wp_enqueue_style( 'eastwood-prose' );
@@ -3632,3 +3634,225 @@ function ew_academy_content() {
 </div>
 HTML;
 }
+
+/* ------------------------------------------------------------------
+ * A page for every team, on this site.
+ *
+ * The teams index used to send twenty-eight of the twenty-nine sides
+ * out to Pitchero. That was my call and it was wrong: the whole point
+ * of this build is that the club's website is the club's website.
+ * Every team now has a page here at /teams/<slug>/ and nothing links
+ * out to Pitchero.
+ *
+ * What is honestly on those pages depends on the side:
+ *
+ *  - The first team has the full live squad, appearances and goals,
+ *    because Football Web Pages covers the United Counties League.
+ *  - The Academy has its own written page.
+ *  - The other twenty-seven sides play in leagues that feed is not
+ *    licensed for, so there is no fixture or squad data available to
+ *    this site at all. Their pages carry what is true — who they are,
+ *    where they sit in the club, and how to reach the people who run
+ *    them — and say plainly that fixtures come through the club.
+ *
+ * Writing anything more than that would mean inventing it. The route
+ * to richer junior pages is a real data source (FA Full-Time, which
+ * runs these leagues) and that is a build of its own.
+ * ------------------------------------------------------------------ */
+
+const EW_TEAMS_SLUG  = 'teams';
+const EW_TEAMS_RULES = '1';
+
+add_action( 'init', function () {
+	add_rewrite_rule( '^' . EW_TEAMS_SLUG . '/([a-z0-9\-]+)/?$', 'index.php?ew_team=$matches[1]', 'top' );
+	if ( get_option( 'ew_teams_rules' ) !== EW_TEAMS_RULES ) {
+		flush_rewrite_rules( false );
+		update_option( 'ew_teams_rules', EW_TEAMS_RULES );
+	}
+}, 22 );
+
+add_filter( 'query_vars', function ( $vars ) {
+	$vars[] = 'ew_team';
+	return $vars;
+} );
+
+function ew_team_slug( $name ) {
+	return sanitize_title( $name );
+}
+
+/** Find a team in the roster by its slug. Returns array(group, team) or null. */
+function ew_team_find( $slug ) {
+	foreach ( ew_teams_roster() as $group => $teams ) {
+		foreach ( $teams as $team ) {
+			if ( ew_team_slug( $team['name'] ) === $slug ) {
+				return array( $group, $team );
+			}
+		}
+	}
+	return null;
+}
+
+/**
+ * What each section of the club is, in the club's own terms. Used on
+ * every team page so a parent landing cold knows where they are.
+ */
+function ew_team_group_blurb( $group ) {
+	switch ( $group ) {
+		case 'Senior Men':
+			return 'Our senior sides play out of Coronation Park, from the first team down through the '
+				. 'academy and development squads.';
+		case 'Junior':
+			return 'Our junior section is the biggest part of the club — twenty-two sides from under-7s '
+				. 'to under-18s, playing across Saturday and Sunday leagues.';
+		case 'Mini':
+			return 'Our youngest players, learning the game at Coronation Park.';
+		case 'Ladies and Girls':
+			return 'Girls\' and ladies\' football at Eastwood, and a section we are actively growing.';
+	}
+	return '';
+}
+
+function ew_team_markup( $group, $team ) {
+	$name     = $team['name'];
+	$is_first = '1st Team' === $name;
+	$is_acad  = 'Academy' === $name;
+
+	ob_start();
+	?>
+<div class="ew-prose ew-team">
+
+	<p class="ew-teamCrumb"><a href="<?php echo esc_url( home_url( '/eastwood-teams/' ) ); ?>">Teams</a>
+		<span>/</span> <?php echo esc_html( $group ); ?></p>
+
+	<h1 class="ew-teamTitle"><?php echo esc_html( $name ); ?></h1>
+
+	<p class="ew-lede"><?php echo esc_html( ew_team_group_blurb( $group ) ); ?></p>
+
+	<?php if ( $is_first ) : ?>
+
+	<p>The first team plays in the United Counties League Premier Division North. Every appearance, goal and
+		card is recorded as the league publishes it.</p>
+
+	<div class="ew-teamLinks">
+		<a href="<?php echo esc_url( home_url( '/eastwood-squad/' ) ); ?>">Squad and season stats</a>
+		<a href="<?php echo esc_url( home_url( '/eastwood-matches/' ) ); ?>">Fixtures, results and table</a>
+		<a href="<?php echo esc_url( home_url( '/eastwood-tickets/' ) ); ?>">Matchday and tickets</a>
+	</div>
+
+	<?php elseif ( $is_acad ) : ?>
+
+	<p>The Academy is a full-time elite programme combining intensive football development with a BTEC Level 3
+		education, based at Coronation Park.</p>
+
+	<div class="ew-teamLinks">
+		<a href="<?php echo esc_url( home_url( '/academy/' ) ); ?>">About the Academy</a>
+	</div>
+
+	<?php else : ?>
+
+	<h2>Fixtures and results</h2>
+
+	<p><?php echo esc_html( $name ); ?> plays in a league our results feed does not cover, so fixtures and
+		results for this side are not published on this page. Team managers circulate them directly, and they
+		also appear on the club's Facebook and Instagram.</p>
+
+	<p>If you would like fixtures for this side and are not getting them, let us know and we will sort it.</p>
+
+	<?php endif; ?>
+
+	<h2>Getting involved</h2>
+
+	<?php if ( 'Junior' === $group || 'Mini' === $group || 'Ladies and Girls' === $group ) : ?>
+	<p>New players are welcome across the junior, mini and girls' sections. Tell us your child's age and which
+		day suits and we will point you at the right side.</p>
+	<?php else : ?>
+	<p>For anything about this side — playing, coaching or volunteering — get in touch with the club.</p>
+	<?php endif; ?>
+
+	<div class="ew-cta">
+		<h3>Contact the club</h3>
+		<p>Eastwood Football Club, Coronation Park, Chewton Street, Eastwood, Nottinghamshire NG16 3HB</p>
+		<p><a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> &nbsp;·&nbsp;
+			<a href="tel:+441773432414">01773 432414</a></p>
+	</div>
+
+	<?php
+	// The rest of the section, so somebody landing here can move sideways.
+	$siblings = array();
+	foreach ( ew_teams_roster() as $g => $teams ) {
+		if ( $g !== $group ) { continue; }
+		foreach ( $teams as $t ) {
+			if ( $t['name'] !== $name ) { $siblings[] = $t['name']; }
+		}
+	}
+	if ( $siblings ) :
+	?>
+	<h2>Also in <?php echo esc_html( $group ); ?></h2>
+	<div class="ew-teamSibs">
+		<?php foreach ( $siblings as $sib ) : ?>
+		<a href="<?php echo esc_url( home_url( '/teams/' . ew_team_slug( $sib ) . '/' ) ); ?>"><?php
+			echo esc_html( $sib ); ?></a>
+		<?php endforeach; ?>
+	</div>
+	<?php endif; ?>
+
+</div>
+	<?php
+	return ob_get_clean();
+}
+
+function ew_team_css() {
+	return '
+.ew-team .ew-teamCrumb{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#8a8a8a;margin:0 0 10px}
+.ew-team .ew-teamCrumb a{color:#CC0000;text-decoration:none;font-weight:600}
+.ew-team .ew-teamCrumb a:hover{text-decoration:underline}
+.ew-team .ew-teamCrumb span{padding:0 4px;color:#c9c9c9}
+.ew-teamTitle{font-family:Anton,"Instrument Sans",sans-serif;font-size:40px;line-height:1.05;
+ letter-spacing:.01em;margin:0 0 16px;color:#111}
+.ew-teamLinks{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px;margin:0 0 24px}
+.ew-teamLinks a{display:block;background:#fff;border:1px solid #e6e6e6;border-left:3px solid #CC0000;
+ border-radius:4px;padding:14px 16px;text-decoration:none;color:#111;font-weight:600;font-size:15px;
+ transition:border-color .15s,box-shadow .15s}
+.ew-teamLinks a:hover{border-color:#CC0000;box-shadow:0 2px 10px rgba(0,0,0,.07)}
+.ew-teamSibs{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 20px}
+.ew-teamSibs a{display:inline-block;background:#f3f3f3;border-radius:3px;padding:6px 11px;font-size:13px;
+ text-decoration:none;color:#444;transition:background .15s,color .15s}
+.ew-teamSibs a:hover{background:#CC0000;color:#fff}
+@media(max-width:720px){ .ew-teamTitle{font-size:30px} }';
+}
+
+add_action( 'template_redirect', function () {
+	$slug = (string) get_query_var( 'ew_team' );
+	if ( '' === $slug || is_admin() ) {
+		return;
+	}
+
+	$found = ew_team_find( $slug );
+
+	add_action( 'wp_head', function () {
+		echo '<style id="ew-team">' . ew_prose_css_inline() . ew_team_css() . '</style>';
+	}, 20 );
+
+	if ( ! $found ) {
+		global $wp_query;
+		$wp_query->set_404();
+		status_header( 404 );
+		nocache_headers();
+		get_header();
+		echo '<div class="ew-prose"><p style="margin:60px 0">We have no team by that name. '
+			. '<a href="' . esc_url( home_url( '/eastwood-teams/' ) ) . '">All teams</a></p></div>';
+		get_footer();
+		exit;
+	}
+
+	list( $group, $team ) = $found;
+
+	add_filter( 'pre_get_document_title', function () use ( $team ) {
+		return $team['name'] . ' — ' . get_bloginfo( 'name' );
+	} );
+
+	get_header();
+	echo ew_team_markup( $group, $team ); // phpcs:ignore WordPress.Security.EscapeOutput
+	get_footer();
+	exit;
+}, 7 );
