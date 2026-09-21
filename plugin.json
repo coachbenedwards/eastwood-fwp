@@ -1,7 +1,7 @@
 {
   "name": "Eastwood — club data",
   "slug": "eastwood-fwp",
-  "version": "2.9.3",
+  "version": "2.10.0",
   "requires_php": "7.4",
   "homepage": "https://github.com/coachbenedwards/eastwood-fwp"
 }

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.9.3
+ * Version: 2.10.0
  * Author: Eastwood CFC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1463,7 +1463,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  *     table, pasted once at Settings → Eastwood FWP.
  * ------------------------------------------------------------------ */
 
-const EW_FWP_VERSION = '2.9.3';
+const EW_FWP_VERSION = '2.10.0';
 
 /*
  * Parts loader.
@@ -1721,10 +1721,16 @@ add_filter( 'pre_get_document_title', function ( $title ) {
  * there. The moment somebody edits a page by hand, we leave it alone.
  * ------------------------------------------------------------------ */
 
-const EW_PAGES_V = '7';
+const EW_PAGES_V = '8';
 
 function ew_owned_pages() {
 	return array(
+		'home-preview' => array(
+			'title'    => 'Homepage (new design)',
+			'content'  => ew_home_preview_content(),
+			'template' => EW_HOME_TPL,
+			'noindex'  => true,
+		),
 		'eastwood-teams' => array(
 			'title'   => 'Teams',
 			'content' => '[eastwood_teams]',
@@ -1791,6 +1797,24 @@ function ew_install_pages() {
 	foreach ( $owned as $slug => $spec ) {
 		$existing = get_page_by_path( $slug );
 
+		/**
+		 * A page that has to render outside the theme's text column says so
+		 * with a template. Set on create, and set on an existing page only
+		 * while it is still on the theme's default — if somebody has chosen
+		 * a template in the editor, that is their choice and it stands.
+		 */
+		$ew_apply_meta = function ( $id ) use ( $spec ) {
+			if ( ! empty( $spec['template'] ) ) {
+				$current = (string) get_post_meta( $id, '_wp_page_template', true );
+				if ( '' === $current || 'default' === $current ) {
+					update_post_meta( $id, '_wp_page_template', $spec['template'] );
+				}
+			}
+			if ( ! empty( $spec['noindex'] ) ) {
+				update_post_meta( $id, '_ew_noindex', '1' );
+			}
+		};
+
 		// WordPress creates a draft Privacy Policy page on install. It matches
 		// by slug, so the check below would skip creation and leave the URL
 		// 404ing. An unpublished placeholder is ours to take over.
@@ -1801,6 +1825,7 @@ function ew_install_pages() {
 				'post_title'   => $spec['title'],
 				'post_content' => $spec['content'],
 			) );
+			$ew_apply_meta( $existing->ID );
 			$state[ $slug ] = array( 'id' => $existing->ID, 'hash' => md5( $spec['content'] ) );
 			continue;
 		}
@@ -1814,10 +1839,13 @@ function ew_install_pages() {
 				'post_content' => $spec['content'],
 			) );
 			if ( ! is_wp_error( $id ) ) {
+				$ew_apply_meta( $id );
 				$state[ $slug ] = array( 'id' => $id, 'hash' => md5( $spec['content'] ) );
 			}
 			continue;
 		}
+
+		$ew_apply_meta( $existing->ID );
 
 		// Ours to update only while nobody has touched it.
 		$known = isset( $state[ $slug ]['hash'] ) ? $state[ $slug ]['hash'] : '';
@@ -2895,7 +2923,7 @@ add_action( 'template_redirect', function () {
 	//
 	// One list, checked in one place. Anything routed by a query var goes in
 	// it at the moment the route is written, not after somebody notices.
-	foreach ( array( 'ew_news', 'ew_match', 'ew_team', 'ew_preview' ) as $ew_route ) {
+	foreach ( array( 'ew_news', 'ew_match', 'ew_team' ) as $ew_route ) {
 		if ( get_query_var( $ew_route ) ) {
 			return;
 		}
