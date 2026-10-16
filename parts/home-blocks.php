@@ -148,6 +148,50 @@ function ew_hb_asset( $rel ) {
 	return plugins_url( 'assets/' . ltrim( $rel, '/' ), dirname( __DIR__ ) . '/eastwood-fwp.php' );
 }
 
+/**
+ * "Label | football-web-pages-team-id" lines from the editor, as the club's
+ * sides. A team with no id is still a team — it renders, and says its
+ * fixtures are not on the feed, rather than being quietly dropped.
+ */
+function ew_hb_teams( $content ) {
+	$teams = array();
+	foreach ( ew_hb_lines( $content ) as $line ) {
+		$parts = array_map( 'trim', explode( '|', $line ) );
+		if ( '' === $parts[0] ) {
+			continue;
+		}
+		$teams[] = array(
+			'label' => $parts[0],
+			'id'    => isset( $parts[1] ) ? (int) preg_replace( '/[^0-9]/', '', $parts[1] ) : 0,
+		);
+	}
+	if ( ! $teams ) {
+		$teams = array(
+			array( 'label' => "Men's First Team", 'id' => (int) EW_TEAM ),
+			array( 'label' => "Women's", 'id' => 0 ),
+			array( 'label' => 'Reserves', 'id' => 0 ),
+			array( 'label' => 'Under 21s', 'id' => 0 ),
+		);
+	}
+	return $teams;
+}
+
+/** Every match the feed holds for one team, split into done and to come. */
+function ew_hb_team_matches( $id ) {
+	if ( ! $id ) {
+		return array( 'played' => array(), 'todo' => array() );
+	}
+	$fx  = ew_fwp_fetch( 'fixtures-results', array( 'team' => $id ) );
+	$all = (array) ( $fx['fixtures-results']['matches'] ?? array() );
+
+	$played = array_values( array_filter( $all, 'ew_home_played' ) );
+	$todo   = array_values( array_filter( $all, function ( $m ) { return ! ew_home_played( $m ); } ) );
+	usort( $played, function ( $a, $b ) { return strcmp( (string) $b['date'], (string) $a['date'] ); } );
+	usort( $todo, function ( $a, $b ) { return strcmp( (string) $a['date'], (string) $b['date'] ); } );
+
+	return array( 'played' => $played, 'todo' => $todo );
+}
+
 /** The post used by the hero, so the news grid below does not repeat it. */
 function ew_hb_hero_id( $set = null ) {
 	static $id = 0;
@@ -296,12 +340,18 @@ add_shortcode( 'eastwood_home_hero', 'ew_hb_hero_sc' );
 function ew_hb_banner_sc( $atts ) {
 	$atts = shortcode_atts(
 		array(
-			'cta'        => 'Buy Tickets',
-			'cta_url'    => '/eastwood-tickets/',
-			'centre'     => 'Match Centre',
-			'centre_url' => '/eastwood-matches/',
-			'image'      => ew_hb_asset( 'banner/scarf.jpg' ),
-			'countdown'  => 'yes',
+			'cta'            => 'Buy Tickets',
+			'cta_url'        => '/eastwood-tickets/',
+			'hosp'           => 'Book Hospitality',
+			'hosp_url'       => '/eastwood-hospitality/',
+			'centre'         => '',
+			'centre_url'     => '/eastwood-matches/',
+			'image'          => ew_hb_asset( 'banner/scarf.jpg' ),
+			'countdown'      => 'yes',
+			'featured'       => 'Featured On',
+			'featured_url'   => 'https://www.youtube.com/@eastwoodfootballclub',
+			'featured_icon'  => ew_hb_asset( 'banner/play.png' ),
+			'featured_label' => 'YouTube',
 		),
 		$atts,
 		'eastwood_home_banner'
@@ -368,11 +418,38 @@ function ew_hb_banner_sc( $atts ) {
 			<a class="is-primary" href="<?php echo esc_url( home_url( $atts['cta_url'] ) ); ?>"><?php
 				echo esc_html( $atts['cta'] ); ?></a>
 			<?php endif; ?>
+			<?php if ( $at_home && '' !== $atts['hosp'] ) : ?>
+			<a href="<?php echo esc_url( home_url( $atts['hosp_url'] ) ); ?>"><?php
+				echo esc_html( $atts['hosp'] ); ?></a>
+			<?php endif; ?>
 			<?php if ( '' !== $atts['centre'] ) : ?>
 			<a href="<?php echo esc_url( home_url( $atts['centre_url'] ) ); ?>"><?php
 				echo esc_html( $atts['centre'] ); ?></a>
 			<?php endif; ?>
 		</p>
+
+		<?php if ( '' !== $atts['featured']
+			&& ( '' !== $atts['featured_icon'] || '' !== $atts['featured_label'] ) ) : ?>
+		<p class="ewp-bannerFeat">
+			<span><?php echo esc_html( $atts['featured'] ); ?></span>
+			<?php
+			$feat_url = '' !== $atts['featured_url'] ? $atts['featured_url'] : '';
+			if ( '' !== $feat_url && 0 !== strpos( $feat_url, 'http' ) ) {
+				$feat_url = home_url( $feat_url );
+			}
+			?>
+			<?php if ( '' !== $feat_url ) : ?><a href="<?php echo esc_url( $feat_url ); ?>"
+				rel="noopener" target="_blank"><?php endif; ?>
+				<?php if ( '' !== $atts['featured_icon'] ) : ?>
+				<img src="<?php echo esc_url( $atts['featured_icon'] ); ?>" alt=""
+					onerror="this.style.display='none'">
+				<?php endif; ?>
+				<?php if ( '' !== $atts['featured_label'] ) : ?>
+				<b><?php echo esc_html( $atts['featured_label'] ); ?></b>
+				<?php endif; ?>
+			<?php if ( '' !== $feat_url ) : ?></a><?php endif; ?>
+		</p>
+		<?php endif; ?>
 	</div>
 	</div>
 </section>
@@ -383,83 +460,137 @@ add_shortcode( 'eastwood_home_banner', 'ew_hb_banner_sc' );
 
 /* ------------------------------------------------------------------
  * [eastwood_home_fixtures title="..." count="8" open="fixtures"]
+ * Men's First Team | 2059
+ * Women's |
+ * [/eastwood_home_fixtures]
+ *
+ * Two levels of tab, as Forest run their matches page: the club's sides
+ * along the top on white, then Fixtures / Results / Table underneath.
  * ------------------------------------------------------------------ */
 
-function ew_hb_fixtures_sc( $atts ) {
+function ew_hb_fixtures_sc( $atts, $content = '' ) {
 	$atts = shortcode_atts(
 		array( 'title' => 'Fixtures & Results', 'count' => '8', 'open' => 'fixtures' ),
 		$atts,
 		'eastwood_home_fixtures'
 	);
-	$n = max( 1, (int) $atts['count'] );
-
-	$fx  = ew_fwp_fetch( 'fixtures-results' );
-	$all = (array) ( $fx['fixtures-results']['matches'] ?? array() );
-
-	$played = array_values( array_filter( $all, 'ew_home_played' ) );
-	$todo   = array_values( array_filter( $all, function ( $m ) { return ! ew_home_played( $m ); } ) );
-	usort( $played, function ( $a, $b ) { return strcmp( $b['date'], $a['date'] ); } );
-	usort( $todo, function ( $a, $b ) { return strcmp( $a['date'], $b['date'] ); } );
-
-	$lt   = ew_fwp_fetch( 'league-table' );
-	$rows = (array) ( $lt['league-table']['teams'] ?? array() );
+	$n     = max( 1, (int) $atts['count'] );
+	$teams = ew_hb_teams( $content );
 
 	$tabs = array( 'fixtures' => 'Fixtures', 'results' => 'Results', 'table' => 'Table' );
 	$open = isset( $tabs[ $atts['open'] ] ) ? $atts['open'] : 'fixtures';
 
+	// Open on the first side that has anything, so nobody lands on a tab
+	// that is empty only because the feed does not carry that team.
+	$t_open = 0;
+	foreach ( $teams as $i => $team ) {
+		$teams[ $i ]['split'] = ew_hb_team_matches( $team['id'] );
+		if ( ! $t_open && ( $teams[ $i ]['split']['todo'] || $teams[ $i ]['split']['played'] ) ) {
+			$t_open = $i + 1;
+		}
+	}
+	$t_open = $t_open ? $t_open - 1 : 0;
+
 	ob_start();
 	?>
-<section class="ewp ewp-fixtures">
-	<div class="ewp-wrap">
-		<?php if ( '' !== $atts['title'] ) : ?>
-		<h2 class="ewp-h2"><?php echo esc_html( $atts['title'] ); ?></h2>
-		<?php endif; ?>
-		<div class="ewp-tabs" role="tablist">
-			<?php foreach ( $tabs as $key => $label ) : ?>
-			<button type="button" data-pv="<?php echo esc_attr( $key ); ?>"
-				aria-selected="<?php echo $key === $open ? 'true' : 'false'; ?>"><?php
-				echo esc_html( $label ); ?></button>
-			<?php endforeach; ?>
+<section class="ewp ewp-fixtures" data-pv-group>
+	<?php if ( count( $teams ) > 1 ) : ?>
+	<div class="ewp-teamBar">
+		<div class="ewp-wrap">
+			<div class="ewp-teamTabs" role="tablist">
+				<?php foreach ( $teams as $i => $team ) : ?>
+				<button type="button" data-pv="team<?php echo (int) $i; ?>"
+					aria-selected="<?php echo $i === $t_open ? 'true' : 'false'; ?>"><?php
+					echo esc_html( $team['label'] ); ?></button>
+				<?php endforeach; ?>
+			</div>
 		</div>
 	</div>
+	<?php endif; ?>
 
-	<div class="ewp-panel" data-pv-panel="fixtures"<?php echo 'fixtures' === $open ? '' : ' hidden'; ?>>
-		<?php echo ew_hb_rail( array_slice( $todo, 0, $n ), false, 'No fixtures published yet.' ); // phpcs:ignore ?>
-	</div>
-
-	<div class="ewp-panel" data-pv-panel="results"<?php echo 'results' === $open ? '' : ' hidden'; ?>>
-		<?php echo ew_hb_rail( array_slice( $played, 0, $n ), true, 'No results yet this season.' ); // phpcs:ignore ?>
-	</div>
-
-	<div class="ewp-panel ewp-wrap" data-pv-panel="table"<?php echo 'table' === $open ? '' : ' hidden'; ?>>
-		<?php if ( ! $rows ) : ?>
-		<p class="ewp-empty">The league table is not available right now.</p>
-		<?php else : ?>
-		<table class="ewp-table">
-			<thead><tr><th>#</th><th class="ewp-club">Club</th><th>P</th><th class="ewp-opt">W</th>
-				<th class="ewp-opt">D</th><th class="ewp-opt">L</th><th>GD</th><th>Pts</th></tr></thead>
-			<tbody>
-			<?php foreach ( $rows as $t ) :
-				$a  = (array) ( $t['all-matches'] ?? array() );
-				$us = (int) ( $t['id'] ?? 0 ) === (int) EW_TEAM; ?>
-				<tr<?php echo $us ? ' class="is-us"' : ''; ?>>
-					<td><?php echo esc_html( $t['position'] ?? '' ); ?></td>
-					<td class="ewp-club">
-						<img src="<?php echo esc_url( ew_home_badge( $t['id'] ?? 0 ) ); ?>" alt=""
-							onerror="this.style.visibility='hidden'"><?php echo esc_html( $t['name'] ?? '' ); ?></td>
-					<td><?php echo esc_html( $a['played'] ?? '' ); ?></td>
-					<td class="ewp-opt"><?php echo esc_html( $a['won'] ?? '' ); ?></td>
-					<td class="ewp-opt"><?php echo esc_html( $a['drawn'] ?? '' ); ?></td>
-					<td class="ewp-opt"><?php echo esc_html( $a['lost'] ?? '' ); ?></td>
-					<td><?php echo esc_html( $a['goal-difference'] ?? '' ); ?></td>
-					<td class="ewp-pts"><?php echo esc_html( $t['total-points'] ?? '' ); ?></td>
-				</tr>
-			<?php endforeach; ?>
-			</tbody>
-		</table>
+	<div class="ewp-fixturesBody">
+		<?php if ( '' !== $atts['title'] ) : ?>
+		<div class="ewp-wrap"><h2 class="ewp-h2 is-center"><?php echo esc_html( $atts['title'] ); ?></h2></div>
 		<?php endif; ?>
+
+		<?php foreach ( $teams as $i => $team ) :
+			$todo   = $team['split']['todo'];
+			$played = $team['split']['played'];
+			?>
+		<div data-pv-panel="team<?php echo (int) $i; ?>"<?php echo $i === $t_open ? '' : ' hidden'; ?>>
+			<?php if ( ! $todo && ! $played ) : ?>
+			<p class="ewp-empty is-center"><?php
+				echo esc_html( $team['id']
+					? 'Nothing published for this team yet.'
+					: $team['label'] . ' fixtures are not on the feed yet.' ); ?></p>
+			<?php else : ?>
+			<div data-pv-group>
+				<div class="ewp-wrap">
+					<div class="ewp-tabs" role="tablist">
+						<?php foreach ( $tabs as $key => $label ) : ?>
+						<button type="button" data-pv="<?php echo esc_attr( $key ); ?>"
+							aria-selected="<?php echo $key === $open ? 'true' : 'false'; ?>"><?php
+							echo esc_html( $label ); ?></button>
+						<?php endforeach; ?>
+					</div>
+				</div>
+
+				<div class="ewp-panel" data-pv-panel="fixtures"<?php echo 'fixtures' === $open ? '' : ' hidden'; ?>>
+					<?php echo ew_hb_rail( array_slice( $todo, 0, $n ), false, 'No fixtures published yet.' ); // phpcs:ignore ?>
+				</div>
+
+				<div class="ewp-panel" data-pv-panel="results"<?php echo 'results' === $open ? '' : ' hidden'; ?>>
+					<?php echo ew_hb_rail( array_slice( $played, 0, $n ), true, 'No results yet this season.' ); // phpcs:ignore ?>
+				</div>
+
+				<div class="ewp-panel ewp-wrap" data-pv-panel="table"<?php echo 'table' === $open ? '' : ' hidden'; ?>>
+					<?php echo ew_hb_table( $team['id'] ); // phpcs:ignore ?>
+				</div>
+			</div>
+			<?php endif; ?>
+		</div>
+		<?php endforeach; ?>
 	</div>
 </section>
+	<?php
+	return ob_get_clean();
+}
+
+/** The league table the given team sits in. */
+function ew_hb_table( $team_id ) {
+	if ( ! $team_id ) {
+		return '<p class="ewp-empty is-center">No league table for this team yet.</p>';
+	}
+	$lt   = ew_fwp_fetch( 'league-table', array( 'team' => $team_id ) );
+	$rows = (array) ( $lt['league-table']['teams'] ?? array() );
+	if ( ! $rows ) {
+		return '<p class="ewp-empty is-center">The league table is not available right now.</p>';
+	}
+
+	ob_start();
+	?>
+<table class="ewp-table">
+	<thead><tr><th>#</th><th class="ewp-club">Club</th><th>P</th><th class="ewp-opt">W</th>
+		<th class="ewp-opt">D</th><th class="ewp-opt">L</th><th>GD</th><th>Pts</th></tr></thead>
+	<tbody>
+	<?php foreach ( $rows as $t ) :
+		$a  = (array) ( $t['all-matches'] ?? array() );
+		$us = (int) ( $t['id'] ?? 0 ) === (int) $team_id; ?>
+		<tr<?php echo $us ? ' class="is-us"' : ''; ?>>
+			<td><?php echo esc_html( $t['position'] ?? '' ); ?></td>
+			<td class="ewp-club">
+				<img src="<?php echo esc_url( ew_home_badge( $t['id'] ?? 0 ) ); ?>" alt=""
+					onerror="this.style.visibility='hidden'"><?php echo esc_html( $t['name'] ?? '' ); ?></td>
+			<td><?php echo esc_html( $a['played'] ?? '' ); ?></td>
+			<td class="ewp-opt"><?php echo esc_html( $a['won'] ?? '' ); ?></td>
+			<td class="ewp-opt"><?php echo esc_html( $a['drawn'] ?? '' ); ?></td>
+			<td class="ewp-opt"><?php echo esc_html( $a['lost'] ?? '' ); ?></td>
+			<td><?php echo esc_html( $a['goal-difference'] ?? '' ); ?></td>
+			<td class="ewp-pts"><?php echo esc_html( $t['total-points'] ?? '' ); ?></td>
+		</tr>
+	<?php endforeach; ?>
+	</tbody>
+</table>
 	<?php
 	return ob_get_clean();
 }
@@ -497,45 +628,17 @@ function ew_hb_upcoming_sc( $atts, $content = '' ) {
 	);
 	$n = max( 1, (int) $atts['count'] );
 
-	// One tab per team. Nothing typed into the editor gets the club's four
-	// sides, because that is what the club has — not what the feed carries.
-	$teams = array();
-	foreach ( ew_hb_lines( $content ) as $line ) {
-		$parts = array_map( 'trim', explode( '|', $line ) );
-		if ( '' === $parts[0] ) {
-			continue;
-		}
-		$teams[] = array(
-			'label' => $parts[0],
-			'id'    => isset( $parts[1] ) ? (int) preg_replace( '/[^0-9]/', '', $parts[1] ) : 0,
-		);
-	}
-	if ( ! $teams ) {
-		$teams = array(
-			array( 'label' => "Men's First Team", 'id' => (int) EW_TEAM ),
-			array( 'label' => "Women's", 'id' => 0 ),
-			array( 'label' => 'Reserves', 'id' => 0 ),
-			array( 'label' => 'Under 21s', 'id' => 0 ),
-		);
-	}
-
-	$cta = array( 'label' => $atts['cta'], 'url' => home_url( $atts['cta_url'] ) );
+	$teams = ew_hb_teams( $content );
+	$cta   = array( 'label' => $atts['cta'], 'url' => home_url( $atts['cta_url'] ) );
 
 	// Work out each tab's fixtures up front, so the first tab with any can
 	// be the one that opens. A page that lands on an empty tab looks broken
 	// even when every other tab is full.
 	$open = 0;
 	foreach ( $teams as $i => $team ) {
-		$todo = array();
-		if ( $team['id'] ) {
-			$fx   = ew_fwp_fetch( 'fixtures-results', array( 'team' => $team['id'] ) );
-			$all  = (array) ( $fx['fixtures-results']['matches'] ?? array() );
-			$todo = array_values( array_filter( $all, function ( $m ) { return ! ew_home_played( $m ); } ) );
-			usort( $todo, function ( $a, $b ) { return strcmp( $a['date'], $b['date'] ); } );
-			$todo = array_slice( $todo, 0, $n );
-		}
-		$teams[ $i ]['matches'] = $todo;
-		if ( $todo && ! $open ) {
+		$split = ew_hb_team_matches( $team['id'] );
+		$teams[ $i ]['matches'] = array_slice( $split['todo'], 0, $n );
+		if ( $teams[ $i ]['matches'] && ! $open ) {
 			$open = $i + 1;
 		}
 	}
@@ -543,14 +646,14 @@ function ew_hb_upcoming_sc( $atts, $content = '' ) {
 
 	ob_start();
 	?>
-<section class="ewp ewp-upcoming">
+<section class="ewp ewp-upcoming" data-pv-group>
 	<div class="ewp-wrap">
 		<?php if ( '' !== $atts['title'] ) : ?>
 		<h2 class="ewp-h2 is-light is-center"><?php echo esc_html( $atts['title'] ); ?></h2>
 		<?php endif; ?>
 
 		<?php if ( count( $teams ) > 1 ) : ?>
-		<div class="ewp-pills" role="tablist">
+		<div class="ewp-pills" role="tablist" data-pv-tabs>
 			<?php foreach ( $teams as $i => $team ) : ?>
 			<button type="button" data-pv="t<?php echo (int) $i; ?>"
 				aria-selected="<?php echo $i === $open ? 'true' : 'false'; ?>"><?php
@@ -822,6 +925,13 @@ function ew_hb_css() {
  letter-spacing:.12em;text-transform:uppercase;text-decoration:none;color:#fff;
  border:1px solid rgba(255,255,255,.55)}
 .ewp-bannerCta a.is-primary{background:#fff;color:#CC0000;border-color:#fff}
+.ewp-bannerFeat{display:flex;align-items:center;justify-content:center;gap:11px;margin:26px 0 0}
+.ewp-bannerFeat > span{font-size:10px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;
+ color:rgba(255,255,255,.62)}
+.ewp-bannerFeat a{display:inline-flex;align-items:center;gap:8px;text-decoration:none;color:#fff}
+.ewp-bannerFeat img{height:22px;width:auto;display:block}
+.ewp-bannerFeat b{font-size:13px;font-weight:700;letter-spacing:.04em}
+.ewp-bannerFeat a:hover b{text-decoration:underline}
 .ewp-bannerCta a:hover{border-color:#fff}
 @media(max-width:760px){
  .ewp-bannerName{font-size:26px}
@@ -851,14 +961,32 @@ function ew_hb_css() {
  line-height:1.02;color:#fff;margin:0 0 10px;max-width:16ch;text-transform:uppercase}
 .ewp-heroText i{font-style:normal;font-size:13px;color:#d6d6d6}
 
-.ewp-fixtures{background:#f3f3f3;padding:44px 0 48px}
-.ewp-tabs{display:flex;gap:0;border-bottom:2px solid #e0e0e0;margin:0 0 26px}
-.ewp-tabs button{appearance:none;background:none;border:0;border-bottom:3px solid transparent;
- margin-bottom:-2px;padding:10px 20px 12px;font-family:Anton,sans-serif;font-size:16px;
- letter-spacing:.06em;text-transform:uppercase;color:#8a8a8a;cursor:pointer}
-.ewp-tabs button[aria-selected="true"]{color:#CC0000;border-bottom-color:#CC0000}
+.ewp-fixtures{background:#f3f3f3}
+.ewp-fixturesBody{padding:36px 0 48px}
+
+/* The club sides, on white above everything else, the Forest shape. */
+.ewp-teamBar{background:#fff}
+.ewp-teamTabs{display:flex;flex-wrap:wrap;gap:26px;overflow-x:auto;scrollbar-width:none}
+.ewp-teamTabs::-webkit-scrollbar{display:none}
+.ewp-teamTabs button{appearance:none;background:none;border:0;cursor:pointer;white-space:nowrap;
+ padding:16px 0 13px;border-bottom:3px solid transparent;margin-bottom:-1px;
+ font-family:Anton,"Instrument Sans",sans-serif;font-size:18px;letter-spacing:.04em;
+ text-transform:uppercase;color:#6f6f6f;transition:color .15s}
+.ewp-teamTabs button:hover{color:#101010}
+.ewp-teamTabs button[aria-selected="true"]{color:#101010;border-bottom-color:#CC0000}
+
+/* Fixtures / Results / Table, centred under them. */
+.ewp-tabs{display:flex;justify-content:center;gap:26px;margin:0 0 26px}
+.ewp-tabs button{appearance:none;background:none;border:0;cursor:pointer;
+ padding:6px 4px 9px;border-bottom:3px solid transparent;
+ font-family:"Instrument Sans",system-ui,sans-serif;font-size:18px;font-weight:700;
+ color:#1e293b;transition:color .15s}
+.ewp-tabs button:hover{color:#000}
+.ewp-tabs button[aria-selected="true"]{color:#000;border-bottom-color:#CC0000}
 .ewp-panel[hidden]{display:none}
+[data-pv-panel][hidden]{display:none}
 .ewp-empty{max-width:1180px;margin:0 auto;padding:30px 16px;color:#6b6b6b;font-size:15px}
+.ewp-empty.is-center{text-align:center}
 
 .ewp-rail{position:relative;max-width:1180px;margin:0 auto;padding:0 16px}
 .ewp-railList{display:flex;gap:10px;list-style:none;margin:0;padding:0 0 4px;
@@ -989,7 +1117,12 @@ function ew_hb_css() {
  .ewp-hero a{min-height:380px}
  .ewp-heroText b{font-size:30px;max-width:none}
  .ewp-h2{font-size:21px}
- .ewp-fixtures,.ewp-news{padding:32px 0 36px}
+ .ewp-news{padding:32px 0 36px}
+ .ewp-fixturesBody{padding:26px 0 36px}
+ .ewp-teamTabs{gap:18px;flex-wrap:nowrap}
+ .ewp-teamTabs button{font-size:15px}
+ .ewp-tabs{gap:18px}
+ .ewp-tabs button{font-size:15px}
  .ewp-upcoming,.ewp-shop{padding:32px 0 38px}
  .ewp-shopGrid{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
  .ewp-discover{padding:34px 0 38px}
@@ -1034,17 +1167,30 @@ function ew_hb_js() {
   });
   window.addEventListener('resize',function(){rails.forEach(sync);});
 
-  var tabs=[].slice.call(root.querySelectorAll('.ewp-tabs button, .ewp-pills button'));
-  var panels=[].slice.call(root.querySelectorAll('[data-pv-panel]'));
-  tabs.forEach(function(b){
-   b.addEventListener('click',function(){
-    var want=b.getAttribute('data-pv');
-    tabs.forEach(function(t){t.setAttribute('aria-selected', t===b ? 'true':'false');});
-    panels.forEach(function(p){
-     if(p.getAttribute('data-pv-panel')===want){p.removeAttribute('hidden');}
-     else{p.setAttribute('hidden','');}
+  /* Tabs can nest: a team tab holds a Fixtures/Results/Table set inside it.
+     Each set lives in its own [data-pv-group], and a button only ever moves
+     the panels belonging to the same group — otherwise clicking a team
+     would hide the inner panels too and the section would go blank. */
+  var groups=[].slice.call(root.querySelectorAll('[data-pv-group]'));
+  if(root.hasAttribute('data-pv-group')){groups.unshift(root);}
+  groups.forEach(function(g){
+   function mine(sel){
+    return [].slice.call(g.querySelectorAll(sel)).filter(function(el){
+     return el.closest('[data-pv-group]')===g;
     });
-    rails.forEach(sync);
+   }
+   var tabs=mine('[data-pv]');
+   var panels=mine('[data-pv-panel]');
+   tabs.forEach(function(b){
+    b.addEventListener('click',function(){
+     var want=b.getAttribute('data-pv');
+     tabs.forEach(function(t){t.setAttribute('aria-selected', t===b ? 'true':'false');});
+     panels.forEach(function(p){
+      if(p.getAttribute('data-pv-panel')===want){p.removeAttribute('hidden');}
+      else{p.setAttribute('hidden','');}
+     });
+     rails.forEach(sync);
+    });
    });
   });
  });
@@ -1078,7 +1224,12 @@ JS;
 
 function ew_home_preview_content() {
 	return "[eastwood_home_hero]\n\n"
-		. "[eastwood_home_fixtures title=\"Fixtures &amp; Results\" count=\"8\"]\n\n"
+		. "[eastwood_home_fixtures title=\"Fixtures &amp; Results\" count=\"8\"]\n"
+		. "Men's First Team | 2059\n"
+		. "Women's |\n"
+		. "Reserves |\n"
+		. "Under 21s |\n"
+		. "[/eastwood_home_fixtures]\n\n"
 		. "[eastwood_home_upcoming title=\"Upcoming Matches\" count=\"3\"]\n"
 		. "Men's First Team | 2059\n"
 		. "Women's |\n"
