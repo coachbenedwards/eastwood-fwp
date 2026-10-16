@@ -168,7 +168,7 @@ function ew_hb_teams( $content ) {
 	if ( ! $teams ) {
 		$teams = array(
 			array( 'label' => "Men's First Team", 'id' => (int) EW_TEAM ),
-			array( 'label' => "Women's", 'id' => 0 ),
+			array( 'label' => "Women's First Team", 'id' => 0 ),
 			array( 'label' => 'Reserves', 'id' => 0 ),
 			array( 'label' => 'Under 21s', 'id' => 0 ),
 		);
@@ -583,7 +583,7 @@ add_shortcode( 'eastwood_home_banner', 'ew_hb_banner_sc' );
 /* ------------------------------------------------------------------
  * [eastwood_home_fixtures title="..." count="8" open="fixtures"]
  * Men's First Team | 2059
- * Women's |
+ * Women's First Team |
  * [/eastwood_home_fixtures]
  *
  * Two levels of tab, as Forest run their matches page: the club's sides
@@ -755,7 +755,7 @@ add_shortcode( 'eastwood_home_fixtures', 'ew_hb_fixtures_sc' );
  * [eastwood_home_upcoming title="..." count="3" all="View all matches"
  *                         all_url="/matches/" cta="Buy tickets" cta_url="/tickets/"]
  * Men's First Team | 2059
- * Women's |
+ * Women's First Team |
  * [/eastwood_home_upcoming]
  *
  * One tab per team, "Label | football-web-pages-team-id". Only the men's
@@ -1425,13 +1425,13 @@ function ew_home_preview_content() {
 	return "[eastwood_home_hero]\n\n"
 		. "[eastwood_home_fixtures title=\"Fixtures &amp; Results\" count=\"8\"]\n"
 		. "Men's First Team | 2059\n"
-		. "Women's |\n"
+		. "Women's First Team |\n"
 		. "Reserves |\n"
 		. "Under 21s |\n"
 		. "[/eastwood_home_fixtures]\n\n"
 		. "[eastwood_home_upcoming title=\"Upcoming Matches\" count=\"3\"]\n"
 		. "Men's First Team | 2059\n"
-		. "Women's |\n"
+		. "Women's First Team |\n"
 		. "Reserves |\n"
 		. "Under 21s |\n"
 		. "[/eastwood_home_upcoming]\n\n"
