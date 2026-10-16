@@ -79,7 +79,7 @@ function ew_home_blocks_present() {
 	if ( ! $post ) {
 		return false;
 	}
-	foreach ( array( 'eastwood_home_hero', 'eastwood_home_fixtures',
+	foreach ( array( 'eastwood_home_banner', 'eastwood_home_hero', 'eastwood_home_fixtures',
 		'eastwood_home_discover', 'eastwood_home_news' ) as $tag ) {
 		if ( has_shortcode( (string) $post->post_content, $tag ) ) {
 			return true;
@@ -260,6 +260,84 @@ function ew_hb_hero_sc( $atts ) {
 	return ob_get_clean();
 }
 add_shortcode( 'eastwood_home_hero', 'ew_hb_hero_sc' );
+
+/* ------------------------------------------------------------------
+ * [eastwood_home_banner cta="Buy Tickets" cta_url="/eastwood-tickets/"]
+ * The next fixture, full width, directly under the header. The words on
+ * the buttons are editor-side; everything else comes from the feed.
+ * ------------------------------------------------------------------ */
+
+function ew_hb_banner_sc( $atts ) {
+	$atts = shortcode_atts(
+		array(
+			'cta'        => 'Buy Tickets',
+			'cta_url'    => '/eastwood-tickets/',
+			'centre'     => 'Match Centre',
+			'centre_url' => '/eastwood-matches/',
+		),
+		$atts,
+		'eastwood_home_banner'
+	);
+
+	$fx   = ew_fwp_fetch( 'fixtures-results' );
+	$all  = (array) ( $fx['fixtures-results']['matches'] ?? array() );
+	$todo = array_values( array_filter( $all, function ( $m ) { return ! ew_home_played( $m ); } ) );
+	usort( $todo, function ( $a, $b ) { return strcmp( (string) $a['date'], (string) $b['date'] ); } );
+	$next = $todo ? $todo[0] : null;
+	if ( ! $next ) {
+		return '';
+	}
+
+	$home    = (array) ( $next['home-team'] ?? array() );
+	$away    = (array) ( $next['away-team'] ?? array() );
+	$at_home = (int) ( $home['id'] ?? 0 ) === (int) EW_TEAM;
+	$ts      = strtotime( (string) ( $next['date'] ?? '' ) . ' ' . (string) ( $next['time'] ?? '15:00' ) );
+	$comp    = (string) ( $next['competition']['name'] ?? '' );
+
+	ob_start();
+	?>
+<section class="ewp ewp-banner">
+	<div class="ewp-bannerInner">
+		<?php if ( '' !== $comp ) : ?>
+		<p class="ewp-bannerComp"><?php echo esc_html( $comp ); ?></p>
+		<?php endif; ?>
+
+		<p class="ewp-bannerWhere">
+			<em><?php echo $at_home ? 'Home' : 'Away'; ?></em>
+			<?php echo esc_html( (string) ( $next['venue'] ?? '' ) ); ?>
+		</p>
+
+		<div class="ewp-bannerTie">
+			<span class="ewp-bannerName"><?php echo esc_html( (string) ( $home['name'] ?? '' ) ); ?></span>
+			<img src="<?php echo esc_url( ew_home_badge( $home['id'] ?? 0 ) ); ?>" alt=""
+				onerror="this.style.visibility='hidden'">
+			<span class="ewp-bannerV">V</span>
+			<img src="<?php echo esc_url( ew_home_badge( $away['id'] ?? 0 ) ); ?>" alt=""
+				onerror="this.style.visibility='hidden'">
+			<span class="ewp-bannerName"><?php echo esc_html( (string) ( $away['name'] ?? '' ) ); ?></span>
+		</div>
+
+		<?php if ( $ts ) : ?>
+		<p class="ewp-bannerWhen"><?php echo esc_html( date_i18n( 'D j M', $ts ) ); ?>
+			<b><?php echo esc_html( date_i18n( 'H:i', $ts ) ); ?></b></p>
+		<?php endif; ?>
+
+		<p class="ewp-bannerCta">
+			<?php if ( $at_home && '' !== $atts['cta'] ) : ?>
+			<a class="is-primary" href="<?php echo esc_url( home_url( $atts['cta_url'] ) ); ?>"><?php
+				echo esc_html( $atts['cta'] ); ?></a>
+			<?php endif; ?>
+			<?php if ( '' !== $atts['centre'] ) : ?>
+			<a href="<?php echo esc_url( home_url( $atts['centre_url'] ) ); ?>"><?php
+				echo esc_html( $atts['centre'] ); ?></a>
+			<?php endif; ?>
+		</p>
+	</div>
+</section>
+	<?php
+	return ob_get_clean();
+}
+add_shortcode( 'eastwood_home_banner', 'ew_hb_banner_sc' );
 
 /* ------------------------------------------------------------------
  * [eastwood_home_fixtures title="..." count="8" open="fixtures"]
@@ -458,6 +536,32 @@ add_shortcode( 'eastwood_home_news', 'ew_hb_news_sc' );
 
 function ew_hb_css() {
 	return '
+.ewp-banner{background:#CC0000;color:#fff;padding:30px 16px 34px;text-align:center}
+.ewp-bannerInner{max-width:1180px;margin:0 auto}
+.ewp-bannerComp{margin:0 0 14px;font-size:11px;font-weight:700;letter-spacing:.14em;
+ text-transform:uppercase;color:rgba(255,255,255,.78)}
+.ewp-bannerWhere{margin:0 0 20px;font-size:10px;font-weight:600;letter-spacing:.2em;
+ text-transform:uppercase;color:rgba(255,255,255,.72)}
+.ewp-bannerWhere em{font-style:normal;color:#fff;margin-right:10px}
+.ewp-bannerTie{display:flex;align-items:center;justify-content:center;gap:20px;flex-wrap:wrap}
+.ewp-bannerName{font-family:Anton,"Instrument Sans",sans-serif;font-size:40px;line-height:1;
+ letter-spacing:.01em;text-transform:uppercase}
+.ewp-bannerTie img{width:58px;height:58px;object-fit:contain}
+.ewp-bannerV{font-family:Anton,sans-serif;font-size:18px;color:rgba(255,255,255,.6)}
+.ewp-bannerWhen{margin:20px 0 22px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;
+ color:rgba(255,255,255,.85)}
+.ewp-bannerWhen b{margin-left:6px}
+.ewp-bannerCta{margin:0;display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.ewp-bannerCta a{display:inline-block;padding:13px 26px;font-size:12px;font-weight:700;
+ letter-spacing:.12em;text-transform:uppercase;text-decoration:none;color:#fff;
+ border:1px solid rgba(255,255,255,.55)}
+.ewp-bannerCta a.is-primary{background:#fff;color:#CC0000;border-color:#fff}
+.ewp-bannerCta a:hover{border-color:#fff}
+@media(max-width:760px){
+ .ewp-bannerName{font-size:26px}
+ .ewp-bannerTie{gap:12px}
+ .ewp-bannerTie img{width:42px;height:42px}
+}
 .ewp{font-family:"Instrument Sans",system-ui,sans-serif;color:#111}
 .ewp *{box-sizing:border-box}
 .ewp-wrap{max-width:1180px;margin:0 auto;padding:0 16px}
