@@ -79,10 +79,26 @@ function ew_home_blocks_present() {
 	if ( ! $post ) {
 		return false;
 	}
+
+	/**
+	 * A page built in Elementor keeps its widgets in _elementor_data and
+	 * leaves post_content empty, so has_shortcode() on post_content alone
+	 * reports false and this stylesheet never prints — every block then
+	 * renders as unstyled markup. Search both.
+	 */
+	$hay = array( (string) $post->post_content );
+
+	$elementor = get_post_meta( $post->ID, '_elementor_data', true );
+	if ( ! empty( $elementor ) ) {
+		$hay[] = is_string( $elementor ) ? $elementor : (string) wp_json_encode( $elementor );
+	}
+
 	foreach ( array( 'eastwood_home_banner', 'eastwood_home_hero', 'eastwood_home_fixtures',
 		'eastwood_home_discover', 'eastwood_home_news' ) as $tag ) {
-		if ( has_shortcode( (string) $post->post_content, $tag ) ) {
-			return true;
+		foreach ( $hay as $text ) {
+			if ( '' !== $text && false !== strpos( $text, '[' . $tag ) ) {
+				return true;
+			}
 		}
 	}
 	return false;

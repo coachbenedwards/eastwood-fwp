@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.13.0
+ * Version: 2.13.1
  * Author: Eastwood CFC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1777,7 +1777,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  *     table, pasted once at Settings → Eastwood FWP.
  * ------------------------------------------------------------------ */
 
-const EW_FWP_VERSION = '2.13.0';
+const EW_FWP_VERSION = '2.13.1';
 
 /*
  * Parts loader.
@@ -2934,8 +2934,31 @@ function ew_fwp_fetch( $endpoint, $args = array() ) {
 		}
 	}
 
+	$data = ew_fwp_fix_names( $data );
+
 	set_transient( $key, $data, empty( $data ) ? 2 * MINUTE_IN_SECONDS : 10 * MINUTE_IN_SECONDS );
 	return $data;
+}
+
+/**
+ * The feed calls us "Eastwood CFC". Every other surface — the crest, the
+ * header, the way anyone here says it out loud — is "Eastwood FC". Fix it
+ * once on the way in rather than at each of the dozen places a team name
+ * gets printed, so fixtures, the banner, the table and the match pages all
+ * agree. Only our own club is touched; opponents keep whatever the feed
+ * calls them.
+ */
+function ew_fwp_fix_names( $node ) {
+	if ( is_array( $node ) ) {
+		foreach ( $node as $k => $v ) {
+			if ( 'name' === $k && is_string( $v ) && 'eastwood cfc' === strtolower( trim( $v ) ) ) {
+				$node[ $k ] = 'Eastwood FC';
+			} else {
+				$node[ $k ] = ew_fwp_fix_names( $v );
+			}
+		}
+	}
+	return $node;
 }
 
 /**
