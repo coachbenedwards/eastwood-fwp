@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.10.1
+ * Version: 2.12.1
  * Author: Eastwood CFC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -50,6 +50,144 @@ add_action( 'admin_menu', function () {
 	add_options_page( 'Eastwood FWP', 'Eastwood FWP', 'manage_options', 'eastwood-fwp', 'ew_fwp_settings_page' );
 } );
 
+/**
+ * Every club we might need a crest for, by Football Web Pages team id.
+ *
+ * The league list alone is not enough: cup ties and friendlies put clubs on the
+ * fixture list that are in no competition we subscribe to. Cotgrave (3453) in
+ * the Notts Senior Cup was the case that found this — a crest-shaped hole on the
+ * front page on the morning of the tie.
+ *
+ * 'ew-store' says where a club's crest actually comes from. There are two
+ * stores and they are NOT interchangeable:
+ *
+ *   club   — ew_badge_install() pulled it from the club's own website at up to
+ *            512x512 and remembers the URL in ew_badge_sources, so the weekly
+ *            refresh keeps it current. This is the good one.
+ *   fwp    — the Football Web Pages graphics host, 64px. The fallback for a
+ *            club we have no proper source for.
+ *
+ * The Football Web Pages sweep must therefore SKIP anything in the club store.
+ * It did not, once: the 2.11.0 sweep replaced 23 crests pulled from clubs' own
+ * sites with 64px copies, Eastwood's own among them (166KB -> 7KB). The sources
+ * survived in the option, so a refresh put them back, but nothing in the code
+ * stopped it. Now something does.
+ *
+ * @return array List of array( 'id', 'label', 'names', 'ew-source' => league|cup, 'ew-store' => club|fwp ).
+ */
+function ew_badge_candidates( $key ) {
+	if ( '' === $key ) {
+		return array();
+	}
+
+	$sources = (array) get_option( 'ew_badge_sources', array() );
+
+	$add = function ( &$out, $tm, $source ) use ( $sources ) {
+		$id = (int) ( $tm['id'] ?? 0 );
+		if ( ! $id || isset( $out[ $id ] ) ) {
+			return;
+		}
+		// Short name first: the graphics host files crests under it.
+		$names = array_values( array_unique( array_filter( array(
+			trim( (string) ( $tm['name'] ?? '' ) ),
+			trim( (string) ( $tm['full-name'] ?? '' ) ),
+		) ) ) );
+		if ( ! $names ) {
+			return;
+		}
+		$out[ $id ] = array(
+			'id'        => $id,
+			'label'     => $names[0],
+			'names'     => $names,
+			'ew-source' => $source,
+			'ew-store'  => empty( $sources[ $id ]['url'] ) ? 'fwp' : 'club',
+		);
+	};
+
+	$out = array();
+
+	$t = wp_remote_get( 'https://api.footballwebpages.co.uk/v2/teams.json?comp=' . EW_COMP, array(
+		'timeout' => 15,
+		'headers' => array( 'FWP-API-Key' => $key ),
+	) );
+	if ( ! is_wp_error( $t ) ) {
+		$j = json_decode( wp_remote_retrieve_body( $t ), true );
+		foreach ( (array) ( $j['teams'] ?? array() ) as $tm ) {
+			$add( $out, $tm, 'league' );
+		}
+	}
+
+	$fx = ew_fwp_fetch( 'fixtures-results' );
+	foreach ( (array) ( $fx['fixtures-results']['matches'] ?? array() ) as $m ) {
+		foreach ( array( 'home-team', 'away-team' ) as $side ) {
+			$add( $out, (array) ( $m[ $side ] ?? array() ), 'cup' );
+		}
+	}
+
+	$out = array_values( $out );
+	usort( $out, function ( $a, $b ) {
+		return $a['ew-source'] === $b['ew-source']
+			? strcasecmp( $a['label'], $b['label'] )
+			: ( 'league' === $a['ew-source'] ? -1 : 1 );
+	} );
+	return $out;
+}
+
+/**
+ * The crest bytes for a club, or null if Football Web Pages publishes none.
+ *
+ * Two things measured on the graphics host, both of which the first importer
+ * got wrong:
+ *
+ * 1. The crest is filed under the club's SHORT name, not its full one.
+ *    "Eastwood CFC" gives eastwood-cfc.png, which is the crest; "Eastwood
+ *    Community" gives nothing. So try every name the API hands us.
+ * 2. It answers 200 to any slug at all. For one it does not know it generates
+ *    a grey shield carrying the first letter. Saving that is worse than saving
+ *    nothing, because the front end already falls back to an initials disc in
+ *    the site's own styling. So fetch the shield for a slug that cannot exist
+ *    but starts with the same letter, and treat a byte-identical answer as
+ *    "no crest". The decoy is per-letter and cached for the request.
+ *
+ * @param string[] $names Candidate club names.
+ * @return string|null PNG bytes, or null.
+ */
+function ew_badge_download( $names ) {
+	static $decoys = array();
+
+	$get = function ( $s ) {
+		$g = wp_remote_get( 'https://www.footballwebpages.co.uk/graphics/teams/64/' . $s . '.png', array( 'timeout' => 20 ) );
+		if ( is_wp_error( $g ) || 200 !== (int) wp_remote_retrieve_response_code( $g ) ) {
+			return '';
+		}
+		return (string) wp_remote_retrieve_body( $g );
+	};
+
+	$tried = array();
+	foreach ( (array) $names as $name ) {
+		$slug = trim( preg_replace( '/-+/', '-', preg_replace( '/[^a-z0-9]+/', '-', strtolower( (string) $name ) ) ), '-' );
+		if ( '' === $slug || isset( $tried[ $slug ] ) ) {
+			continue;
+		}
+		$tried[ $slug ] = true;
+
+		$body = $get( $slug );
+		if ( '' === $body ) {
+			continue;
+		}
+
+		$initial = substr( $slug, 0, 1 );
+		if ( ! isset( $decoys[ $initial ] ) ) {
+			$decoys[ $initial ] = md5( $get( $initial . 'qxzj-no-such-club' ) );
+		}
+		if ( md5( $body ) !== $decoys[ $initial ] ) {
+			return $body;
+		}
+	}
+
+	return null;
+}
+
 function ew_fwp_settings_page() {
 	if ( ! current_user_can( 'manage_options' ) ) {
 		return;
@@ -73,51 +211,99 @@ function ew_fwp_settings_page() {
 	echo '</form>';
 	echo '<p>Test it: <code>' . esc_html( home_url( '/wp-json/eastwood/v1/fwp?endpoint=league-table&comp=' . EW_COMP ) ) . '</code></p>';
 
-	$teams = array();
-	if ( '' !== $key ) {
-		$t = wp_remote_get( 'https://api.footballwebpages.co.uk/v2/teams.json?comp=' . EW_COMP, array(
-			'timeout' => 15,
-			'headers' => array( 'FWP-API-Key' => $key ),
-		) );
-		if ( ! is_wp_error( $t ) ) {
-			$j     = json_decode( wp_remote_retrieve_body( $t ), true );
-			$teams = isset( $j['teams'] ) ? $j['teams'] : array();
+	$teams = ew_badge_candidates( $key );
+
+	// Put the club-sourced crests back, at full resolution, from their own sites.
+	if ( isset( $_POST['ew_badge_resync'] ) && check_admin_referer( 'ew_badge_resync' ) ) {
+		$urls = array();
+		foreach ( (array) get_option( 'ew_badge_sources', array() ) as $team => $row ) {
+			if ( ! empty( $row['url'] ) ) {
+				$urls[ $team ] = $row['url'];
+			}
 		}
+		$done = 0;
+		$bad  = array();
+		foreach ( $urls as $team => $url ) {
+			// Force it: ew_badge_install() skips a source whose bytes match the
+			// stored hash, which would leave an overwritten file exactly as it is.
+			// Re-read each time — ew_badge_install() writes this option itself.
+			$meta = (array) get_option( 'ew_badge_sources', array() );
+			unset( $meta[ $team ]['hash'] );
+			update_option( 'ew_badge_sources', $meta, false );
+			$r = ew_badge_install( $team, $url );
+			if ( is_wp_error( $r ) ) {
+				$bad[] = $team . ' (' . $r->get_error_message() . ')';
+			} else {
+				$done++;
+			}
+		}
+		echo '<div class="notice notice-success"><p>Re-fetched ' . (int) $done . ' crests from the clubs\' own sites.</p></div>';
+		if ( $bad ) {
+			echo '<div class="notice notice-error"><p>Could not re-fetch: ' . esc_html( implode( ', ', $bad ) ) . '</p></div>';
+		}
+		$teams = ew_badge_candidates( $key );
 	}
 
 	// The API carries no crests, so they are stored by Football Web Pages team id.
 	if ( $teams && isset( $_POST['ew_fwp_import'] ) && check_admin_referer( 'ew_fwp_import' ) ) {
 		wp_mkdir_p( $dir );
-		$got = 0;
+		$got     = 0;
+		$skipped = array();
+		$kept    = array();
 		foreach ( $teams as $tm ) {
-			$slug = trim( preg_replace( '/-+/', '-', preg_replace( '/[^a-z0-9]+/', '-', strtolower( $tm['full-name'] ) ) ), '-' );
-			$g    = wp_remote_get( 'https://www.footballwebpages.co.uk/graphics/teams/64/' . $slug . '.png', array( 'timeout' => 20 ) );
-			if ( is_wp_error( $g ) || 200 !== (int) wp_remote_retrieve_response_code( $g ) ) {
+			// Never write 64px over a crest pulled from the club's own site.
+			if ( 'club' === $tm['ew-store'] ) {
+				$kept[] = $tm['label'];
 				continue;
 			}
-			$body = wp_remote_retrieve_body( $g );
-			if ( '' !== $body && false !== file_put_contents( $dir . $tm['id'] . '.png', $body ) ) {
+			$body = ew_badge_download( $tm['names'] );
+			if ( null === $body ) {
+				$skipped[] = $tm['label'];
+				continue;
+			}
+			if ( false !== file_put_contents( $dir . $tm['id'] . '.png', $body ) ) {
 				$got++;
 			}
 		}
-		echo '<div class="notice notice-success"><p>Imported ' . (int) $got . ' badges.</p></div>';
+		echo '<div class="notice notice-success"><p>Imported ' . (int) $got . ' badges from Football Web Pages.</p></div>';
+		if ( $kept ) {
+			echo '<div class="notice notice-info"><p>Left alone, because they come from the club\'s own site at a higher resolution: ' .
+				esc_html( implode( ', ', $kept ) ) . '</p></div>';
+		}
+		if ( $skipped ) {
+			echo '<div class="notice notice-warning"><p>No real crest published for: ' .
+				esc_html( implode( ', ', $skipped ) ) . '. These fall back to the initials disc.</p></div>';
+		}
 	}
 
 	echo '<h2>Club badges</h2>';
 	echo '<p>Served from <code>wp-content/uploads/ew-badges/</code>, named after the club id. A club without one falls back to an initials disc.</p>';
 
 	if ( $teams ) {
+		echo '<form method="post" style="margin-bottom:8px">';
+		wp_nonce_field( 'ew_badge_resync' );
+		submit_button( 'Re-fetch crests from the clubs\' own sites', 'primary', 'ew_badge_resync', false );
+		echo '</form>';
 		echo '<form method="post" style="margin-bottom:16px">';
 		wp_nonce_field( 'ew_fwp_import' );
-		submit_button( 'Import badges from Football Web Pages', 'secondary', 'ew_fwp_import', false );
+		submit_button( 'Fill the gaps from Football Web Pages', 'secondary', 'ew_fwp_import', false );
 		echo '</form>';
 
-		echo '<table class="widefat striped" style="max-width:640px"><thead><tr><th>Club</th><th>File name</th><th>Status</th></tr></thead><tbody>';
+		echo '<table class="widefat striped" style="max-width:860px"><thead><tr><th>Club</th><th>Fixture list</th><th>Crest comes from</th><th>File name</th><th>Status</th></tr></thead><tbody>';
 		foreach ( $teams as $tm ) {
 			$file = $tm['id'] . '.png';
-			$have = file_exists( $dir . $file );
-			echo '<tr><td>' . esc_html( $tm['full-name'] ) . '</td><td><code>' . esc_html( $file ) . '</code></td><td>' .
-				( $have ? '&#10003; in place' : '&mdash; missing' ) . '</td></tr>';
+			$path = $dir . $file;
+			$have = file_exists( $path );
+			$px   = '';
+			if ( $have ) {
+				$g  = @getimagesize( $path );
+				$px = $g ? $g[0] . '&times;' . $g[1] : '';
+			}
+			echo '<tr><td>' . esc_html( $tm['label'] ) . '</td><td>' .
+				esc_html( 'cup' === $tm['ew-source'] ? 'cup or friendly' : 'league' ) . '</td><td>' .
+				( 'club' === $tm['ew-store'] ? 'the club&rsquo;s own site' : 'Football Web Pages' ) . '</td><td><code>' .
+				esc_html( $file ) . '</code></td><td>' .
+				( $have ? '&#10003; in place ' . $px : '&mdash; missing' ) . '</td></tr>';
 		}
 		echo '</tbody></table>';
 		echo '<p>The competition logo above each fixture uses <code>comp-' . esc_html( EW_COMP ) . '.png</code> in the same folder, and stays hidden until one is there.</p>';
@@ -126,9 +312,73 @@ function ew_fwp_settings_page() {
 	}
 
 	do_action( 'ew_fwp_after_badges' );
+	do_action( 'ew_fwp_after_settings' );
 
 	echo '</div>';
 }
+
+/* ------------------------------------------------------------------ *
+ * /claimtickets/
+ *
+ * Until October 2026 the whole domain was a GoDaddy forward to a Fanbase
+ * fixture page, so eastwoodfc.com WAS the ticket link. Pointing the domain at
+ * this site ends that forward, and the ticket link has to survive it — it is
+ * on printed matter and in posts that are already out.
+ *
+ * A DNS record cannot redirect one path, so it lives here instead. The target
+ * is an option rather than a constant because it is a SINGLE FIXTURE on
+ * Fanbase: the id changes every home game. Hard-coding it would mean a plugin
+ * release before every match, which is exactly the trap the homepage was in.
+ * ------------------------------------------------------------------ */
+
+const EW_CLAIM_SLUG    = 'claimtickets';
+const EW_CLAIM_DEFAULT = 'https://app.fanbaseclub.com/fixture/eastwoodfc/23383';
+
+function ew_claim_url() {
+	$url = trim( (string) get_option( 'ew_claim_url', '' ) );
+	return '' !== $url ? $url : EW_CLAIM_DEFAULT;
+}
+
+add_action( 'template_redirect', function () {
+	if ( is_admin() ) {
+		return;
+	}
+
+	$path = trim( (string) wp_parse_url( $_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH ), '/' );
+	if ( EW_CLAIM_SLUG !== strtolower( $path ) ) {
+		return;
+	}
+
+	$url = ew_claim_url();
+	if ( '' === $url ) {
+		return;
+	}
+
+	// 302, never 301. The fixture changes; a permanent redirect would stay in
+	// people's browsers pointing at last month's game and could not be undone.
+	nocache_headers();
+	wp_redirect( $url, 302 );
+	exit;
+}, 1 );
+
+add_action( 'ew_fwp_after_settings', function () {
+	if ( isset( $_POST['ew_claim_url'] ) && check_admin_referer( 'ew_claim_save' ) ) {
+		$raw = trim( (string) wp_unslash( $_POST['ew_claim_url'] ) );
+		update_option( 'ew_claim_url', '' === $raw ? '' : esc_url_raw( $raw ) );
+		echo '<div class="notice notice-success"><p>Ticket link saved.</p></div>';
+	}
+
+	echo '<h2>Ticket link</h2>';
+	echo '<p><code>' . esc_html( home_url( '/' . EW_CLAIM_SLUG . '/' ) ) . '</code> sends people straight to wherever you point it below. '
+		. 'Change it when the fixture changes &mdash; no one needs to touch the website.</p>';
+	echo '<form method="post">';
+	wp_nonce_field( 'ew_claim_save' );
+	echo '<p><input type="url" name="ew_claim_url" size="70" value="' . esc_attr( ew_claim_url() ) . '"></p>';
+	submit_button( 'Save ticket link' );
+	echo '</form>';
+	echo '<p>Leave it as it is and it keeps going to the fixture it is on now. '
+		. 'It redirects temporarily, so changing it here takes effect straight away.</p>';
+} );
 
 /* ------------------------------------------------------------------ *
  * The Football Web Pages proxy.
@@ -782,6 +1032,36 @@ function ew_icon_sprite() {
 add_action( 'wp_body_open', 'ew_icon_sprite', 1 );
 
 /**
+ * Favicons.
+ *
+ * WordPress's own Site Icon takes a single upload and regenerates every size
+ * with its own resampler, which turns a detailed crest into a smear at 16px.
+ * These files are tuned per size instead, so we emit the tags ourselves and
+ * leave the site_icon option alone.
+ */
+function ew_favicons() {
+	$base = plugins_url( 'assets/favicon/', __FILE__ );
+	$v    = EW_FWP_VERSION;
+	$tags = array(
+		array( 'icon', '16x16', 'favicon-16.png', 'image/png' ),
+		array( 'icon', '32x32', 'favicon-32.png', 'image/png' ),
+		array( 'icon', '48x48', 'favicon-48.png', 'image/png' ),
+		array( 'apple-touch-icon', '180x180', 'favicon-180.png', '' ),
+	);
+	foreach ( $tags as $t ) {
+		printf(
+			'<link rel="%s" sizes="%s"%s href="%s">' . "\n",
+			esc_attr( $t[0] ),
+			esc_attr( $t[1] ),
+			$t[3] ? ' type="' . esc_attr( $t[3] ) . '"' : '',
+			esc_url( $base . $t[2] . '?v=' . $v )
+		);
+	}
+	printf( '<link rel="shortcut icon" href="%s">' . "\n", esc_url( $base . 'favicon.ico?v=' . $v ) );
+}
+add_action( 'wp_head', 'ew_favicons', 2 );
+
+/**
  * Which captured icon path maps to which of ours.
  */
 function ew_icon_map() {
@@ -991,10 +1271,45 @@ function ew_matches_shortcode( $atts ) {
 }
 add_shortcode( 'eastwood_matches', 'ew_matches_shortcode' );
 
+/**
+ * Does this post use a shortcode, wherever it lives?
+ *
+ * has_shortcode() only reads post_content. On an Elementor page the shortcodes
+ * sit inside the _elementor_data meta instead, so the content check comes back
+ * false, no CSS is printed, and the block renders unstyled and stacked while
+ * still returning a clean 200. Search both.
+ */
+function ew_uses_shortcode( $post, $tag ) {
+	if ( ! $post ) {
+		return false;
+	}
+	if ( has_shortcode( (string) $post->post_content, $tag ) ) {
+		return true;
+	}
+	$data = get_post_meta( $post->ID, '_elementor_data', true );
+	return is_string( $data ) && false !== strpos( $data, '[' . $tag );
+}
+
+/**
+ * Same problem, for markup rather than a shortcode: a class name written into
+ * a page body lands in _elementor_data on an Elementor page, so a gate that
+ * only reads post_content never fires and the stylesheet is never printed.
+ */
+function ew_post_contains( $post, $needle ) {
+	if ( ! $post ) {
+		return false;
+	}
+	if ( false !== strpos( (string) $post->post_content, $needle ) ) {
+		return true;
+	}
+	$data = get_post_meta( $post->ID, '_elementor_data', true );
+	return is_string( $data ) && false !== strpos( $data, $needle );
+}
+
 function ew_matches_assets() {
 	if ( ! is_singular() ) { return; }
 	$post = get_post();
-	if ( ! $post || ! has_shortcode( (string) $post->post_content, 'eastwood_matches' ) ) { return; }
+	if ( ! ew_uses_shortcode( $post, 'eastwood_matches' ) ) { return; }
 
 	$css = '
 .ew-matches{max-width:1100px;margin:0 auto;padding:0 16px 56px;font-family:"Instrument Sans",system-ui,sans-serif;color:#111}
@@ -1301,9 +1616,8 @@ function ew_teams_assets() {
 	if ( ! is_singular() ) { return; }
 	$post = get_post();
 	if ( ! $post ) { return; }
-	$content = (string) $post->post_content;
-	$teams   = has_shortcode( $content, 'eastwood_teams' );
-	$squad   = has_shortcode( $content, 'eastwood_squad' );
+	$teams = ew_uses_shortcode( $post, 'eastwood_teams' );
+	$squad = ew_uses_shortcode( $post, 'eastwood_squad' );
 	if ( ! $teams && ! $squad ) { return; }
 
 	$css = '
@@ -1463,7 +1777,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  *     table, pasted once at Settings → Eastwood FWP.
  * ------------------------------------------------------------------ */
 
-const EW_FWP_VERSION = '2.10.1';
+const EW_FWP_VERSION = '2.12.1';
 
 /*
  * Parts loader.
@@ -1795,17 +2109,15 @@ function ew_owned_pages() {
 		),
 	);
 
-	// Guarded: this page's content and template live in parts/home-blocks.php.
-	// If that file is ever missing, the rest of the site must still install and
-	// run — an unguarded reference here is a fatal on every request.
-	if ( function_exists( 'ew_home_preview_content' ) && defined( 'EW_HOME_TPL' ) ) {
-		$pages['home-preview'] = array(
-			'title'    => 'Homepage (new design)',
-			'content'  => ew_home_preview_content(),
-			'template' => EW_HOME_TPL,
-			'noindex'  => true,
-		);
-	}
+	// 'home-preview' used to be registered here. It was the shortcode draft of the
+	// new homepage, and /eastwood-home-v2/ — a real Elementor page, editable in the
+	// builder — replaced it. Trashing it was not enough: this spec re-runs whenever
+	// EW_FWP_VERSION changes, so every release quietly resurrected a second
+	// homepage in the Pages list. Removed rather than guarded.
+	//
+	// ew_home_preview_content() and EW_HOME_TPL stay in parts/home-blocks.php:
+	// the template is what /eastwood-home-v2/ renders through, and the function is
+	// the reference for what that page's sections contain.
 
 	return $pages;
 }
@@ -2052,7 +2364,7 @@ add_shortcode( 'eastwood_tv', 'ew_tv_shortcode' );
 function ew_tv_assets() {
 	if ( ! is_singular() ) { return; }
 	$post = get_post();
-	if ( ! $post || ! has_shortcode( (string) $post->post_content, 'eastwood_tv' ) ) { return; }
+	if ( ! ew_uses_shortcode( $post, 'eastwood_tv' ) ) { return; }
 
 	$css = '
 .ew-tv{max-width:1100px;margin:0 auto;padding:0 16px 56px;font-family:"Instrument Sans",system-ui,sans-serif;color:#111}
@@ -2218,7 +2530,7 @@ function ew_prose_css_inline() {
 function ew_prose_assets() {
 	if ( ! is_singular() ) { return; }
 	$post = get_post();
-	if ( ! $post || false === strpos( (string) $post->post_content, 'ew-prose' ) ) { return; }
+	if ( ! ew_post_contains( $post, 'ew-prose' ) ) { return; }
 
 	$css = ew_prose_css_inline();
 
@@ -2436,9 +2748,7 @@ HTML;
 function ew_commercial_assets() {
 	if ( ! is_singular() ) { return; }
 	$post = get_post();
-	if ( ! $post ) { return; }
-	$c = (string) $post->post_content;
-	if ( false === strpos( $c, 'ew-prose' ) ) { return; }
+	if ( ! ew_post_contains( $post, 'ew-prose' ) ) { return; }
 
 	$css = '
 .ew-prose .ew-prices{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin:0 0 20px}
@@ -2551,7 +2861,7 @@ HTML;
 function ew_history_assets() {
 	if ( ! is_singular() ) { return; }
 	$post = get_post();
-	if ( ! $post || false === strpos( (string) $post->post_content, 'ew-timeline' ) ) { return; }
+	if ( ! ew_post_contains( $post, 'ew-timeline' ) ) { return; }
 
 	$css = '
 .ew-prose .ew-timeline{margin:0 0 24px;border-left:2px solid #e3e3e3;padding-left:0}
