@@ -94,7 +94,8 @@ function ew_home_blocks_present() {
 	}
 
 	foreach ( array( 'eastwood_home_banner', 'eastwood_home_hero', 'eastwood_home_fixtures',
-		'eastwood_home_discover', 'eastwood_home_news' ) as $tag ) {
+		'eastwood_home_upcoming', 'eastwood_home_shop', 'eastwood_home_discover',
+		'eastwood_home_news' ) as $tag ) {
 		foreach ( $hay as $text ) {
 			if ( '' !== $text && false !== strpos( $text, '[' . $tag ) ) {
 				return true;
@@ -152,7 +153,7 @@ function ew_hb_hero_id( $set = null ) {
 }
 
 /** One fixture card, in the captured design, from live data. */
-function ew_hb_card( $m, $done = false ) {
+function ew_hb_card( $m, $done = false, $cta = array() ) {
 	$home  = (int) ( $m['home-team']['id'] ?? 0 ) === (int) EW_TEAM;
 	$opp   = $home ? ( $m['away-team'] ?? array() ) : ( $m['home-team'] ?? array() );
 	$ts    = strtotime( $m['date'] ?? '' );
@@ -195,6 +196,10 @@ function ew_hb_card( $m, $done = false ) {
 			</span>
 		</span>
 	</a>
+	<?php if ( $home && ! $done && ! empty( $cta['label'] ) && ! empty( $cta['url'] ) ) : ?>
+	<a class="ewp-cardCta" href="<?php echo esc_url( $cta['url'] ); ?>"><?php
+		echo esc_html( $cta['label'] ); ?></a>
+	<?php endif; ?>
 </li>
 	<?php
 	return ob_get_clean();
@@ -454,6 +459,69 @@ function ew_hb_fixtures_sc( $atts ) {
 add_shortcode( 'eastwood_home_fixtures', 'ew_hb_fixtures_sc' );
 
 /* ------------------------------------------------------------------
+ * [eastwood_home_upcoming title="..." count="3" all="View all matches"
+ *                         all_url="/matches/" cta="Buy tickets" cta_url="/tickets/"]
+ *
+ * The next few fixtures on a red band, the way Forest run theirs under
+ * the news. Three cards, not a rail: at three there is nothing to scroll
+ * and an arrow that does nothing looks broken. The ticket button shows on
+ * home games only — there is nothing to sell for an away trip.
+ * ------------------------------------------------------------------ */
+
+function ew_hb_upcoming_sc( $atts ) {
+	$atts = shortcode_atts(
+		array(
+			'title'   => 'Upcoming Matches',
+			'count'   => '3',
+			'all'     => 'View all matches',
+			'all_url' => '/matches/',
+			'cta'     => 'Buy tickets',
+			'cta_url' => '/eastwood-tickets/',
+		),
+		$atts,
+		'eastwood_home_upcoming'
+	);
+	$n = max( 1, (int) $atts['count'] );
+
+	$fx   = ew_fwp_fetch( 'fixtures-results' );
+	$all  = (array) ( $fx['fixtures-results']['matches'] ?? array() );
+	$todo = array_values( array_filter( $all, function ( $m ) { return ! ew_home_played( $m ); } ) );
+	usort( $todo, function ( $a, $b ) { return strcmp( $a['date'], $b['date'] ); } );
+	$todo = array_slice( $todo, 0, $n );
+
+	ob_start();
+	?>
+<section class="ewp ewp-upcoming">
+	<div class="ewp-wrap">
+		<?php if ( '' !== $atts['title'] ) : ?>
+		<h2 class="ewp-h2 is-light is-center"><?php echo esc_html( $atts['title'] ); ?></h2>
+		<?php endif; ?>
+
+		<?php if ( ! $todo ) : ?>
+		<p class="ewp-empty is-light">No fixtures published yet.</p>
+		<?php else : ?>
+		<ul class="ewp-upcomingGrid">
+			<?php
+			$cta = array( 'label' => $atts['cta'], 'url' => home_url( $atts['cta_url'] ) );
+			foreach ( $todo as $m ) {
+				echo ew_hb_card( $m, false, $cta ); // phpcs:ignore
+			}
+			?>
+		</ul>
+
+		<?php if ( '' !== $atts['all'] ) : ?>
+		<p class="ewp-upcomingAll"><a href="<?php echo esc_url( home_url( $atts['all_url'] ) ); ?>"><?php
+			echo esc_html( $atts['all'] ); ?> <span aria-hidden="true">&rarr;</span></a></p>
+		<?php endif; ?>
+		<?php endif; ?>
+	</div>
+</section>
+	<?php
+	return ob_get_clean();
+}
+add_shortcode( 'eastwood_home_upcoming', 'ew_hb_upcoming_sc' );
+
+/* ------------------------------------------------------------------
  * [eastwood_home_discover title="..."]
  * Label | /where-it-goes/ | One line underneath
  * [/eastwood_home_discover]
@@ -501,6 +569,88 @@ function ew_hb_discover_sc( $atts, $content = '' ) {
 	return ob_get_clean();
 }
 add_shortcode( 'eastwood_home_discover', 'ew_hb_discover_sc' );
+
+/* ------------------------------------------------------------------
+ * [eastwood_home_shop title="..." all="Shop all" all_url="/shop/"]
+ * Home Shirt 26/27 | /shop/home-shirt/ | £45.00 | https://…/shirt.jpg
+ * [/eastwood_home_shop]
+ *
+ * Forest pull this row straight out of their store. We have no store on
+ * this site yet, so the tiles are typed in and point wherever the shirts
+ * are actually being sold. Price and image are both optional — a tile
+ * with neither still renders as a link.
+ * ------------------------------------------------------------------ */
+
+function ew_hb_shop_sc( $atts, $content = '' ) {
+	$atts = shortcode_atts(
+		array(
+			'title'   => 'Get Kitted Out',
+			'all'     => 'Shop all',
+			'all_url' => '/shop/',
+		),
+		$atts,
+		'eastwood_home_shop'
+	);
+
+	$items = array();
+	foreach ( ew_hb_lines( $content ) as $line ) {
+		$parts = array_map( 'trim', explode( '|', $line ) );
+		if ( '' === $parts[0] || ! isset( $parts[1] ) || '' === $parts[1] ) {
+			continue;
+		}
+		$url = $parts[1];
+		if ( 0 !== strpos( $url, 'http' ) ) {
+			$url = home_url( '/' . ltrim( $url, '/' ) );
+		}
+		$items[] = array(
+			$parts[0],
+			$url,
+			isset( $parts[2] ) ? $parts[2] : '',
+			isset( $parts[3] ) ? $parts[3] : '',
+		);
+	}
+
+	if ( ! $items ) {
+		return '';
+	}
+
+	ob_start();
+	?>
+<section class="ewp ewp-shop">
+	<div class="ewp-wrap">
+		<?php if ( '' !== $atts['title'] ) : ?>
+		<h2 class="ewp-h2 is-center is-red"><?php echo esc_html( $atts['title'] ); ?></h2>
+		<?php endif; ?>
+
+		<ul class="ewp-shopGrid">
+			<?php foreach ( $items as $item ) : ?>
+			<li>
+				<a href="<?php echo esc_url( $item[1] ); ?>">
+					<span class="ewp-shopImg">
+						<?php if ( '' !== $item[3] ) : ?>
+						<img src="<?php echo esc_url( $item[3] ); ?>" alt="" loading="lazy"
+							onerror="this.style.display='none'">
+						<?php endif; ?>
+					</span>
+					<b><?php echo esc_html( $item[0] ); ?></b>
+					<?php if ( '' !== $item[2] ) : ?>
+					<i><?php echo esc_html( $item[2] ); ?></i>
+					<?php endif; ?>
+				</a>
+			</li>
+			<?php endforeach; ?>
+		</ul>
+
+		<?php if ( '' !== $atts['all'] ) : ?>
+		<p class="ewp-shopAll"><a href="<?php echo esc_url( home_url( $atts['all_url'] ) ); ?>"><?php
+			echo esc_html( $atts['all'] ); ?> <span aria-hidden="true">&rarr;</span></a></p>
+		<?php endif; ?>
+	</div>
+</section>
+	<?php
+	return ob_get_clean();
+}
+add_shortcode( 'eastwood_home_shop', 'ew_hb_shop_sc' );
 
 /* ------------------------------------------------------------------
  * [eastwood_home_news title="..." count="4" link="/eastwood-news/"]
@@ -689,6 +839,45 @@ function ew_hb_css() {
 .ewp-table td.ewp-pts{font-weight:700}
 .ewp-table tr.is-us td{color:#CC0000}
 
+.ewp-h2.is-center{justify-content:center;text-align:center}
+.ewp-h2.is-red{color:#CC0000}
+.ewp-empty.is-light{color:rgba(255,255,255,.72);text-align:center}
+
+/* Upcoming Matches — the red band under the news. */
+.ewp-upcoming{background:#990000;padding:44px 0 48px}
+.ewp-upcomingGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(272px,1fr));
+ gap:12px;list-style:none;margin:0;padding:0}
+.ewp-upcoming .ewp-card:hover{box-shadow:0 3px 18px rgba(0,0,0,.28)}
+.ewp-upcomingGrid .ewp-slide{display:flex;flex-direction:column;flex:1 1 auto;max-width:none;
+ background:#fff;border-radius:4px;overflow:hidden}
+.ewp-upcomingGrid .ewp-card{flex:1 1 auto;border-radius:0}
+.ewp-cardCta{display:block;margin:0 14px 15px;padding:11px 14px;background:#CC0000;color:#fff;
+ font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;text-align:center;
+ text-decoration:none;border-radius:3px;transition:background .15s}
+.ewp-cardCta:hover{background:#b00000}
+.ewp-upcomingAll{margin:28px 0 0;text-align:center}
+.ewp-upcomingAll a{font-family:Anton,"Instrument Sans",sans-serif;font-size:14px;letter-spacing:.09em;
+ text-transform:uppercase;color:#fff;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.45);
+ padding-bottom:3px}
+.ewp-upcomingAll a:hover{border-bottom-color:#fff}
+
+/* Get Kitted Out — typed-in tiles until there is a real store. */
+.ewp-shop{background:#f3f3f3;padding:44px 0 50px}
+.ewp-shopGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+ gap:14px;list-style:none;margin:0;padding:0}
+.ewp-shopGrid a{display:block;text-decoration:none;color:#111;text-align:center}
+.ewp-shopImg{display:flex;align-items:center;justify-content:center;aspect-ratio:1/1;
+ background:#e8e8e8;border-radius:4px;overflow:hidden;margin:0 0 12px;transition:background .15s}
+.ewp-shopGrid a:hover .ewp-shopImg{background:#dedede}
+.ewp-shopImg img{width:100%;height:100%;object-fit:cover;display:block}
+.ewp-shopGrid b{display:block;font-size:14px;font-weight:600;line-height:1.35;margin:0 0 4px}
+.ewp-shopGrid i{font-style:normal;font-size:14px;color:#6b6b6b}
+.ewp-shopAll{margin:30px 0 0;text-align:center}
+.ewp-shopAll a{font-family:Anton,"Instrument Sans",sans-serif;font-size:14px;letter-spacing:.09em;
+ text-transform:uppercase;color:#CC0000;text-decoration:none;border-bottom:1px solid rgba(204,0,0,.4);
+ padding-bottom:3px}
+.ewp-shopAll a:hover{border-bottom-color:#CC0000}
+
 .ewp-discover{background:#111;padding:46px 0 52px}
 .ewp-discoverGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:10px}
 .ewp-discoverGrid a{display:block;position:relative;background:#17171a;border-radius:4px;
@@ -720,6 +909,8 @@ function ew_hb_css() {
  .ewp-heroText b{font-size:30px;max-width:none}
  .ewp-h2{font-size:21px}
  .ewp-fixtures,.ewp-news{padding:32px 0 36px}
+ .ewp-upcoming,.ewp-shop{padding:32px 0 38px}
+ .ewp-shopGrid{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
  .ewp-discover{padding:34px 0 38px}
  .ewp-slide{flex:0 0 240px;max-width:240px}
  .ewp-table th,.ewp .ewp-table tbody td{padding:9px 5px;font-size:13px}
@@ -807,6 +998,14 @@ JS;
 function ew_home_preview_content() {
 	return "[eastwood_home_hero]\n\n"
 		. "[eastwood_home_fixtures title=\"Fixtures &amp; Results\" count=\"8\"]\n\n"
+		. "[eastwood_home_upcoming title=\"Upcoming Matches\" count=\"3\"]\n\n"
+		. "[eastwood_home_shop title=\"Get Kitted Out\" all_url=\"/shop/\"]\n"
+		. "Home Shirt 26/27 | /shop/ | \u00a345.00\n"
+		. "Away Shirt 26/27 | /shop/ | \u00a345.00\n"
+		. "Junior Home Shirt | /shop/ | \u00a335.00\n"
+		. "Training Tee | /shop/ | \u00a325.00\n"
+		. "Club Scarf | /shop/ | \u00a312.00\n"
+		. "[/eastwood_home_shop]\n\n"
 		. "[eastwood_home_discover title=\"Discover Eastwood\"]\n"
 		. "Matchday | /eastwood-tickets/ | Tickets, prices and hospitality\n"
 		. "The Venue | /eastwood-hospitality/ | Function room and bar hire\n"
