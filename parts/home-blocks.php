@@ -254,6 +254,128 @@ function ew_hb_card( $m, $done = false, $cta = array() ) {
 	return ob_get_clean();
 }
 
+
+/**
+ * One fixture as a full-width panel — the shape Forest run down their
+ * matches page, and the same shape the banner uses with a photo behind it:
+ * date across the top, then NAME crest V crest NAME, then whatever there is
+ * to do about it.
+ *
+ * $opts: done, cta, cta_url, hosp, hosp_url, centre, centre_url.
+ */
+function ew_hb_panel( $m, $opts = array() ) {
+	$opts = array_merge(
+		array(
+			'done'       => false,
+			'cta'        => '',
+			'cta_url'    => '',
+			'hosp'       => '',
+			'hosp_url'   => '',
+			'centre'     => '',
+			'centre_url' => '',
+		),
+		$opts
+	);
+
+	$home    = (array) ( $m['home-team'] ?? array() );
+	$away    = (array) ( $m['away-team'] ?? array() );
+	$at_home = (int) ( $home['id'] ?? 0 ) === (int) EW_TEAM;
+	$ts      = strtotime( (string) ( $m['date'] ?? '' ) . ' ' . (string) ( $m['time'] ?? '15:00' ) );
+	$comp    = (string) ( $m['competition']['name'] ?? '' );
+	$venue   = $at_home ? 'Coronation Park' : (string) ( $m['venue'] ?? '' );
+
+	ob_start();
+	?>
+<li class="ewp-row">
+	<div class="ewp-rowTop">
+		<b><?php echo esc_html( $ts ? date_i18n( 'D j M', $ts ) : '' ); ?></b>
+		<?php if ( $opts['done'] ) : ?>
+		<i>FT</i>
+		<?php elseif ( $ts ) : ?>
+		<i><?php echo esc_html( date_i18n( 'H:i', $ts ) ); ?></i>
+		<?php endif; ?>
+		<?php if ( '' !== $comp ) : ?>
+		<span class="ewp-rowComp"><?php echo esc_html( $comp ); ?></span>
+		<?php endif; ?>
+	</div>
+
+	<div class="ewp-rowBody">
+		<p class="ewp-rowWhere">
+			<em><?php echo $at_home ? 'Home' : 'Away'; ?></em>
+			<?php echo esc_html( $venue ); ?>
+		</p>
+
+		<div class="ewp-tie">
+			<span class="ewp-tieName"><?php echo esc_html( (string) ( $home['name'] ?? '' ) ); ?></span>
+			<span class="ewp-tieMid">
+				<img src="<?php echo esc_url( ew_home_badge( $home['id'] ?? 0 ) ); ?>" alt=""
+					onerror="this.style.visibility='hidden'">
+				<?php if ( $opts['done'] ) : ?>
+				<b class="ewp-tieScore"><?php
+					echo esc_html( (int) ( $home['score'] ?? 0 ) . ' – ' . (int) ( $away['score'] ?? 0 ) );
+				?></b>
+				<?php else : ?>
+				<b class="ewp-tieV">V</b>
+				<?php endif; ?>
+				<img src="<?php echo esc_url( ew_home_badge( $away['id'] ?? 0 ) ); ?>" alt=""
+					onerror="this.style.visibility='hidden'">
+			</span>
+			<span class="ewp-tieName"><?php echo esc_html( (string) ( $away['name'] ?? '' ) ); ?></span>
+		</div>
+
+		<?php if ( ! $opts['done'] && $at_home && ( '' !== $opts['cta'] || '' !== $opts['hosp'] ) ) : ?>
+		<p class="ewp-rowCta">
+			<?php if ( '' !== $opts['cta'] ) : ?>
+			<a class="is-primary" href="<?php echo esc_url( home_url( $opts['cta_url'] ) ); ?>"><?php
+				echo esc_html( $opts['cta'] ); ?></a>
+			<?php endif; ?>
+			<?php if ( '' !== $opts['hosp'] ) : ?>
+			<a href="<?php echo esc_url( home_url( $opts['hosp_url'] ) ); ?>"><?php
+				echo esc_html( $opts['hosp'] ); ?></a>
+			<?php endif; ?>
+		</p>
+		<?php endif; ?>
+
+		<?php if ( '' !== $opts['centre'] ) : ?>
+		<p class="ewp-rowCentre"><a href="<?php
+			echo esc_url( home_url( $opts['centre_url'] . (int) ( $m['id'] ?? 0 ) . '/' ) ); ?>"><?php
+			echo esc_html( $opts['centre'] ); ?></a></p>
+		<?php endif; ?>
+	</div>
+</li>
+	<?php
+	return ob_get_clean();
+}
+
+/** A season's worth of panels, broken by month the way a calendar reads. */
+function ew_hb_list( $matches, $opts, $empty ) {
+	if ( ! $matches ) {
+		return '<p class="ewp-empty is-center">' . esc_html( $empty ) . '</p>';
+	}
+
+	$out   = '';
+	$month = '';
+	$open  = false;
+	foreach ( $matches as $m ) {
+		$ts  = strtotime( (string) ( $m['date'] ?? '' ) );
+		$key = $ts ? date_i18n( 'F Y', $ts ) : '';
+		if ( $key !== $month ) {
+			if ( $open ) {
+				$out .= '</ul>';
+			}
+			$month = $key;
+			$out  .= '<p class="ewp-month">' . esc_html( $ts ? date_i18n( 'F', $ts ) : '' ) . '</p>';
+			$out  .= '<ul class="ewp-rows">';
+			$open  = true;
+		}
+		$out .= ew_hb_panel( $m, $opts );
+	}
+	if ( $open ) {
+		$out .= '</ul>';
+	}
+	return $out;
+}
+
 /**
  * A horizontal rail of fixture cards.
  *
@@ -470,12 +592,33 @@ add_shortcode( 'eastwood_home_banner', 'ew_hb_banner_sc' );
 
 function ew_hb_fixtures_sc( $atts, $content = '' ) {
 	$atts = shortcode_atts(
-		array( 'title' => 'Fixtures & Results', 'count' => '8', 'open' => 'fixtures' ),
+		array(
+			'title'      => 'Fixtures & Results',
+			'count'      => '0',
+			'open'       => 'fixtures',
+			'layout'     => 'list',
+			'cta'        => 'Buy Tickets',
+			'cta_url'    => '/eastwood-tickets/',
+			'hosp'       => 'Book Hospitality',
+			'hosp_url'   => '/eastwood-hospitality/',
+			'centre'     => 'Match Centre',
+			'centre_url' => '/match/',
+		),
 		$atts,
 		'eastwood_home_fixtures'
 	);
-	$n     = max( 1, (int) $atts['count'] );
+	$n     = max( 0, (int) $atts['count'] );
 	$teams = ew_hb_teams( $content );
+	$list  = 'rail' !== $atts['layout'];
+
+	$opts = array(
+		'cta'        => $atts['cta'],
+		'cta_url'    => $atts['cta_url'],
+		'hosp'       => $atts['hosp'],
+		'hosp_url'   => $atts['hosp_url'],
+		'centre'     => $atts['centre'],
+		'centre_url' => $atts['centre_url'],
+	);
 
 	$tabs = array( 'fixtures' => 'Fixtures', 'results' => 'Results', 'table' => 'Table' );
 	$open = isset( $tabs[ $atts['open'] ] ) ? $atts['open'] : 'fixtures';
@@ -535,12 +678,24 @@ function ew_hb_fixtures_sc( $atts, $content = '' ) {
 					</div>
 				</div>
 
-				<div class="ewp-panel" data-pv-panel="fixtures"<?php echo 'fixtures' === $open ? '' : ' hidden'; ?>>
-					<?php echo ew_hb_rail( array_slice( $todo, 0, $n ), false, 'No fixtures published yet.' ); // phpcs:ignore ?>
+				<div class="ewp-panel<?php echo $list ? ' ewp-wrap' : ''; ?>"
+					data-pv-panel="fixtures"<?php echo 'fixtures' === $open ? '' : ' hidden'; ?>>
+					<?php
+					$show = $n ? array_slice( $todo, 0, $n ) : $todo;
+					echo $list // phpcs:ignore
+						? ew_hb_list( $show, $opts, 'No fixtures published yet.' )
+						: ew_hb_rail( $show, false, 'No fixtures published yet.' );
+					?>
 				</div>
 
-				<div class="ewp-panel" data-pv-panel="results"<?php echo 'results' === $open ? '' : ' hidden'; ?>>
-					<?php echo ew_hb_rail( array_slice( $played, 0, $n ), true, 'No results yet this season.' ); // phpcs:ignore ?>
+				<div class="ewp-panel<?php echo $list ? ' ewp-wrap' : ''; ?>"
+					data-pv-panel="results"<?php echo 'results' === $open ? '' : ' hidden'; ?>>
+					<?php
+					$show = $n ? array_slice( $played, 0, $n ) : $played;
+					echo $list // phpcs:ignore
+						? ew_hb_list( $show, array_merge( $opts, array( 'done' => true ) ), 'No results yet this season.' )
+						: ew_hb_rail( $show, true, 'No results yet this season.' );
+					?>
 				</div>
 
 				<div class="ewp-panel ewp-wrap" data-pv-panel="table"<?php echo 'table' === $open ? '' : ' hidden'; ?>>
@@ -941,6 +1096,7 @@ function ew_hb_css() {
 .ewp{font-family:"Instrument Sans",system-ui,sans-serif;color:#111}
 .ewp *{box-sizing:border-box}
 .ewp-wrap{max-width:1180px;margin:0 auto;padding:0 16px}
+.ewp-fixtures .ewp-wrap{max-width:1248px}
 .ewp-h2{font-family:Anton,"Instrument Sans",sans-serif;font-size:26px;letter-spacing:.04em;
  text-transform:uppercase;margin:0 0 18px;display:flex;align-items:baseline;gap:14px;color:#111}
 .ewp-h2.is-light{color:#fff}
@@ -963,6 +1119,42 @@ function ew_hb_css() {
 
 .ewp-fixtures{background:#f3f3f3}
 .ewp-fixturesBody{padding:36px 0 48px}
+
+/* The matches page: a month, then one full-width panel per fixture.
+   Same tie layout as the banner, white instead of a photograph. */
+.ewp-month{margin:30px 0 14px;text-align:center;font-size:18px;font-weight:700;color:#212121}
+.ewp-rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
+.ewp-row{background:#fff;border-radius:6px;overflow:hidden}
+.ewp-rowTop{display:flex;align-items:center;gap:9px;padding:14px 22px;background:#fafafa;
+ border-bottom:1px solid #efefef}
+.ewp-rowTop b{font-family:Anton,"Instrument Sans",sans-serif;font-size:17px;letter-spacing:.03em;
+ text-transform:uppercase;color:#111}
+.ewp-rowTop i{font-style:normal;font-size:16px;font-weight:700;color:#111}
+.ewp-rowComp{margin-left:auto;font-size:10px;font-weight:600;letter-spacing:.14em;
+ text-transform:uppercase;color:#9a9aa3;text-align:right}
+.ewp-rowBody{padding:20px 22px 24px;text-align:center}
+.ewp-rowWhere{margin:0 0 16px;font-size:10px;font-weight:600;letter-spacing:.2em;
+ text-transform:uppercase;color:#9a9aa3}
+.ewp-rowWhere em{font-style:normal;color:#111;margin-right:9px}
+
+.ewp-tie{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:18px}
+.ewp-tieName{font-family:Anton,"Instrument Sans",sans-serif;font-size:40px;line-height:1.02;
+ letter-spacing:.01em;text-transform:uppercase;color:#111}
+.ewp-tieName{text-align:center}
+.ewp-tieMid{display:flex;align-items:center;gap:18px}
+.ewp-tieMid img{width:62px;height:62px;object-fit:contain;flex:none}
+.ewp-tieV{font-family:Anton,sans-serif;font-size:22px;color:#111;font-weight:400}
+.ewp-tieScore{font-family:Anton,sans-serif;font-size:26px;color:#111;font-weight:400;white-space:nowrap}
+
+.ewp-rowCta{margin:20px 0 0;display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.ewp-rowCta a{display:inline-block;padding:12px 24px;border-radius:4px;font-size:13px;
+ font-weight:700;letter-spacing:.03em;text-decoration:none;border:1px solid #CC0000;color:#CC0000}
+.ewp-rowCta a.is-primary{background:#CC0000;color:#fff}
+.ewp-rowCta a:hover{background:#CC0000;color:#fff}
+.ewp-rowCentre{margin:18px 0 0}
+.ewp-rowCentre a{font-size:16px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
+ color:#111;text-decoration:none}
+.ewp-rowCentre a:hover{text-decoration:underline}
 
 /* The club sides, on white above everything else, the Forest shape. */
 .ewp-teamBar{background:#fff}
@@ -1123,6 +1315,13 @@ function ew_hb_css() {
  .ewp-teamTabs button{font-size:15px}
  .ewp-tabs{gap:18px}
  .ewp-tabs button{font-size:15px}
+ .ewp-tie{grid-template-columns:1fr;gap:10px}
+ .ewp-tieName,.ewp-tieName:first-child,.ewp-tieName:last-child{text-align:center;font-size:24px}
+ .ewp-tieMid{justify-content:center}
+ .ewp-tieMid img{width:46px;height:46px}
+ .ewp-rowBody{padding:18px 16px 20px}
+ .ewp-rowTop{padding:12px 16px}
+ .ewp-rowComp{display:none}
  .ewp-upcoming,.ewp-shop{padding:32px 0 38px}
  .ewp-shopGrid{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
  .ewp-discover{padding:34px 0 38px}
