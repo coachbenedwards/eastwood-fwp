@@ -95,7 +95,8 @@ function ew_home_blocks_present() {
 
 	foreach ( array( 'eastwood_home_banner', 'eastwood_home_hero', 'eastwood_home_fixtures',
 		'eastwood_home_upcoming', 'eastwood_home_shop', 'eastwood_home_tiles',
-		'eastwood_home_sponsors', 'eastwood_home_discover', 'eastwood_home_news' ) as $tag ) {
+		'eastwood_home_sponsors', 'eastwood_home_discover', 'eastwood_home_news',
+		'eastwood_matches' ) as $tag ) {
 		foreach ( $hay as $text ) {
 			if ( '' !== $text && false !== strpos( $text, '[' . $tag ) ) {
 				return true;
@@ -1345,6 +1346,8 @@ function ew_hb_css() {
 /* The matches page: a month, then one full-width panel per fixture.
    Same tie layout as the banner, white instead of a photograph. */
 .ewp-month{margin:30px 0 14px;text-align:center;font-size:18px;font-weight:700;color:#212121}
+.ewp-credit{max-width:1248px;margin:0 auto;padding:26px 16px 44px;text-align:center;
+ font-size:12px;color:#9a9aa3}
 .ewp-rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
 .ewp-row{background:#fff;border-radius:6px;overflow:hidden}
 .ewp-rowTop{display:flex;align-items:center;gap:9px;padding:14px 22px;background:#fafafa;

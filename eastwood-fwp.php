@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.19.0
+ * Version: 2.20.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1253,21 +1253,20 @@ function ew_matches_shortcode( $atts ) {
 	$atts = shortcode_atts( array( 'open' => 'fixtures' ), $atts, 'eastwood_matches' );
 	$open = in_array( $atts['open'], array( 'fixtures', 'results', 'table' ), true ) ? $atts['open'] : 'fixtures';
 
-	ob_start();
-	?>
-<div class="ew-matches" data-team="<?php echo esc_attr( EW_TEAM ); ?>" data-open="<?php echo esc_attr( $open ); ?>">
-	<div class="ew-tabs" role="tablist">
-		<button type="button" role="tab" data-tab="fixtures">Fixtures</button>
-		<button type="button" role="tab" data-tab="results">Results</button>
-		<button type="button" role="tab" data-tab="table">Table</button>
-	</div>
-	<div class="ew-panel" data-panel="fixtures"><p class="ew-loading">Loading fixtures…</p></div>
-	<div class="ew-panel" data-panel="results"><p class="ew-loading">Loading results…</p></div>
-	<div class="ew-panel" data-panel="table"><p class="ew-loading">Loading table…</p></div>
-	<p class="ew-credit">Fixtures, results and standings supplied by Football Web Pages.</p>
-</div>
-	<?php
-	return trim( ob_get_clean() );
+	// The matches page is the next game enlarged, then the whole season
+	// underneath — the shape Forest use. Both come from parts/home-blocks.php
+	// so this page and the homepage cannot drift apart.
+	if ( ! function_exists( 'ew_hb_fixtures_sc' ) ) {
+		return '';
+	}
+
+	$out  = ew_hb_banner_sc( array( 'countdown' => 'yes' ) );
+	$out .= ew_hb_fixtures_sc(
+		array( 'title' => '', 'open' => $open ),
+		"Men's First Team | " . EW_TEAM . "\nWomen's First Team |\nReserves |\nUnder 21s |"
+	);
+	$out .= '<p class="ewp-credit">Fixtures, results and standings supplied by Football Web Pages.</p>';
+	return $out;
 }
 add_shortcode( 'eastwood_matches', 'ew_matches_shortcode' );
 
@@ -1307,6 +1306,10 @@ function ew_post_contains( $post, $needle ) {
 }
 
 function ew_matches_assets() {
+	// The shortcode renders the shared blocks now; this sheet and its script
+	// styled the old .ew-matches markup, which is gone.
+	return;
+	// phpcs:disable
 	if ( ! is_singular() ) { return; }
 	$post = get_post();
 	if ( ! ew_uses_shortcode( $post, 'eastwood_matches' ) ) { return; }
@@ -1777,7 +1780,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  *     table, pasted once at Settings → Eastwood FWP.
  * ------------------------------------------------------------------ */
 
-const EW_FWP_VERSION = '2.19.0';
+const EW_FWP_VERSION = '2.20.0';
 
 /*
  * Parts loader.
