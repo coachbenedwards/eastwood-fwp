@@ -290,6 +290,8 @@ function ew_hb_banner_sc( $atts ) {
 			'cta_url'    => '/eastwood-tickets/',
 			'centre'     => 'Match Centre',
 			'centre_url' => '/eastwood-matches/',
+			'image'      => '',
+			'countdown'  => 'yes',
 		),
 		$atts,
 		'eastwood_home_banner'
@@ -312,7 +314,10 @@ function ew_hb_banner_sc( $atts ) {
 
 	ob_start();
 	?>
-<section class="ewp ewp-banner">
+<section class="ewp ewp-banner<?php echo '' !== $atts['image'] ? ' has-img' : ''; ?>"<?php
+	echo '' !== $atts['image']
+		? ' style="background-image:url(' . esc_url( $atts['image'] ) . ')"'
+		: ''; ?>>
 	<div class="ewp-bannerInner">
 		<?php if ( '' !== $comp ) : ?>
 		<p class="ewp-bannerComp"><?php echo esc_html( $comp ); ?></p>
@@ -336,6 +341,15 @@ function ew_hb_banner_sc( $atts ) {
 		<?php if ( $ts ) : ?>
 		<p class="ewp-bannerWhen"><?php echo esc_html( date_i18n( 'D j M', $ts ) ); ?>
 			<b><?php echo esc_html( date_i18n( 'H:i', $ts ) ); ?></b></p>
+		<?php endif; ?>
+
+		<?php if ( $ts && 'no' !== $atts['countdown'] ) : ?>
+		<div class="ewp-bannerClock" data-ko="<?php echo esc_attr( (string) $ts ); ?>" aria-hidden="true">
+			<span><b data-u="d">--</b><i>Days</i></span>
+			<span><b data-u="h">--</b><i>Hours</i></span>
+			<span><b data-u="m">--</b><i>Mins</i></span>
+			<span><b data-u="s">--</b><i>Secs</i></span>
+		</div>
 		<?php endif; ?>
 
 		<p class="ewp-bannerCta">
@@ -553,6 +567,20 @@ add_shortcode( 'eastwood_home_news', 'ew_hb_news_sc' );
 function ew_hb_css() {
 	return '
 .ewp-banner{background:#CC0000;color:#fff;padding:30px 16px 34px;text-align:center}
+.ewp-banner.has-img{position:relative;background-size:cover;background-position:center;
+ background-repeat:no-repeat;padding:44px 16px 48px}
+.ewp-banner.has-img::before{content:"";position:absolute;inset:0;background:rgba(10,8,8,.68)}
+.ewp-banner .ewp-bannerInner{position:relative}
+.ewp-bannerClock{display:flex;justify-content:center;gap:30px;margin:4px 0 24px}
+.ewp-bannerClock span{display:block;text-align:center}
+.ewp-bannerClock b{display:block;font-family:Anton,"Instrument Sans",sans-serif;font-size:32px;
+ line-height:1;color:#fff}
+.ewp-bannerClock i{display:block;margin-top:5px;font-style:normal;font-size:9px;letter-spacing:.17em;
+ text-transform:uppercase;color:rgba(255,255,255,.62)}
+@media(max-width:760px){
+ .ewp-bannerClock{gap:18px}
+ .ewp-bannerClock b{font-size:22px}
+}
 .ewp-bannerInner{max-width:1180px;margin:0 auto}
 .ewp-bannerComp{margin:0 0 14px;font-size:11px;font-weight:700;letter-spacing:.14em;
  text-transform:uppercase;color:rgba(255,255,255,.78)}
@@ -562,7 +590,7 @@ function ew_hb_css() {
 .ewp-bannerTie{display:flex;align-items:center;justify-content:center;gap:20px;flex-wrap:wrap}
 .ewp-bannerName{font-family:Anton,"Instrument Sans",sans-serif;font-size:40px;line-height:1;
  letter-spacing:.01em;text-transform:uppercase}
-.ewp-bannerTie img{width:58px;height:58px;object-fit:contain}
+.ewp-bannerTie img{width:76px;height:76px;object-fit:contain}
 .ewp-bannerV{font-family:Anton,sans-serif;font-size:18px;color:rgba(255,255,255,.6)}
 .ewp-bannerWhen{margin:20px 0 22px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;
  color:rgba(255,255,255,.85)}
@@ -576,7 +604,7 @@ function ew_hb_css() {
 @media(max-width:760px){
  .ewp-bannerName{font-size:26px}
  .ewp-bannerTie{gap:12px}
- .ewp-bannerTie img{width:42px;height:42px}
+ .ewp-bannerTie img{width:52px;height:52px}
 }
 .ewp{font-family:"Instrument Sans",system-ui,sans-serif;color:#111}
 .ewp *{box-sizing:border-box}
@@ -749,6 +777,26 @@ function ew_hb_js() {
   });
  });
 })();
+ /* next-match countdown */
+ [].forEach.call(document.querySelectorAll('.ewp-bannerClock'), function(el){
+  var ko = parseInt(el.getAttribute('data-ko'), 10) * 1000;
+  if (!ko) { return; }
+  function pad(n){ return (n<10?'0':'') + n; }
+  function tick(){
+   var left = ko - Date.now();
+   if (left <= 0) { el.style.display='none'; return; }
+   var s = Math.floor(left/1000);
+   var parts = { d: Math.floor(s/86400), h: Math.floor(s/3600)%24,
+                 m: Math.floor(s/60)%60, s: s%60 };
+   Object.keys(parts).forEach(function(k){
+    var b = el.querySelector('[data-u="'+k+'"]');
+    if (b) { b.textContent = pad(parts[k]); }
+   });
+  }
+  tick();
+  setInterval(tick, 1000);
+ });
+
 JS;
 }
 
