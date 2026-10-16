@@ -94,8 +94,8 @@ function ew_home_blocks_present() {
 	}
 
 	foreach ( array( 'eastwood_home_banner', 'eastwood_home_hero', 'eastwood_home_fixtures',
-		'eastwood_home_upcoming', 'eastwood_home_shop', 'eastwood_home_discover',
-		'eastwood_home_news' ) as $tag ) {
+		'eastwood_home_upcoming', 'eastwood_home_shop', 'eastwood_home_tiles',
+		'eastwood_home_sponsors', 'eastwood_home_discover', 'eastwood_home_news' ) as $tag ) {
 		foreach ( $hay as $text ) {
 			if ( '' !== $text && false !== strpos( $text, '[' . $tag ) ) {
 				return true;
@@ -228,7 +228,8 @@ function ew_hb_card( $m, $done = false, $cta = array() ) {
 				<i><?php echo esc_html( ! empty( $m['time'] ) ? substr( $m['time'], 0, 5 ) : '' ); ?></i>
 				<?php endif; ?>
 			</span>
-			<span class="ewp-ha" title="<?php echo $home ? 'Home' : 'Away'; ?>"><?php echo $home ? 'H' : 'A'; ?></span>
+			<span class="ewp-ha is-<?php echo $home ? 'home' : 'away'; ?>"
+				title="<?php echo $home ? 'Home' : 'Away'; ?>"><?php echo $home ? 'H' : 'A'; ?></span>
 		</span>
 		<span class="ewp-cardBody">
 			<img src="<?php echo esc_url( ew_home_badge( $opp['id'] ?? 0 ) ); ?>" alt=""
@@ -979,6 +980,179 @@ function ew_hb_shop_sc( $atts, $content = '' ) {
 add_shortcode( 'eastwood_home_shop', 'ew_hb_shop_sc' );
 
 /* ------------------------------------------------------------------
+ * [eastwood_home_tiles title="Hospitality" all="Book now" all_url="/..."
+ *                      tone="light" cols="4"]
+ * Matchday Hospitality | /hospitality/ | From £45 a head | https://…/img.jpg
+ * [/eastwood_home_tiles]
+ *
+ * Forest run the same band four times over — Discover, Memberships,
+ * Hospitality, Forest Looks — a heading, a row of photographs with a label
+ * across the bottom, and one link underneath. One block does all of them,
+ * and the video row too, where the third field is the running time.
+ * ------------------------------------------------------------------ */
+
+function ew_hb_tiles_sc( $atts, $content = '' ) {
+	$atts = shortcode_atts(
+		array(
+			'title'   => '',
+			'all'     => '',
+			'all_url' => '/',
+			'tone'    => 'light',
+			'cols'    => '4',
+			'play'    => 'no',
+		),
+		$atts,
+		'eastwood_home_tiles'
+	);
+
+	$tiles = array();
+	foreach ( ew_hb_lines( $content ) as $line ) {
+		$parts = array_map( 'trim', explode( '|', $line ) );
+		if ( '' === $parts[0] || ! isset( $parts[1] ) || '' === $parts[1] ) {
+			continue;
+		}
+		$url = $parts[1];
+		if ( 0 !== strpos( $url, 'http' ) ) {
+			$url = home_url( '/' . ltrim( $url, '/' ) );
+		}
+		$tiles[] = array(
+			$parts[0],
+			$url,
+			isset( $parts[2] ) ? $parts[2] : '',
+			isset( $parts[3] ) ? $parts[3] : '',
+		);
+	}
+	if ( ! $tiles ) {
+		return '';
+	}
+
+	$dark = 'dark' === $atts['tone'];
+	$cols = max( 2, min( 6, (int) $atts['cols'] ) );
+	$ext  = false !== strpos( $atts['all_url'], 'http' );
+
+	ob_start();
+	?>
+<section class="ewp ewp-tiles<?php echo $dark ? ' is-dark' : ''; ?>">
+	<div class="ewp-wrap">
+		<?php if ( '' !== $atts['title'] ) : ?>
+		<h2 class="ewp-h2<?php echo $dark ? ' is-light' : ' is-red'; ?>"><?php
+			echo esc_html( $atts['title'] ); ?></h2>
+		<?php endif; ?>
+
+		<ul class="ewp-tileGrid" style="--ewp-cols:<?php echo (int) $cols; ?>">
+			<?php foreach ( $tiles as $t ) : ?>
+			<li>
+				<a href="<?php echo esc_url( $t[1] ); ?>"<?php
+					echo false !== strpos( $t[1], 'http' ) && false === strpos( $t[1], 'eastwoodfc.com' )
+						? ' target="_blank" rel="noopener"' : ''; ?>>
+					<span class="ewp-tileImg">
+						<?php if ( '' !== $t[3] ) : ?>
+						<img src="<?php echo esc_url( $t[3] ); ?>" alt="" loading="lazy"
+							onerror="this.style.display='none'">
+						<?php endif; ?>
+						<?php if ( 'no' !== $atts['play'] ) : ?>
+						<span class="ewp-tilePlay" aria-hidden="true"></span>
+						<?php endif; ?>
+						<?php if ( '' !== $t[2] && 'no' !== $atts['play'] ) : ?>
+						<i class="ewp-tileMeta"><?php echo esc_html( $t[2] ); ?></i>
+						<?php endif; ?>
+					</span>
+					<b><?php echo esc_html( $t[0] ); ?> <span aria-hidden="true">&rarr;</span></b>
+					<?php if ( '' !== $t[2] && 'no' === $atts['play'] ) : ?>
+					<i class="ewp-tileSub"><?php echo esc_html( $t[2] ); ?></i>
+					<?php endif; ?>
+				</a>
+			</li>
+			<?php endforeach; ?>
+		</ul>
+
+		<?php if ( '' !== $atts['all'] ) : ?>
+		<p class="ewp-allRow<?php echo $dark ? ' is-light' : ''; ?>"><a class="ewp-all"
+			href="<?php echo esc_url( $ext ? $atts['all_url'] : home_url( $atts['all_url'] ) ); ?>"><?php
+			echo esc_html( $atts['all'] ); ?> <span aria-hidden="true">&rarr;</span></a></p>
+		<?php endif; ?>
+	</div>
+</section>
+	<?php
+	return ob_get_clean();
+}
+add_shortcode( 'eastwood_home_tiles', 'ew_hb_tiles_sc' );
+
+/* ------------------------------------------------------------------
+ * [eastwood_home_sponsors title="..." lead="Shirt Sponsor,Event Sponsor"]
+ *
+ * Straight off ew_sponsor_roster(), so the homepage cannot drift from the
+ * store the rest of the site serves. Forest split theirs into principal
+ * partners and the rest; "lead" names the tiers that go in the top row.
+ * ------------------------------------------------------------------ */
+
+function ew_hb_sponsors_sc( $atts ) {
+	$atts = shortcode_atts(
+		array(
+			'title'      => 'Our Partners',
+			'tone'       => 'light',
+			'lead'       => 'Shirt Sponsor,Event Sponsor',
+			'lead_label' => 'Principal Partners',
+			'rest_label' => 'Club Partners',
+		),
+		$atts,
+		'eastwood_home_sponsors'
+	);
+
+	if ( ! function_exists( 'ew_sponsor_roster' ) || ! function_exists( 'ew_sponsor_url' ) ) {
+		return '';
+	}
+
+	$lead_tiers = array_filter( array_map( 'trim', explode( ',', $atts['lead'] ) ) );
+	$rows       = array( 'lead' => array(), 'rest' => array() );
+	foreach ( ew_sponsor_roster() as $slug => $row ) {
+		$where = in_array( (string) ( $row[1] ?? '' ), $lead_tiers, true ) ? 'lead' : 'rest';
+		$rows[ $where ][] = array(
+			'name' => (string) ( $row[0] ?? '' ),
+			'tier' => (string) ( $row[1] ?? '' ),
+			'url'  => (string) ( $row[2] ?? '' ),
+			'img'  => ew_sponsor_url( $slug ),
+		);
+	}
+	if ( ! $rows['lead'] && ! $rows['rest'] ) {
+		return '';
+	}
+
+	ob_start();
+	?>
+<section class="ewp ewp-sponsors<?php echo 'red' === $atts['tone'] ? ' is-red' : ''; ?>">
+	<div class="ewp-wrap">
+		<?php if ( '' !== $atts['title'] ) : ?>
+		<h2 class="ewp-h2 <?php echo 'red' === $atts['tone'] ? 'is-light' : 'is-red'; ?>"><?php
+			echo esc_html( $atts['title'] ); ?></h2>
+		<?php endif; ?>
+
+		<?php foreach ( array( 'lead' => $atts['lead_label'], 'rest' => $atts['rest_label'] ) as $k => $label ) : ?>
+			<?php if ( ! $rows[ $k ] ) { continue; } ?>
+		<p class="ewp-sponsorLabel"><?php echo esc_html( $label ); ?></p>
+		<ul class="ewp-sponsorRow<?php echo 'lead' === $k ? ' is-lead' : ''; ?>">
+			<?php foreach ( $rows[ $k ] as $sp ) : ?>
+			<li>
+				<?php if ( '' !== $sp['url'] ) : ?>
+				<a href="<?php echo esc_url( $sp['url'] ); ?>" target="_blank" rel="noopener sponsored"
+					title="<?php echo esc_attr( $sp['name'] . ' — ' . $sp['tier'] ); ?>">
+				<?php endif; ?>
+					<img src="<?php echo esc_url( $sp['img'] ); ?>"
+						alt="<?php echo esc_attr( $sp['name'] ); ?>" loading="lazy"
+						onerror="this.closest('li').style.display='none'">
+				<?php if ( '' !== $sp['url'] ) : ?></a><?php endif; ?>
+			</li>
+			<?php endforeach; ?>
+		</ul>
+		<?php endforeach; ?>
+	</div>
+</section>
+	<?php
+	return ob_get_clean();
+}
+add_shortcode( 'eastwood_home_sponsors', 'ew_hb_sponsors_sc' );
+
+/* ------------------------------------------------------------------
  * [eastwood_home_news title="..." count="4" link="/eastwood-news/"]
  * ------------------------------------------------------------------ */
 
@@ -1007,12 +1181,7 @@ function ew_hb_news_sc( $atts ) {
 	?>
 <section class="ewp ewp-news">
 	<div class="ewp-wrap">
-		<h2 class="ewp-h2"><?php echo esc_html( $atts['title'] ); ?>
-			<?php if ( '' !== $atts['link'] ) : ?>
-			<a class="ewp-all" href="<?php echo esc_url( home_url( '/' . ltrim( $atts['link'], '/' ) ) ); ?>"><?php
-				echo esc_html( $atts['link_text'] ); ?> &rarr;</a>
-			<?php endif; ?>
-		</h2>
+		<h2 class="ewp-h2"><?php echo esc_html( $atts['title'] ); ?></h2>
 		<div class="ewp-newsGrid">
 			<?php foreach ( $posts as $p ) : ?>
 			<a class="ewp-newsCard" href="<?php echo esc_url( get_permalink( $p ) ); ?>">
@@ -1031,6 +1200,11 @@ function ew_hb_news_sc( $atts ) {
 			</a>
 			<?php endforeach; ?>
 		</div>
+		<?php if ( '' !== $atts['link'] ) : ?>
+		<p class="ewp-allRow"><a class="ewp-all" href="<?php
+			echo esc_url( home_url( '/' . ltrim( $atts['link'], '/' ) ) ); ?>"><?php
+			echo esc_html( $atts['link_text'] ); ?> <span aria-hidden="true">&rarr;</span></a></p>
+		<?php endif; ?>
 	</div>
 </section>
 	<?php
@@ -1097,12 +1271,17 @@ function ew_hb_css() {
 .ewp *{box-sizing:border-box}
 .ewp-wrap{max-width:1180px;margin:0 auto;padding:0 16px}
 .ewp-fixtures .ewp-wrap{max-width:1248px}
-.ewp-h2{font-family:Anton,"Instrument Sans",sans-serif;font-size:26px;letter-spacing:.04em;
- text-transform:uppercase;margin:0 0 18px;display:flex;align-items:baseline;gap:14px;color:#111}
+.ewp-h2{font-family:Anton,"Instrument Sans",sans-serif;font-size:54px;letter-spacing:.02em;
+ line-height:1.02;text-transform:uppercase;margin:0 0 26px;text-align:center;color:#111}
 .ewp-h2.is-light{color:#fff}
-.ewp-all{margin-left:auto;font-family:"Instrument Sans",sans-serif;font-size:13px;letter-spacing:0;
- text-transform:none;font-weight:600;color:#CC0000;text-decoration:none}
-.ewp-all:hover{text-decoration:underline}
+.ewp-h2.is-red{color:#CC0000}
+.ewp-allRow{margin:30px 0 0;text-align:center}
+.ewp-all{font-family:Anton,"Instrument Sans",sans-serif;font-size:14px;letter-spacing:.09em;
+ text-transform:uppercase;color:#CC0000;text-decoration:none;
+ border-bottom:1px solid rgba(204,0,0,.4);padding-bottom:3px}
+.ewp-all:hover{border-bottom-color:#CC0000}
+.ewp-allRow.is-light .ewp-all{color:#fff;border-bottom-color:rgba(255,255,255,.45)}
+.ewp-allRow.is-light .ewp-all:hover{border-bottom-color:#fff}
 
 .ewp-hero{position:relative;background:#111}
 .ewp-hero a{position:relative;display:block;min-height:520px;text-decoration:none;overflow:hidden}
@@ -1119,6 +1298,49 @@ function ew_hb_css() {
 
 .ewp-fixtures{background:#f3f3f3}
 .ewp-fixturesBody{padding:36px 0 48px}
+
+/* Photo tiles — Discover, Hospitality, the video row, anything of that shape. */
+.ewp-tiles{background:#f3f3f3;padding:48px 0 54px}
+.ewp-tiles.is-dark{background:#111}
+.ewp-tileGrid{display:grid;grid-template-columns:repeat(var(--ewp-cols,4),1fr);gap:14px;
+ list-style:none;margin:0;padding:0}
+.ewp-tileGrid a{display:block;text-decoration:none;color:inherit}
+.ewp-tileImg{display:block;position:relative;aspect-ratio:3/4;border-radius:5px;overflow:hidden;
+ background:#1a1a1d;margin:0 0 11px}
+.ewp-tiles.is-dark .ewp-tileImg{background:#17171a}
+.ewp-tileImg img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .35s}
+.ewp-tileGrid a:hover .ewp-tileImg img{transform:scale(1.04)}
+.ewp-tileImg::after{content:"";position:absolute;inset:0;
+ background:linear-gradient(to top,rgba(0,0,0,.72) 0%,rgba(0,0,0,0) 48%)}
+.ewp-tileMeta{position:absolute;right:9px;top:9px;z-index:2;font-style:normal;font-size:11px;
+ font-weight:700;letter-spacing:.04em;color:#fff;background:rgba(0,0,0,.72);
+ padding:4px 8px;border-radius:3px}
+.ewp-tilePlay{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;
+ width:46px;height:46px;border-radius:50%;border:2px solid rgba(255,255,255,.9)}
+.ewp-tilePlay::before{content:"";position:absolute;left:52%;top:50%;transform:translate(-50%,-50%);
+ border-style:solid;border-width:9px 0 9px 15px;border-color:transparent transparent transparent #fff}
+.ewp-tileGrid b{display:block;font-family:Anton,"Instrument Sans",sans-serif;font-size:16px;
+ letter-spacing:.04em;text-transform:uppercase;color:#111;line-height:1.2}
+.ewp-tiles.is-dark .ewp-tileGrid b{color:#fff}
+.ewp-tileGrid b span{color:#CC0000;margin-left:4px}
+.ewp-tileSub{display:block;font-style:normal;font-size:13px;color:#6b6b6b;margin-top:5px;line-height:1.4}
+.ewp-tiles.is-dark .ewp-tileSub{color:#9a9aa3}
+
+/* Partners, pulled from the sponsor store rather than typed again. */
+.ewp-sponsors{background:#fff;padding:46px 0 52px}
+.ewp-sponsorLabel{margin:26px 0 18px;text-align:center;font-size:11px;font-weight:700;
+ letter-spacing:.16em;text-transform:uppercase;color:#9a9aa3}
+.ewp-sponsorRow{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;
+ gap:26px 40px;list-style:none;margin:0;padding:0}
+.ewp-sponsorRow img{height:46px;width:auto;max-width:170px;object-fit:contain;display:block;
+ opacity:.88;transition:opacity .15s}
+.ewp-sponsorRow.is-lead img{height:66px;max-width:230px}
+.ewp-sponsorRow a:hover img{opacity:1}
+/* Only worth turning red once every logo exists as a white version —
+   a colour logo on red flattens to a blank rectangle. */
+.ewp-sponsors.is-red{background:#CC0000}
+.ewp-sponsors.is-red .ewp-sponsorLabel{color:rgba(255,255,255,.75)}
+.ewp-sponsors.is-red .ewp-sponsorRow img{filter:brightness(0) invert(1)}
 
 /* The matches page: a month, then one full-width panel per fixture.
    Same tie layout as the banner, white instead of a photograph. */
@@ -1202,8 +1424,10 @@ function ew_hb_css() {
  padding:9px 14px;background:rgba(0,0,0,.03)}
 .ewp-when b{font-family:Anton,sans-serif;font-size:14px;letter-spacing:.03em}
 .ewp-when i{font-style:normal;font-size:13px;color:#6b6b6b;margin-left:7px}
-.ewp-ha{width:18px;height:18px;border-radius:50%;background:#CC0000;color:#fff;font-size:10px;
- font-weight:700;display:flex;align-items:center;justify-content:center;flex:none}
+.ewp-ha{width:19px;height:19px;border-radius:50%;background:#CC0000;color:#fff;font-size:10px;
+ font-weight:700;display:flex;align-items:center;justify-content:center;flex:none;
+ border:1.5px solid #CC0000}
+.ewp-ha.is-away{background:transparent;color:#CC0000}
 .ewp-cardBody{display:flex;align-items:center;gap:13px;padding:15px 14px 17px}
 .ewp-cardBody img{width:44px;height:44px;object-fit:contain;flex:none}
 .ewp-cardText{min-width:0}
@@ -1308,7 +1532,7 @@ function ew_hb_css() {
 @media(max-width:820px){
  .ewp-hero a{min-height:380px}
  .ewp-heroText b{font-size:30px;max-width:none}
- .ewp-h2{font-size:21px}
+ .ewp-h2{font-size:30px;margin-bottom:20px}
  .ewp-news{padding:32px 0 36px}
  .ewp-fixturesBody{padding:26px 0 36px}
  .ewp-teamTabs{gap:18px;flex-wrap:nowrap}
@@ -1324,6 +1548,13 @@ function ew_hb_css() {
  .ewp-rowComp{display:none}
  .ewp-upcoming,.ewp-shop{padding:32px 0 38px}
  .ewp-shopGrid{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+ .ewp-tiles{padding:32px 0 38px}
+ .ewp-tileGrid{grid-template-columns:repeat(2,1fr)}
+ .ewp-tileGrid b{font-size:14px}
+ .ewp-sponsors{padding:32px 0 36px}
+ .ewp-sponsorRow{gap:22px 30px}
+ .ewp-sponsorRow img{height:32px;max-width:120px}
+ .ewp-sponsorRow.is-lead img{height:44px;max-width:150px}
  .ewp-discover{padding:34px 0 38px}
  .ewp-slide{flex:0 0 240px;max-width:240px}
  .ewp-table th,.ewp .ewp-table tbody td{padding:9px 5px;font-size:13px}
