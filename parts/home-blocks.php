@@ -1191,7 +1191,7 @@ function ew_hb_sponsors_sc( $atts ) {
 add_shortcode( 'eastwood_home_sponsors', 'ew_hb_sponsors_sc' );
 
 /* ------------------------------------------------------------------
- * [eastwood_home_news title="..." count="4" link="/eastwood-news/"]
+ * [eastwood_home_news title="..." count="4" link="/news/"]
  * ------------------------------------------------------------------ */
 
 function ew_hb_news_sc( $atts ) {
@@ -1199,7 +1199,7 @@ function ew_hb_news_sc( $atts ) {
 		array(
 			'title'     => 'Latest News',
 			'count'     => '4',
-			'link'      => '/eastwood-news/',
+			'link'      => '/news/',
 			'link_text' => 'View all news',
 		),
 		$atts,

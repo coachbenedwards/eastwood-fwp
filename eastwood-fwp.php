@@ -1054,6 +1054,12 @@ h1.elementor-heading-title{
 @media(max-width:820px){
  h1.elementor-heading-title{font-size:38px;padding:32px 16px 34px !important}
 }
+
+/* The news hero collapses to 88px because its own min-height class never
+   made it into the captured stylesheet — the image inside is absolutely
+   positioned, so without it the anchor has nothing to stand on. The grid
+   cards below use min-h-[320px], which did survive. */
+.min-h-\[420px\]{min-height:420px}
 ';
 }
 
@@ -1177,6 +1183,14 @@ function ew_sponsor_slot_map() {
  */
 function ew_rewrite_markup( $html ) {
 	if ( '' === $html || false === stripos( $html, '<body' ) ) { return $html; }
+
+	// The slugs lost their "eastwood-" prefix; the captured header and
+	// footer still carry the old ones in markup we do not own.
+	$html = str_replace(
+		array( '/eastwood-matches/', '/eastwood-news/' ),
+		array( '/matches/', '/news/' ),
+		$html
+	);
 
 	// Icons. The captured markup hard-codes fill="red" on the <use>, which
 	// would flood-fill an outline icon, so the stroke attributes go on in
@@ -1330,7 +1344,6 @@ function ew_matches_shortcode( $atts ) {
 		array( 'title' => '', 'open' => $open, 'hero' => 'yes' ),
 		"Men's First Team | " . EW_TEAM . "\nWomen's First Team |\nReserves |\nUnder 21s |"
 	);
-	$out .= '<p class="ewp-credit">Fixtures, results and standings supplied by Football Web Pages.</p>';
 	return $out;
 }
 add_shortcode( 'eastwood_matches', 'ew_matches_shortcode' );
@@ -1659,7 +1672,7 @@ function ew_teams_shortcode() {
 	</section>
 	<?php endforeach; ?>
 	<p class="ew-credit">Twenty-nine teams play out of Coronation Park. New players are welcome across every
-		section &mdash; <a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a>.</p>
+		section &mdash; <a href="mailto:grassroots@eastwoodfc.com">grassroots@eastwoodfc.com</a>.</p>
 </div>
 	<?php
 	return trim( ob_get_clean() );
@@ -1672,8 +1685,8 @@ function ew_squad_shortcode() {
 <div class="ew-squad" data-team="<?php echo esc_attr( EW_TEAM ); ?>">
 	<div class="ew-sq-top"><p class="ew-loading">Loading the squad…</p></div>
 	<div class="ew-sq-body"></div>
-	<p class="ew-credit">Appearances, goals and cards supplied by Football Web Pages and updated as the league
-		records each match. The list covers every player who has featured for the first team this season.</p>
+	<p class="ew-credit">Updated as each match is recorded. The list covers every player who has featured
+		for the first team this season.</p>
 </div>
 	<?php
 	return trim( ob_get_clean() );
@@ -2026,6 +2039,21 @@ add_action( 'rest_api_init', function () {
 	) );
 } );
 
+/* The old addresses, kept alive for anything already pointing at them. */
+add_action( 'template_redirect', function () {
+	$path = trim( (string) wp_parse_url( $_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH ), '/' );
+	$moved = array(
+		'eastwood-matches' => '/matches/',
+		'eastwood-news'    => '/news/',
+	);
+	$first = explode( '/', $path )[0];
+	if ( isset( $moved[ $first ] ) ) {
+		$rest = substr( $path, strlen( $first ) );
+		wp_redirect( home_url( rtrim( $moved[ $first ], '/' ) . $rest . '/' ), 301 );
+		exit;
+	}
+}, 1 );
+
 /* ------------------------------------------------------------------
  * The News landing page.
  *
@@ -2043,8 +2071,8 @@ add_action( 'rest_api_init', function () {
  * change, no front-page change, and the listing stays the theme's.
  * ------------------------------------------------------------------ */
 
-const EW_NEWS_SLUG  = 'eastwood-news';
-const EW_NEWS_RULES = '1';
+const EW_NEWS_SLUG  = 'news';
+const EW_NEWS_RULES = '2';
 
 add_action( 'init', function () {
 	add_rewrite_rule( '^' . EW_NEWS_SLUG . '/?$', 'index.php?ew_news=1', 'top' );
@@ -2134,6 +2162,10 @@ function ew_owned_pages() {
 		'academy' => array(
 			'title'   => 'Academy',
 			'content' => ew_academy_content(),
+		),
+		'matches' => array(
+			'title'   => 'Matches',
+			'content' => '[eastwood_matches]',
 		),
 		'eastwood-tickets' => array(
 			'title'   => 'Matchday',
@@ -3096,7 +3128,7 @@ function ew_home_football() {
 			$home = (int) ( $next['home-team']['id'] ?? 0 ) === (int) EW_TEAM;
 			$ts   = strtotime( $next['date'] );
 			?>
-		<a class="ewh-panel ewh-next" href="<?php echo esc_url( home_url( '/eastwood-matches/' ) ); ?>">
+		<a class="ewh-panel ewh-next" href="<?php echo esc_url( home_url( '/matches/' ) ); ?>">
 			<span class="ewh-kicker">Next match<?php echo $home ? ' · Home' : ' · Away'; ?></span>
 			<div class="ewh-fixture">
 				<?php
@@ -3116,7 +3148,7 @@ function ew_home_football() {
 		<?php endif; ?>
 
 		<?php if ( $last ) : $ts = strtotime( $last['date'] ); ?>
-		<a class="ewh-panel ewh-last" href="<?php echo esc_url( home_url( '/eastwood-matches/#results' ) ); ?>">
+		<a class="ewh-panel ewh-last" href="<?php echo esc_url( home_url( '/matches/#results' ) ); ?>">
 			<span class="ewh-kicker">Last result</span>
 			<div class="ewh-fixture">
 				<?php
@@ -3135,7 +3167,7 @@ function ew_home_football() {
 		<?php endif; ?>
 
 		<?php if ( $row ) : $a = (array) ( $row['all-matches'] ?? array() ); ?>
-		<a class="ewh-panel ewh-pos" href="<?php echo esc_url( home_url( '/eastwood-matches/#table' ) ); ?>">
+		<a class="ewh-panel ewh-pos" href="<?php echo esc_url( home_url( '/matches/#table' ) ); ?>">
 			<span class="ewh-kicker">League</span>
 			<span class="ewh-posn"><?php echo esc_html( $row['position'] ?? '' ); ?><sup><?php
 				echo esc_html( ew_home_ordinal( (int) ( $row['position'] ?? 0 ) ) ); ?></sup></span>
@@ -3175,7 +3207,7 @@ function ew_home_lead() {
 	?>
 <section class="ewh-news">
 	<div class="ewh-wrap">
-		<h2 class="ewh-head">Latest news <a href="<?php echo esc_url( home_url( '/eastwood-news/' ) ); ?>">All news</a></h2>
+		<h2 class="ewh-head">Latest news <a href="<?php echo esc_url( home_url( '/news/' ) ); ?>">All news</a></h2>
 		<div class="ewh-newsGrid">
 			<a class="ewh-lead" href="<?php echo esc_url( get_permalink( $lead ) ); ?>">
 				<?php if ( has_post_thumbnail( $lead ) ) : ?>
@@ -3608,8 +3640,7 @@ function ew_match_markup( $m ) {
 	<?php endif; ?>
 
 	<div class="ewm-wrap">
-		<p class="ewm-back"><a href="<?php echo esc_url( home_url( '/eastwood-matches/' ) ); ?>">All fixtures and results</a></p>
-		<p class="ewm-credit">Match detail supplied by Football Web Pages.</p>
+		<p class="ewm-back"><a href="<?php echo esc_url( home_url( '/matches/' ) ); ?>">All fixtures and results</a></p>
 	</div>
 </div>
 	<?php
@@ -3696,7 +3727,7 @@ add_action( 'template_redirect', function () {
 		get_header();
 		echo '<div class="ewm"><div class="ewm-wrap"><p class="ewm-back" style="margin:60px 0">'
 			. 'We have no record of that match. '
-			. '<a href="' . esc_url( home_url( '/eastwood-matches/' ) ) . '">All fixtures and results</a>'
+			. '<a href="' . esc_url( home_url( '/matches/' ) ) . '">All fixtures and results</a>'
 			. '</p></div></div>';
 		get_footer();
 		exit;
@@ -4238,7 +4269,7 @@ function ew_team_markup( $group, $team ) {
 
 	<div class="ew-teamLinks">
 		<a href="<?php echo esc_url( home_url( '/eastwood-squad/' ) ); ?>">Squad and season stats</a>
-		<a href="<?php echo esc_url( home_url( '/eastwood-matches/' ) ); ?>">Fixtures, results and table</a>
+		<a href="<?php echo esc_url( home_url( '/matches/' ) ); ?>">Fixtures, results and table</a>
 		<a href="<?php echo esc_url( home_url( '/eastwood-tickets/' ) ); ?>">Matchday and tickets</a>
 	</div>
 
