@@ -19,7 +19,7 @@
  *   [eastwood_home_hero]
  *   [eastwood_home_fixtures title="Fixtures & Results"]
  *   [eastwood_home_discover title="Discover Eastwood"]
- *   Matchday | /tickets/ | Tickets, prices and hospitality
+ *   Matchday | /matchday/ | Coming to a game at Coronation Park
  *   [/eastwood_home_discover]
  *   [eastwood_home_news title="Latest News" count="4"]
  *
@@ -1889,7 +1889,7 @@ function ew_home_preview_content() {
 		. "Club Scarf | /shop/ | \u00a312.00\n"
 		. "[/eastwood_home_shop]\n\n"
 		. "[eastwood_home_discover title=\"Discover Eastwood\"]\n"
-		. "Matchday | /tickets/ | Tickets, prices and hospitality\n"
+		. "Matchday | /matchday/ | Coming to a game at Coronation Park\n"
 		. "The Venue | /thevenue/ | Function room and bar hire\n"
 		. "Pitch Hire | /pitch-hire/ | Floodlit 3G, all year round\n"
 		. "Academy | /academy/ | Full-time football and education\n"

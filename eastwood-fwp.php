@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.36.0
+ * Version: 2.37.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -2277,7 +2277,7 @@ add_filter( 'pre_get_document_title', function ( $title ) {
  * there. The moment somebody edits a page by hand, we leave it alone.
  * ------------------------------------------------------------------ */
 
-const EW_PAGES_V = '10';
+const EW_PAGES_V = '11';
 
 function ew_owned_pages() {
 	$pages = array(
@@ -2302,6 +2302,12 @@ function ew_owned_pages() {
 			'content' => '[eastwood_matches]',
 		),
 		'tickets' => array(
+			'title'   => 'Tickets',
+			'content' => ew_tickets_content(),
+		),
+		// What it costs, and what the day is like, are two different
+		// questions and two different visitors. They were one page.
+		'matchday' => array(
 			'title'   => 'Matchday',
 			'content' => ew_matchday_content(),
 		),
@@ -2869,11 +2875,13 @@ function ew_sponsors_shortcode() {
 }
 add_shortcode( 'eastwood_sponsors', 'ew_sponsors_shortcode' );
 
-function ew_matchday_content() {
+function ew_tickets_content() {
 	return <<<'HTML'
 <div class="ew-prose">
 
-<p class="ew-lede">Eastwood play at Coronation Park on Chewton Street. Pay on the gate, park on site for nothing, and under-16s get in free with an adult.</p>
+<p class="ew-lede">Pay on the gate at Coronation Park — there is no need to buy in advance. Under-16s get in free with an adult.</p>
+
+<p>Coming to a game for the first time? <a href="/matchday/">Everything you need for matchday</a> — where we are, parking, and what to expect when you get here.</p>
 
 <h2>First team, league matches</h2>
 
@@ -2883,8 +2891,6 @@ function ew_matchday_content() {
 	<div class="ew-price"><b>£5.00</b><span>Students, with valid ID</span></div>
 	<div class="ew-price"><b>Free</b><span>Under 16s, with an adult</span></div>
 </div>
-
-<p>Parking on site is free unless we say otherwise for a particular fixture.</p>
 
 <h2>U21 matches</h2>
 
@@ -2909,24 +2915,59 @@ function ew_matchday_content() {
 
 <p>Under-3s come in free with a paying adult and are not issued a season ticket. Season tickets cover league games only, run from August to the end of the following June, and are not transferable. Ask us for a copy of the full terms.</p>
 
-<h2>Disabled supporters</h2>
-
-<p>The clubhouse is reached by a ramp at the entrance to the main building. There are four spaces at pitch level in front of the Main Stand for wheelchair users, for home and away supporters alike, with helpers able to sit alongside or stand at the fence. Supporters with specific access needs who are able to walk can sit pitch side in the first few rows of the Main Stand. There are two accessible toilets at the ground.</p>
-
-<p>Please ring ahead on 01773 432414 if you need a particular space reserved, or an accessible parking space — those are first come, first served and must be booked in advance. There are always staff about who can help.</p>
+<h2>Accessible tickets</h2>
 
 <p>Accessible tickets, by the match or by the season, are available to supporters receiving any of the following: the middle or higher rate of Disability Living Allowance, Attendance Allowance, Severe Disablement Allowance, a War Disabled Pension, a Certificate of Visual Impairment, or enhanced Personal Independence Payment. Bring the letter or certificate to the Pitchside Bar &amp; Lounge — evidence is needed once a year.</p>
 
 <p>Anyone qualifying gets the reduced rate and a free enabler ticket. The enabler is responsible for the supporter they accompany and should stay with them throughout; an enabler arriving without them needs to upgrade at the bar before kick-off.</p>
 
-<p>If something about your visit could have been better, tell us. We would rather hear it.</p>
-
-<h2>Match day hospitality</h2>
-
-<p>Hospitality is available for every home game in the Pitchside Bar &amp; Lounge. It usually includes admission, a reserved parking space, a team sheet, and food before the game and at half time.</p>
+<p>What the ground itself is like to get around is on the <a href="/matchday/">matchday page</a>.</p>
 
 <div class="ew-cta">
-	<h3>Book hospitality or ask about tickets</h3>
+	<h3>Ask about tickets</h3>
+	<p><a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
+</div>
+
+</div>
+HTML;
+}
+
+function ew_matchday_content() {
+	return <<<'HTML'
+<div class="ew-prose">
+
+<p class="ew-lede">Eastwood play at Coronation Park on Chewton Street. Pay on the gate, park on site for nothing, and under-16s get in free with an adult.</p>
+
+<p>What it costs is on the <a href="/tickets/">tickets page</a>. This is everything else.</p>
+
+<h2>Getting here</h2>
+
+<p>Coronation Park, Chewton Street, Eastwood. There is parking on site and it is free, unless we say otherwise for a particular fixture.</p>
+
+<h2>On the day</h2>
+
+<p>There is no need to buy in advance — pay on the gate. Under-16s get in free with an adult, and under-3s come in free too.</p>
+
+<p>The Pitchside Bar &amp; Lounge is open on matchdays, and is where to go if you need to ask anyone anything.</p>
+
+<h2>Getting around the ground</h2>
+
+<p>The clubhouse is reached by a ramp at the entrance to the main building. There are four spaces at pitch level in front of the Main Stand for wheelchair users, for home and away supporters alike, with helpers able to sit alongside or stand at the fence. Supporters with specific access needs who are able to walk can sit pitch side in the first few rows of the Main Stand. There are two accessible toilets at the ground.</p>
+
+<p>Please ring ahead on 01773 432414 if you need a particular space reserved, or an accessible parking space — those are first come, first served and must be booked in advance. There are always staff about who can help.</p>
+
+<p>Reduced-rate tickets for supporters who qualify, and the free enabler ticket that comes with them, are explained on the <a href="/tickets/">tickets page</a>.</p>
+
+<h2>Hospitality</h2>
+
+<p>Hospitality is available for every home game in the Pitchside Bar &amp; Lounge. It usually includes admission, a reserved parking space, a team sheet, and food before the game and at half time. <a href="/hospitality/">See the packages</a>.</p>
+
+<h2>Tell us how it went</h2>
+
+<p>If something about your visit could have been better, tell us. We would rather hear it.</p>
+
+<div class="ew-cta">
+	<h3>Any questions before you come</h3>
 	<p><a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
 </div>
 
