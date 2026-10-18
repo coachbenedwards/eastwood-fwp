@@ -152,7 +152,13 @@ function ew_hb_lines( $content ) {
  * markup hides the image and the competition's name carries it instead.
  */
 function ew_comp_badge( $id ) {
-	return content_url( '/uploads/ew-comps/' . (int) $id . '.png' );
+	$id   = (int) $id;
+	$over = WP_CONTENT_DIR . '/uploads/ew-comps/' . $id . '.png';
+	if ( file_exists( $over ) ) {
+		return content_url( '/uploads/ew-comps/' . $id . '.png' );
+	}
+	$ship = dirname( __DIR__ ) . '/assets/comps/' . $id . '.png';
+	return file_exists( $ship ) ? ew_hb_asset( 'comps/' . $id . '.png' ) : '';
 }
 
 /** A file shipped inside the plugin, addressed from parts/. */
@@ -518,8 +524,9 @@ function ew_hb_banner_sc( $atts ) {
 		: ''; ?>>
 	<div class="ewp-bannerBar">
 		<span class="ewp-bannerComp">
-			<?php if ( $comp_id ) : ?>
-			<img src="<?php echo esc_url( ew_comp_badge( $comp_id ) ); ?>" alt=""
+			<?php $comp_img = $comp_id ? ew_comp_badge( $comp_id ) : ''; ?>
+			<?php if ( '' !== $comp_img ) : ?>
+			<img src="<?php echo esc_url( $comp_img ); ?>" alt=""
 				onerror="this.remove()">
 			<?php endif; ?>
 			<?php if ( '' !== $comp ) : ?><em><?php echo esc_html( $comp ); ?></em><?php endif; ?>
@@ -1255,7 +1262,7 @@ function ew_hb_css() {
 .ewp-banner.has-img{position:relative;background-size:cover;background-position:center;
  background-repeat:no-repeat}
 .ewp-banner.has-img::before{content:"";position:absolute;inset:0;background:rgba(10,8,8,.5)}
-.ewp-banner .ewp-bannerInner{position:relative;padding:14px 16px 48px}
+.ewp-banner .ewp-bannerInner{position:relative;padding:14px 16px 20px}
 
 /* The strip across the top: whose competition, when, and the way in. */
 .ewp-bannerBar{position:relative;display:flex;align-items:center;gap:14px;
@@ -1287,7 +1294,8 @@ function ew_hb_css() {
  .ewp-bannerBar{flex-wrap:wrap;gap:8px 12px;padding:14px 16px}
  .ewp-bannerComp img{height:26px}
  .ewp-bannerMore{margin-left:0}
- .ewp-banner .ewp-bannerInner{padding:10px 16px 34px}
+ .ewp-banner .ewp-bannerInner{padding:10px 16px 16px}
+ .ewp-bannerFeat{margin-top:28px}
 }
 .ewp-bannerInner{max-width:1180px;margin:0 auto}
 .ewp-bannerComp{margin:0 0 14px;font-size:11px;font-weight:700;letter-spacing:.14em;
@@ -1308,7 +1316,7 @@ function ew_hb_css() {
  letter-spacing:.12em;text-transform:uppercase;text-decoration:none;color:#fff;
  border:1px solid rgba(255,255,255,.55)}
 .ewp-bannerCta a.is-primary{background:#fff;color:#CC0000;border-color:#fff}
-.ewp-bannerFeat{display:flex;align-items:center;justify-content:center;gap:11px;margin:26px 0 0}
+.ewp-bannerFeat{display:flex;align-items:center;justify-content:center;gap:11px;margin:40px 0 0}
 .ewp-bannerFeat > span{font-size:10px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;
  color:rgba(255,255,255,.62)}
 .ewp-bannerFeat a{display:inline-flex;align-items:center;gap:8px;text-decoration:none;color:#fff}
