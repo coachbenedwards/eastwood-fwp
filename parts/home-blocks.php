@@ -96,7 +96,7 @@ function ew_home_blocks_present() {
 	foreach ( array( 'eastwood_home_banner', 'eastwood_home_hero', 'eastwood_home_fixtures',
 		'eastwood_home_upcoming', 'eastwood_home_shop', 'eastwood_home_tiles',
 		'eastwood_home_sponsors', 'eastwood_home_discover', 'eastwood_home_news',
-		'eastwood_matches' ) as $tag ) {
+		'eastwood_matches', 'eastwood_teams', 'eastwood_squad' ) as $tag ) {
 		foreach ( $hay as $text ) {
 			if ( '' !== $text && false !== strpos( $text, '[' . $tag ) ) {
 				return true;
@@ -1636,7 +1636,7 @@ function ew_hb_css() {
 function ew_hb_js() {
 	return <<<'JS'
 (function(){
- var roots=[].slice.call(document.querySelectorAll('.ewp-fixtures, .ewp-upcoming'));
+ var roots=[].slice.call(document.querySelectorAll('.ewp-fixtures, .ewp-upcoming, .ew-teams-index'));
  roots.forEach(function(root){
   var rails=[].slice.call(root.querySelectorAll('.ewp-rail'));
 
@@ -1684,7 +1684,8 @@ function ew_hb_js() {
      var want=b.getAttribute('data-pv');
      tabs.forEach(function(t){t.setAttribute('aria-selected', t===b ? 'true':'false');});
      panels.forEach(function(p){
-      if(p.getAttribute('data-pv-panel')===want){p.removeAttribute('hidden');}
+      var keys=(p.getAttribute('data-pv-panel')||'').split(/\s+/);
+      if(keys.indexOf(want)>-1){p.removeAttribute('hidden');}
       else{p.setAttribute('hidden','');}
      });
      rails.forEach(sync);

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.19.0
+ * Version: 2.26.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1653,7 +1653,43 @@ function ew_teams_link( $team ) {
 function ew_teams_shortcode() {
 	ob_start();
 	?>
-<div class="ew-teams-index">
+<div class="ew-teams-index" data-pv-group>
+	<?php
+	/*
+	 * The senior sides across the top, the way the reference site opens its
+	 * Teams page. Only the first team has a squad in the league feed; the
+	 * others say so rather than showing an empty grid.
+	 */
+	$sides = array(
+		"Men's First Team" => 'squad',
+		"Women's First Team" => '',
+		'Reserves' => '',
+		'Under 21s' => '',
+	);
+	?>
+	<div class="ewp ewp-teamBar ew-tm-bar">
+		<div class="ewp-teamTabs" role="tablist">
+			<?php $si = -1; ?>
+			<?php foreach ( $sides as $side => $kind ) : $si++; ?>
+			<button type="button" data-pv="s<?php echo (int) $si; ?>"
+				aria-selected="<?php echo 0 === $si ? 'true' : 'false'; ?>"><?php
+				echo esc_html( $side ); ?></button>
+			<?php endforeach; ?>
+		</div>
+	</div>
+
+	<?php $si = -1; ?>
+	<?php foreach ( $sides as $side => $kind ) : $si++; ?>
+	<div class="ew-tm-side" data-pv-panel="s<?php echo (int) $si; ?>"<?php
+		echo 0 === $si ? '' : ' hidden'; ?>>
+		<?php if ( 'squad' === $kind ) : ?>
+		<?php echo ew_squad_shortcode(); // phpcs:ignore ?>
+		<?php else : ?>
+		<p class="ew-credit"><?php echo esc_html( $side ); ?> squad details are being added.</p>
+		<?php endif; ?>
+	</div>
+	<?php endforeach; ?>
+
 	<?php foreach ( ew_teams_roster() as $group => $teams ) : ?>
 	<section class="ew-tm-group">
 		<h2 class="ew-tm-head"><?php echo esc_html( $group ); ?><span><?php echo count( $teams ); ?></span></h2>
@@ -1698,7 +1734,9 @@ function ew_teams_assets() {
 	$post = get_post();
 	if ( ! $post ) { return; }
 	$teams = ew_uses_shortcode( $post, 'eastwood_teams' );
-	$squad = ew_uses_shortcode( $post, 'eastwood_squad' );
+	// The Teams page now opens with the first-team squad, so it needs the
+	// squad script as well as its own.
+	$squad = $teams || ew_uses_shortcode( $post, 'eastwood_squad' );
 	if ( ! $teams && ! $squad ) { return; }
 
 	$css = '
@@ -1727,6 +1765,32 @@ a.ew-tm-card.is-external:hover{border-color:#b5b5b5;box-shadow:0 2px 10px rgba(0
 .ew-sq-star i{display:block;font-style:normal;font-size:12px;color:#8a8a8a}
 .ew-sq-sub{font-family:Anton,sans-serif;font-size:15px;letter-spacing:.08em;text-transform:uppercase;
  color:#6b6b6b;margin:0 0 10px}
+/* The senior sides along the top, each with its own squad underneath. */
+.ew-tm-bar{background:#fff;margin:0 0 26px}
+.ew-teams-index [hidden]{display:none}
+.ew-tm-side{margin:0 0 42px}
+.ew-teams-index .ew-squad{max-width:none;margin:0;padding:0}
+
+/* A player is a face first. Until there are photographs the frame holds
+   its shape and shows the shirt number, rather than collapsing. */
+.ew-sq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(176px,1fr));gap:14px;
+ list-style:none;margin:0;padding:0}
+.ew-sq-card{background:#fff;border:1px solid #e6e6e6;border-radius:5px;overflow:hidden}
+.ew-sq-shot{display:flex;align-items:flex-end;justify-content:center;position:relative;
+ aspect-ratio:4/5;background:#e9e9ec;overflow:hidden}
+.ew-sq-shot img{width:100%;height:100%;object-fit:cover;display:block}
+.ew-sq-shot::before{content:"";position:absolute;left:50%;top:26%;transform:translateX(-50%);
+ width:34%;aspect-ratio:1;border-radius:50%;background:#d6d6da}
+.ew-sq-shot::after{content:"";position:absolute;left:50%;bottom:-14%;transform:translateX(-50%);
+ width:64%;aspect-ratio:1;border-radius:50%;background:#d6d6da}
+.ew-sq-shot img{position:relative;z-index:2}
+.ew-sq-no{position:absolute;z-index:3;left:10px;bottom:9px;font-family:Anton,sans-serif;
+ font-size:30px;line-height:1;color:#CC0000}
+.ew-sq-name{display:block;padding:12px 13px 2px;font-family:Anton,"Instrument Sans",sans-serif;
+ font-size:17px;letter-spacing:.02em;text-transform:uppercase;color:#111}
+.ew-sq-stats{display:block;padding:0 13px 14px;font-size:12.5px;color:#8a8a8a}
+.ew-sq-stats em{font-style:normal;font-weight:700;color:#111}
+
 .ew-sq-table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e6e6e6;
  border-radius:4px;overflow:hidden}
 .ew-sq-table th{background:#f3f3f3;font-family:Anton,sans-serif;font-size:12px;letter-spacing:.06em;
@@ -1740,8 +1804,9 @@ a.ew-tm-card.is-external:hover{border-color:#b5b5b5;box-shadow:0 2px 10px rgba(0
 .ew-sq-table td.ewc-shirt{font-family:Anton,sans-serif;font-size:16px;color:#6b6b6b;width:52px}
 .ew-sq-table td.ewc-who{font-weight:600}
 .ew-sq-table td.ewc-gls{font-weight:700}
-.ew-sq-armband{display:inline-block;margin-left:7px;font-size:10px;font-weight:700;letter-spacing:.06em;
- color:#CC0000;border:1px solid #CC0000;border-radius:3px;padding:1px 4px;vertical-align:1px}
+.ew-sq-armband{display:inline-block;margin-left:7px;font-style:normal;font-size:10px;font-weight:700;
+ letter-spacing:.06em;color:#CC0000;border:1px solid #CC0000;border-radius:3px;padding:1px 4px;
+ vertical-align:1px}
 @media(max-width:720px){
  .ew-sq-table th.ewc-hide,.ew-sq-table td.ewc-hide{display:none}
  .ew-tm-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
@@ -1800,21 +1865,24 @@ function build(apps,gls){
   return x.name<y.name?-1:1;
  });
 
+ function slug(n){return n.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
+
  body.innerHTML='<h3 class="ew-sq-sub">First-team squad</h3>'
-  +'<table class="ew-sq-table"><thead><tr>'
-  +'<th>#</th><th class="ewc-who">Player</th><th>Apps</th><th>Goals</th>'
-  +'<th class="ewc-hide">Yellow</th></tr></thead><tbody>'
+  +'<ul class="ew-sq-grid">'
   +rows.map(function(r){
-    return '<tr>'
-     +'<td class="ewc-shirt">'+(r.shirt||'&ndash;')+'</td>'
-     +'<td class="ewc-who">'+esc(r.name)
-     +(r.capt?'<span class="ew-sq-armband" title="Has captained the side">C</span>':'')+'</td>'
-     +'<td>'+r.apps+'</td>'
-     +'<td class="ewc-gls">'+(r.goals||'&ndash;')+'</td>'
-     +'<td class="ewc-hide">'+(r.cards||'&ndash;')+'</td>'
-     +'</tr>';
+    return '<li class="ew-sq-card">'
+     +'<span class="ew-sq-shot">'
+       +'<img src="/wp-content/uploads/ew-players/'+slug(r.name)+'.jpg" alt="" loading="lazy"'
+       +' onerror="this.remove()">'
+       +(r.shirt?'<b class="ew-sq-no">'+r.shirt+'</b>':'')
+     +'</span>'
+     +'<span class="ew-sq-name">'+esc(r.name)
+     +(r.capt?'<i class="ew-sq-armband" title="Has captained the side">C</i>':'')+'</span>'
+     +'<span class="ew-sq-stats"><em>'+r.apps+'</em> apps'
+     +(r.goals?' &middot; <em>'+r.goals+'</em> '+(r.goals===1?'goal':'goals'):'')+'</span>'
+     +'</li>';
   }).join('')
-  +'</tbody></table>'
+  +'</ul>'
   +'<p class="ew-key" style="margin-top:14px">Shirt numbers are the number each player has worn most often.'
   +' <span class="ew-sq-armband">C</span> marks a player who has captained the side.</p>';
 }
