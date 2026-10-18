@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.20.0
+ * Version: 2.19.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1031,6 +1031,62 @@ function ew_icon_sprite() {
 }
 add_action( 'wp_body_open', 'ew_icon_sprite', 1 );
 
+/* ------------------------------------------------------------------
+ * Page chrome: the red title band, and the nav that comes back on scroll.
+ *
+ * Both are things the reference site does and the capture did not bring
+ * across. The header markup for the scrolled nav is already in the theme —
+ * it sits at top:0, fixed, translated out of sight — but nothing ever put
+ * it back. Thirty lines here rather than a theme release.
+ * ------------------------------------------------------------------ */
+
+function ew_chrome_css() {
+	return '
+/* Every inner page has exactly one h1 and it is the page title. White on
+   red, full bleed, text lined up with the 1248px column. */
+h1.elementor-heading-title{
+ background:#CC0000;color:#fff;
+ font-family:Anton,"Instrument Sans",sans-serif;font-size:70px;line-height:1.02;
+ letter-spacing:.01em;text-transform:uppercase;
+ margin:0 calc(50% - 50vw);
+ padding:56px max(16px,calc(50vw - 624px)) 58px;
+}
+@media(max-width:820px){
+ h1.elementor-heading-title{font-size:38px;padding:34px 16px 36px}
+}
+';
+}
+
+add_action( 'wp_head', function () {
+	echo '<style id="ew-chrome">' . ew_chrome_css() . '</style>'; // phpcs:ignore
+}, 21 );
+
+add_action( 'wp_footer', function () {
+	?>
+<script id="ew-chrome-js">
+(function(){
+ var bar = null;
+ var all = document.querySelectorAll('header,nav,div');
+ for (var i = 0; i < all.length && !bar; i++) {
+  var c = all[i].getAttribute('class') || '';
+  if (c.indexOf('-translate-y-32') > -1 && c.indexOf('fixed') > -1) { bar = all[i]; }
+ }
+ if (!bar) { return; }
+ var shown = null;
+ function sync(){
+  var want = (window.pageYOffset || document.documentElement.scrollTop) > 260;
+  if (want === shown) { return; }
+  shown = want;
+  bar.style.transform = want ? 'translateY(0)' : '';
+ }
+ sync();
+ window.addEventListener('scroll', sync, { passive: true });
+ window.addEventListener('resize', sync, { passive: true });
+})();
+</script>
+	<?php
+}, 21 );
+
 /**
  * Favicons.
  *
@@ -1780,7 +1836,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  *     table, pasted once at Settings → Eastwood FWP.
  * ------------------------------------------------------------------ */
 
-const EW_FWP_VERSION = '2.20.0';
+const EW_FWP_VERSION = '2.19.0';
 
 /*
  * Parts loader.
