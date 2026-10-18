@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.62.0
+ * Version: 2.63.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -2176,7 +2176,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.62.0';
+const EW_FWP_VERSION = '2.63.0';
 
 /*
  * Parts loader.
@@ -2230,7 +2230,20 @@ function ew_fwp_remote_info() {
 	$forced = isset( $_GET['force-check'] );
 
 	$cached = get_transient( 'ew_fwp_remote' );
-	if ( ! $forced && false !== $cached ) {
+
+	// Today, 2.60 through 2.62 sat on GitHub while the updates screen said
+	// the site was current, because this cache had been written an hour
+	// earlier when 2.59 really was the latest, and core ran its check in a
+	// cron loopback that carries no query string for $forced to see. A
+	// cached version that merely matches what is installed is the one
+	// answer that cannot be trusted to still be true: it is indistinguishable
+	// from "nothing has been released since", which is what it then reports.
+	// So re-read it rather than believe it. Every other value is honest and
+	// still gets the full hour.
+	$suspect = is_array( $cached ) && ! empty( $cached['version'] )
+		&& version_compare( $cached['version'], EW_FWP_VERSION, '<=' );
+
+	if ( ! $forced && ! $suspect && false !== $cached ) {
 		return $cached;
 	}
 

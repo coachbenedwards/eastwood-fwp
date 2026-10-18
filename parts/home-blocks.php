@@ -1625,47 +1625,58 @@ function ew_hb_css() {
 /* The next fixtures as one thin band directly under the nav, which is the
    first thing the reference puts on its homepage.
 
-   Measured off the reference at 1440: the band is 109px and full width,
-   cells are 322px butted together with a hairline between them, the date
-   runs across the whole top of each cell on a 41px tint rather than sitting
-   in a box of its own, the crest is 48px, and the next game carries a red
-   rule along the bottom. Every number below is one of those. */
+   Measured off the reference twice, at 1440 and at 1512. The band is 109px
+   and full width. Four cells show at a time, each a quarter of a track that
+   starts 52px in and stops 102px short of the right edge, so a cell is
+   322px at 1440 and 340px at 1512 -- a share, not a fixed width, which the
+   first pass got wrong. They butt together with a hairline between them.
+   The date runs across the whole top of each cell on a 41px tint: 18px
+   light for the day, 18px bold for the kick-off. The crest is 48px. Home
+   and away is a 16px disc carrying a glyph, red for home and grey for away.
+   There is no red rule under the next game -- that was my own invention,
+   and it is gone. Every number below is one of those measurements. */
 .ewp-strip{position:relative;background:#fff;
- margin:0 calc(50% - 50vw);padding:0 0 0 52px;
+ margin:0 calc(50% - 50vw);padding:0 102px 0 52px;
  border-bottom:1px solid rgba(0,0,0,.09)}
 .ewp-stripList{display:flex;list-style:none;margin:0;padding:0;overflow-x:auto;
  scroll-behavior:smooth;scroll-snap-type:x proximity;scrollbar-width:none;-ms-overflow-style:none}
 .ewp-stripList::-webkit-scrollbar{display:none}
-.ewp-strip .ewp-slide{flex:0 0 322px;scroll-snap-align:start;
+.ewp-strip .ewp-slide{flex:0 0 25%;max-width:25%;scroll-snap-align:start;
  border-right:1px solid rgba(0,0,0,.09);position:relative}
-/* The reference marks the next game with a red rule along the bottom. */
-.ewp-strip .ewp-slide:first-child{box-shadow:inset 0 -4px 0 #CC0000}
 .ewp-strip .ewp-card{display:flex;flex-direction:column;gap:0;min-height:109px;height:100%;
  padding:0;background:#fff;border:0;border-radius:0;box-shadow:none}
 /* The date runs the full width of the cell on a tint, not in an inset box. */
 .ewp-strip .ewp-cardTop{display:flex;align-items:center;justify-content:space-between;
  gap:10px;margin:0;padding:0 16px;min-height:41px;background:rgba(0,0,0,.03);border:0;border-radius:0}
 .ewp-strip .ewp-when{display:flex;align-items:baseline;gap:8px}
-.ewp-strip .ewp-when b{font-size:15px}
-.ewp-strip .ewp-when i{font-size:15px;font-weight:400;color:#5c5c5c}
-.ewp-strip .ewp-ha{width:22px;height:22px;flex:none;border:0;border-radius:50%;
- display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;line-height:1}
-.ewp-strip .ewp-ha.is-home{background:#CC0000;color:#fff}
-.ewp-strip .ewp-ha.is-away{background:#e4e4e4;color:#333}
-.ewp-strip .ewp-cardBody{display:flex;align-items:center;gap:12px;margin:0;padding:0 16px;flex:1}
+.ewp-strip .ewp-when b{font-size:18px;font-weight:300}
+.ewp-strip .ewp-when i{font-size:18px;font-weight:700;font-style:normal;color:#101010}
+.ewp-strip .ewp-ha{width:16px;height:16px;flex:none;border:0;border-radius:50%;
+ display:flex;align-items:center;justify-content:center;font-size:0;line-height:1;
+ background-repeat:no-repeat;background-position:50% 50%;background-size:9px 9px}
+.ewp-strip .ewp-ha.is-home{background-color:#CC0000;
+ background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 10 10%27 fill=%27none%27 stroke=%27white%27 stroke-width=%271.4%27 stroke-linejoin=%27round%27%3E%3Cpath d=%27M1 4.6 5 1.2l4 3.4V9H1z%27/%3E%3C/svg%3E")}
+.ewp-strip .ewp-ha.is-away{background-color:#e8e8e8;
+ background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 10 10%27 fill=%27none%27 stroke=%27%23101010%27 stroke-width=%271.4%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3E%3Cpath d=%27M1.4 5h7.2M5.6 2l3 3-3 3%27/%3E%3C/svg%3E")}
+.ewp-strip .ewp-cardBody{display:flex;align-items:center;gap:16px;margin:0;padding:0 16px;flex:1}
 .ewp-strip .ewp-cardBody img{width:48px;height:48px;object-fit:contain;flex:none}
 .ewp-strip .ewp-cardText{min-width:0}
 .ewp-strip .ewp-kicker{font-size:10px;font-weight:700;letter-spacing:1px;
  color:#212121;text-transform:uppercase}
-.ewp-strip .ewp-cardText b{font-size:19px;line-height:1.15;display:block;
+.ewp-strip .ewp-cardText b{font-size:18px;line-height:1;display:block;
  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ewp-strip .ewp-venue{font-size:12px;color:#5c5c5c}
-.ewp-stripNext{position:absolute;right:0;top:0;height:100%;width:46px;border:0;cursor:pointer;
+.ewp-strip .ewp-venue{font-size:14px;line-height:16px;color:#101010}
+.ewp-stripNext{position:absolute;right:0;top:0;height:100%;width:102px;border:0;cursor:pointer;
  background:linear-gradient(90deg,rgba(255,255,255,0),#fff 42%);font-size:26px;color:#101010;line-height:1}
 .ewp-stripNext:focus-visible{outline:2px solid #CC0000;outline-offset:-3px}
+@media(max-width:1100px){
+ .ewp-strip{padding-right:72px}
+ .ewp-strip .ewp-slide{flex:0 0 33.3333%;max-width:33.3333%}
+ .ewp-stripNext{width:72px}
+}
 @media(max-width:700px){
- .ewp-strip{padding-left:0}
- .ewp-strip .ewp-slide{flex:0 0 264px}
+ .ewp-strip{padding:0}
+ .ewp-strip .ewp-slide{flex:0 0 264px;max-width:264px}
  .ewp-stripNext{display:none}
 }
 
