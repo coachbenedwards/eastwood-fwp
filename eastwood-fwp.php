@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.56.0
+ * Version: 2.57.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1391,18 +1391,10 @@ function ew_rewrite_markup( $html ) {
 					'<img alt="' . esc_attr( $roster[ $slug ][0] ) . '"', $body, 1 );
 			}
 
-			// Nowhere to send the click yet, so the logo stays as it is.
-			if ( empty( $roster[ $slug ][2] ) ) {
-				return '<a' . $open . '>' . $body . '</a>';
-			}
-			$open = preg_replace( '#\shref="[^"]*"#', '', $open );
-			$open = preg_replace( '#\sonclick="[^"]*"#', '', $open );
-
 			/*
-			 * These open in a new tab carrying rel="sponsored" and nothing
-			 * else, which leaves the opened page able to reach back at this
-			 * one through window.opener. Browsers imply noopener these days,
-			 * but it belongs in the markup rather than resting on that.
+			 * The new tab wants protecting whether or not there is anywhere
+			 * for it to go. This used to sit after the check below, so the
+			 * one sponsor with no URL on file kept an unprotected target.
 			 */
 			if ( false !== stripos( $open, 'target="_blank"' ) ) {
 				if ( preg_match( '#\srel="([^"]*)"#', $open, $r ) ) {
@@ -1413,6 +1405,13 @@ function ew_rewrite_markup( $html ) {
 					$open .= ' rel="noopener"';
 				}
 			}
+
+			// Nowhere to send the click yet, so the logo stays as it is.
+			if ( empty( $roster[ $slug ][2] ) ) {
+				return '<a' . $open . '>' . $body . '</a>';
+			}
+			$open = preg_replace( '#\shref="[^"]*"#', '', $open );
+			$open = preg_replace( '#\sonclick="[^"]*"#', '', $open );
 
 			return '<a href="' . esc_url( $roster[ $slug ][2] ) . '"'
 				. ' title="' . esc_attr( $roster[ $slug ][1] . ' — ' . $roster[ $slug ][0] ) . '"'
@@ -2073,9 +2072,24 @@ function build(apps,gls){
   }).join('');
 }
 
+/* The host rate-limits bursts of requests, and a single 429 on either of
+   these left the page reading "could not load the squad" with no second
+   attempt. One retry after a short random wait, the same treatment the
+   crests already get. */
+function grab(ep, retried){
+ return fetch('/wp-json/eastwood/v1/fwp?endpoint=' + ep).then(function(r){
+  if (r.status === 429 && !retried) {
+   return new Promise(function(go){ setTimeout(go, 1200 + Math.random() * 1800); })
+     .then(function(){ return grab(ep, true); });
+  }
+  if (!r.ok) { throw new Error(ep + ' ' + r.status); }
+  return r.json();
+ });
+}
+
 Promise.all([
- fetch('/wp-json/eastwood/v1/fwp?endpoint=appearances').then(function(r){return r.json();}),
- fetch('/wp-json/eastwood/v1/fwp?endpoint=goalscorers').then(function(r){return r.json();})
+ grab('appearances'),
+ grab('goalscorers')
 ]).then(function(d){
  build(d[0].appearances||{},d[1].goalscorers||{});
 }).catch(function(){fail('Couldn\'t load the squad just now. Please try again shortly.');});
@@ -2123,7 +2137,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.56.0';
+const EW_FWP_VERSION = '2.57.0';
 
 /*
  * Parts loader.
