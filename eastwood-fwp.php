@@ -1045,14 +1045,14 @@ function ew_chrome_css() {
 /* Every inner page has exactly one h1 and it is the page title. White on
    red, full bleed, text lined up with the 1248px column. */
 h1.elementor-heading-title{
- background:#CC0000;color:#fff;
+ background:#CC0000;color:#fff !important;
  font-family:Anton,"Instrument Sans",sans-serif;font-size:70px;line-height:1.02;
  letter-spacing:.01em;text-transform:uppercase;
- margin:0 calc(50% - 50vw);
- padding:56px max(16px,calc(50vw - 624px)) 58px;
+ margin:0 calc(50% - 50vw) !important;
+ padding:52px max(16px,calc(50vw - 624px)) 54px !important;
 }
 @media(max-width:820px){
- h1.elementor-heading-title{font-size:38px;padding:34px 16px 36px}
+ h1.elementor-heading-title{font-size:38px;padding:32px 16px 34px !important}
 }
 ';
 }
@@ -1082,6 +1082,16 @@ add_action( 'wp_footer', function () {
  sync();
  window.addEventListener('scroll', sync, { passive: true });
  window.addEventListener('resize', sync, { passive: true });
+})();
+(function(){
+ /* The title band has to meet the header with no white seam. Its wrappers
+    carry the page's own top padding, and the amount differs page to page,
+    so it is measured here rather than guessed in the stylesheet. */
+ var h1 = document.querySelector('h1.elementor-heading-title');
+ if (!h1) { return; }
+ var root = document.querySelector('.elementor');
+ var el = h1.parentElement, n = 0;
+ while (el && el !== root && n < 8) { el.style.paddingTop = '0'; el = el.parentElement; n++; }
 })();
 </script>
 	<?php
