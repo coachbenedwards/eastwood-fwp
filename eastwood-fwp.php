@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.51.0
+ * Version: 2.52.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -2040,7 +2040,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.51.0';
+const EW_FWP_VERSION = '2.52.0';
 
 /*
  * Parts loader.
@@ -2270,6 +2270,35 @@ add_action( 'init', function () {
 	flush_rewrite_rules( false );
 }, 20 );
 
+/**
+ * Pages taken down.
+ *
+ * The page is unpublished rather than deleted, so it is still in the editor
+ * and can be put back with one click. This runs once and records that it
+ * has, so republishing it by hand is not undone on the next page load.
+ *
+ * Runs at 21: after the one-time slug rename at 20, before the page install
+ * at 30. The slug is also out of ew_owned_pages(), so nothing recreates it.
+ */
+const EW_RETIRE_V = '1';
+
+function ew_retired_pages() {
+	return array( 'company-details' );
+}
+
+add_action( 'init', function () {
+	if ( get_option( 'ew_retired_pages' ) === EW_RETIRE_V ) {
+		return;
+	}
+	foreach ( ew_retired_pages() as $slug ) {
+		$page = get_page_by_path( $slug );
+		if ( $page && 'publish' === $page->post_status ) {
+			wp_update_post( array( 'ID' => $page->ID, 'post_status' => 'draft' ) );
+		}
+	}
+	update_option( 'ew_retired_pages', EW_RETIRE_V );
+}, 21 );
+
 /* The old addresses, kept alive for anything already pointing at them. */
 add_action( 'template_redirect', function () {
 	$path = trim( (string) wp_parse_url( $_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH ), '/' );
@@ -2427,10 +2456,6 @@ function ew_owned_pages() {
 		'contact' => array(
 			'title'   => 'Contact us',
 			'content' => ew_contact_content(),
-		),
-		'company-details' => array(
-			'title'   => 'Company Details',
-			'content' => ew_company_content(),
 		),
 		'safeguarding' => array(
 			'title'   => 'Safeguarding',
@@ -2770,11 +2795,23 @@ function ew_nav_destinations() {
 
 		// The footer row, dead on every page of the site until now.
 		'Contact us'      => home_url( '/contact/' ),
-		'Company Details' => home_url( '/company-details/' ),
 		'Safeguarding'    => home_url( '/safeguarding/' ),
 		'Privacy Policy'  => home_url( '/privacy-policy/' ),
 		'Terms'           => home_url( '/terms/' ),
 	);
+}
+
+/**
+ * Labels whose link is taken out of the captured markup altogether.
+ *
+ * Dropping a label from ew_nav_destinations() is not enough on its own: an
+ * unmapped label keeps the dead href="#" it was exported with and stays
+ * sitting in the footer looking like a link. A label named here has its
+ * whole anchor removed instead. The footer row is bare anchors in a flex
+ * line with no list markup around them, so taking one out leaves no gap.
+ */
+function ew_retired_nav() {
+	return array( 'Company Details' );
 }
 
 function ew_rewrite_nav( $html ) {
@@ -2807,6 +2844,10 @@ function ew_rewrite_nav( $html ) {
 				$attrs = preg_replace( '#\shref="\#"#', ' href="' . esc_url( home_url( '/' ) ) . '"', $m[1], 1 );
 				$attrs = preg_replace( '#\sonclick="return false"#', '', $attrs );
 				return '<a' . $attrs . '>' . $m[2] . '</a>';
+			}
+
+			if ( '' !== $label && in_array( $label, ew_retired_nav(), true ) ) {
+				return '';
 			}
 
 			if ( ! isset( $map[ $label ] ) ) {
@@ -4015,34 +4056,6 @@ taxis outside the station and at the rank in the town centre.</p>
 HTML;
 }
 
-function ew_company_content() {
-	return <<<'HTML'
-<div class="ew-prose">
-
-<p class="ew-lede">Eastwood Community Football Club CIC is a community interest company registered in England and
-Wales, company number 09196902.</p>
-
-<h2>Registered details</h2>
-
-<ul>
-	<li><b>Registered name:</b> Eastwood Community Football Club CIC</li>
-	<li><b>Company number:</b> 09196902</li>
-	<li><b>Registered office:</b> Coronation Park, Chewton Street, Eastwood, Nottinghamshire NG16 3HB</li>
-	<li><b>Contact:</b> <a href="mailto:info@eastwoodfc.com">info@eastwoodfc.com</a>, 01773 432414</li>
-</ul>
-
-<h2>What a community interest company means</h2>
-
-<p>A CIC is a company that exists to benefit a community rather than to enrich shareholders. Its assets are
-locked to that purpose: they cannot simply be taken out of the business. For Eastwood that community is the town
-and the people who play, coach, volunteer and watch here.</p>
-
-<p>Twenty-nine teams run out of Coronation Park across senior, junior, mini and girls' football. The first team
-is the part most people see, but it is a small share of what the ground does in a given week.</p>
-
-</div>
-HTML;
-}
 
 function ew_safeguarding_content() {
 	return <<<'HTML'
@@ -4236,6 +4249,9 @@ function ew_footer_add_history( $html ) {
 	$anchor = substr( $html, $open, ( $pos + strlen( $needle ) ) - $open );
 	$extra  = str_replace( 'Contact us</a>', 'Club History</a>', $anchor );
 	$extra  = preg_replace( '#\shref="[^"]*"#', ' href="' . esc_url( home_url( '/club-history/' ) ) . '"', $extra, 1 );
+	// The title came across with the rest of the anchor, so the new link was
+	// announcing itself as Contact us to anyone hovering or using a reader.
+	$extra  = preg_replace( '#\stitle="[^"]*"#', ' title="Club History"', $extra, 1 );
 	$extra  = preg_replace( '#\sonclick="return false"#', '', $extra );
 
 	return substr_replace( $html, $anchor . $extra, $open, strlen( $anchor ) );
