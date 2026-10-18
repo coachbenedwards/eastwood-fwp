@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.57.0
+ * Version: 2.58.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1830,48 +1830,52 @@ function ew_teams_shortcode() {
 add_shortcode( 'eastwood_teams', 'ew_teams_shortcode' );
 
 /**
- * Which position each player plays, so the squad can be grouped the way the
- * reference site groups it.
+ * The squad: the number each player has been issued, and where they play.
  *
- * This has to be kept by hand. Football Web Pages carries no position for
- * any player: the appearances feed returns a name, an id and the shirt worn
- * in each individual match, and nothing else. Shirt numbers are allocated
- * per match at this level rather than held for the season, so they cannot be
- * read as positions either.
+ * Both are kept here because the feed carries neither. Football Web Pages
+ * returns a name, an id and the shirt worn in each individual match, and
+ * nothing else.
  *
- * Keys are the full name exactly as the feed spells it, compared without
- * case. Values are gk, df, mf or fw. Anyone missing from this list still
- * appears on the page, grouped under Squad at the bottom, so an unknown
- * player is never dropped.
+ * The club issues numbers for the season, so a number here is the player's
+ * number and is shown as it stands. Before this list existed the page showed
+ * whichever number a player had worn most often, which was the best that
+ * could be done from match data and was wrong whenever somebody borrowed a
+ * shirt. A player not listed here still falls back to that.
+ *
+ * Keys are the full name as the feed spells it, compared without case and
+ * with straight and curly apostrophes treated alike. Values are the issued
+ * number and one of gk, df, mf or fw. Either may be left null.
+ *
+ *   'Scott Loach' => array( 1, 'gk' ),
+ *
+ * Anyone missing from this list still appears on the page, grouped under
+ * Squad at the bottom, so nobody is ever dropped for want of an entry.
  */
-function ew_player_positions() {
+function ew_squad_details() {
 	return array(
-		// 'Scott Loach' => 'gk',
 	);
 }
 
-/**
- * Players who have featured this season but are no longer in the squad.
- *
- * The squad is built from the appearances feed, which by its nature keeps
- * anyone who has played a minute all season. A player who has left is still
- * in that data and has to be named here to come off the page. Their
- * appearances and goals are untouched and still count in the season record;
- * this list governs the squad page only.
- *
- * Matching ignores case and treats a curly apostrophe and a straight one as
- * the same character, because the feed uses the curly one.
- */
-function ew_squad_departed() {
-	return array(
-		'Steven Johnson-Fikula',
-		'Revarnelle James',
-		'Kieren Fenton',
-		'L’Varn Brandy',
-		'Rashaan Frances',
-		'Harry Wood',
-		'Bradley Gascoigne',
-	);
+/** The position half of the list, for the grouping. */
+function ew_player_positions() {
+	$out = array();
+	foreach ( ew_squad_details() as $name => $row ) {
+		if ( ! empty( $row[1] ) ) {
+			$out[ $name ] = $row[1];
+		}
+	}
+	return $out;
+}
+
+/** The issued-number half, for the shirt on the card. */
+function ew_player_numbers() {
+	$out = array();
+	foreach ( ew_squad_details() as $name => $row ) {
+		if ( ! empty( $row[0] ) ) {
+			$out[ $name ] = (int) $row[0];
+		}
+	}
+	return $out;
 }
 
 function ew_squad_shortcode() {
@@ -1879,7 +1883,8 @@ function ew_squad_shortcode() {
 	?>
 <div class="ew-squad" data-team="<?php echo esc_attr( EW_TEAM ); ?>"
 	data-positions="<?php echo esc_attr( (string) wp_json_encode( ew_player_positions() ) ); ?>"
-	data-departed="<?php echo esc_attr( (string) wp_json_encode( ew_squad_departed() ) ); ?>">
+	data-departed="<?php echo esc_attr( (string) wp_json_encode( ew_squad_departed() ) ); ?>"
+	data-numbers="<?php echo esc_attr( (string) wp_json_encode( ew_player_numbers() ) ); ?>">
 	<div class="ew-sq-top"><p class="ew-loading">Loading the squad…</p></div>
 	<div class="ew-sq-body"></div>
 </div>
@@ -2035,6 +2040,16 @@ function build(apps,gls){
  var key={};
  Object.keys(POS).forEach(function(n){key[nkey(n)]=POS[n];});
 
+ var NUM={};
+ try{var rawNum=JSON.parse(root.getAttribute('data-numbers')||'{}');
+  Object.keys(rawNum).forEach(function(n){NUM[nkey(n)]=rawNum[n];});}catch(e){}
+ rows.forEach(function(r){
+  // An issued number is the number. Only fall back to the one worn most
+  // often for a player the club has not given one to yet.
+  var issued=NUM[nkey(r.name)];
+  if(issued){r.shirt=issued;}
+ });
+
  var GONE={};
  try{(JSON.parse(root.getAttribute('data-departed')||'[]')||[])
    .forEach(function(n){GONE[nkey(n)]=1;});}catch(e){}
@@ -2137,7 +2152,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.57.0';
+const EW_FWP_VERSION = '2.58.0';
 
 /*
  * Parts loader.
