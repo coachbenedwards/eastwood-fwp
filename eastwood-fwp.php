@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.52.0
+ * Version: 2.53.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1338,9 +1338,42 @@ function ew_rewrite_markup( $html ) {
 			$body = $m[2];
 			if ( ! preg_match( '#/ew-sponsors/([a-z0-9\-]+)\.png#', $body, $s ) ) { return $m[0]; }
 			$slug = $s[1];
-			if ( empty( $roster[ $slug ][2] ) ) { return $m[0]; }
+			if ( empty( $roster[ $slug ] ) ) { return $m[0]; }
+
+			/*
+			 * Name the logo first, before the click-through is considered. A
+			 * sponsor with no URL on file still has a name, and this is the
+			 * only text in the link, so without it the logo is announced as
+			 * nothing at all.
+			 */
+			if ( false === stripos( $body, ' alt=' ) ) {
+				$body = preg_replace( '#<img\b#',
+					'<img alt="' . esc_attr( $roster[ $slug ][0] ) . '"', $body, 1 );
+			}
+
+			// Nowhere to send the click yet, so the logo stays as it is.
+			if ( empty( $roster[ $slug ][2] ) ) {
+				return '<a' . $open . '>' . $body . '</a>';
+			}
 			$open = preg_replace( '#\shref="[^"]*"#', '', $open );
 			$open = preg_replace( '#\sonclick="[^"]*"#', '', $open );
+
+			/*
+			 * These open in a new tab carrying rel="sponsored" and nothing
+			 * else, which leaves the opened page able to reach back at this
+			 * one through window.opener. Browsers imply noopener these days,
+			 * but it belongs in the markup rather than resting on that.
+			 */
+			if ( false !== stripos( $open, 'target="_blank"' ) ) {
+				if ( preg_match( '#\srel="([^"]*)"#', $open, $r ) ) {
+					if ( false === stripos( $r[1], 'noopener' ) ) {
+						$open = str_replace( $r[0], ' rel="' . esc_attr( $r[1] ) . ' noopener"', $open );
+					}
+				} else {
+					$open .= ' rel="noopener"';
+				}
+			}
+
 			return '<a href="' . esc_url( $roster[ $slug ][2] ) . '"'
 				. ' title="' . esc_attr( $roster[ $slug ][1] . ' — ' . $roster[ $slug ][0] ) . '"'
 				. $open . '>' . $body . '</a>';
@@ -2040,7 +2073,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.52.0';
+const EW_FWP_VERSION = '2.53.0';
 
 /*
  * Parts loader.
@@ -2858,6 +2891,20 @@ function ew_rewrite_nav( $html ) {
 			$attrs = preg_replace( '#\shref="\#"#', ' href="' . esc_url( $map[ $label ] ) . '"', $attrs, 1 );
 			$attrs = preg_replace( '#\sonclick="return false"#', '', $attrs );
 
+			/*
+			 * The exported title does not always match the words in the link.
+			 * Safeguarding carried title="Be Safe", which is what a screen
+			 * reader reads out and what shows on hover, so the link announced
+			 * itself as something the page never says. A title that contains
+			 * the label is left alone, because those add rather than
+			 * contradict -- Terms keeping title="Terms of Use" is fine.
+			 */
+			if ( preg_match( '#\stitle="([^"]*)"#', $attrs, $t )
+				&& false === stripos( $t[1], $label ) ) {
+				$attrs = preg_replace( '#\stitle="[^"]*"#',
+					' title="' . esc_attr( $label ) . '"', $attrs, 1 );
+			}
+
 			// The shop is somebody else's storefront.
 			if ( 0 !== strpos( $map[ $label ], home_url() ) && false === strpos( $attrs, 'target=' ) ) {
 				$attrs .= ' target="_blank" rel="noopener"';
@@ -2899,7 +2946,7 @@ function ew_prose_css_inline() {
 .ew-prose .ew-person b{display:block;font-size:15px}
 .ew-prose .ew-person span{font-size:12px;color:#8a8a8a}
 .ew-prose .ew-cta{background:#111;color:#fff;border-radius:4px;padding:26px 28px;margin:36px 0 0}
-.ew-prose .ew-cta h3{font-family:Anton,"Instrument Sans",sans-serif;font-size:20px;letter-spacing:.05em;
+.ew-prose .ew-cta h2,.ew-prose .ew-cta h3{font-family:Anton,"Instrument Sans",sans-serif;font-size:20px;letter-spacing:.05em;
  text-transform:uppercase;margin:0 0 8px;color:#fff}
 .ew-prose .ew-cta p{color:#d6d6d6;margin:0 0 4px;font-size:15px}
 .ew-prose .ew-cta a{color:#fff;font-weight:600}
@@ -4028,7 +4075,7 @@ function ew_contact_content() {
 <p class="ew-lede">Eastwood Football Club, Coronation Park, Chewton Street, Eastwood, Nottinghamshire NG16 3HB.</p>
 
 <div class="ew-cta">
-	<h3>Get in touch</h3>
+	<h2>Get in touch</h2>
 	<p><a href="mailto:info@eastwoodfc.com">info@eastwoodfc.com</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
 </div>
 
