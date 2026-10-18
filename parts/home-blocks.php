@@ -552,7 +552,7 @@ function ew_hb_banner_sc( $atts ) {
 			'centre_url'     => '/match/',
 			'image'          => ew_hb_asset( 'banner/scarf.jpg' ),
 			'countdown'      => 'yes',
-			'featured'       => 'Featured On',
+			'featured'       => 'Live streamed on',
 			'featured_url'   => 'https://www.youtube.com/@eastwoodfootballclub',
 			'featured_icon'  => ew_hb_asset( 'banner/play.png' ),
 			'featured_label' => 'YouTube',
@@ -714,7 +714,7 @@ function ew_hb_fixtures_sc( $atts, $content = '' ) {
 			'hosp_url'   => '/eastwood-hospitality/',
 			'centre'     => 'Match Centre',
 			'centre_url' => '/match/',
-			'featured'       => 'Featured On',
+			'featured'       => 'Live streamed on',
 			'featured_icon'  => ew_hb_asset( 'banner/play.png' ),
 			'featured_label' => 'YouTube',
 			// Which home games are streamed is not published yet, so the card
