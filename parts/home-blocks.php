@@ -1655,8 +1655,10 @@ function ew_hb_css() {
  display:flex;align-items:center;justify-content:center;font-size:0;line-height:1;
  background-repeat:no-repeat;background-position:50% 50%;background-size:9px 9px}
 .ewp-strip .ewp-ha.is-home{background-color:#CC0000;
+ background-repeat:no-repeat;background-position:50% 50%;background-size:9px 9px;
  background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 10 10%27 fill=%27none%27 stroke=%27white%27 stroke-width=%271.4%27 stroke-linejoin=%27round%27%3E%3Cpath d=%27M1 4.6 5 1.2l4 3.4V9H1z%27/%3E%3C/svg%3E")}
 .ewp-strip .ewp-ha.is-away{background-color:#e8e8e8;
+ background-repeat:no-repeat;background-position:50% 50%;background-size:9px 9px;
  background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 10 10%27 fill=%27none%27 stroke=%27%23101010%27 stroke-width=%271.4%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3E%3Cpath d=%27M1.4 5h7.2M5.6 2l3 3-3 3%27/%3E%3C/svg%3E")}
 .ewp-strip .ewp-cardBody{display:flex;align-items:center;gap:16px;margin:0;padding:0 16px;flex:1}
 .ewp-strip .ewp-cardBody img{width:48px;height:48px;object-fit:contain;flex:none}
