@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.46.0
+ * Version: 2.47.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1748,10 +1748,32 @@ function ew_teams_shortcode() {
 }
 add_shortcode( 'eastwood_teams', 'ew_teams_shortcode' );
 
+/**
+ * Which position each player plays, so the squad can be grouped the way the
+ * reference site groups it.
+ *
+ * This has to be kept by hand. Football Web Pages carries no position for
+ * any player: the appearances feed returns a name, an id and the shirt worn
+ * in each individual match, and nothing else. Shirt numbers are allocated
+ * per match at this level rather than held for the season, so they cannot be
+ * read as positions either.
+ *
+ * Keys are the full name exactly as the feed spells it, compared without
+ * case. Values are gk, df, mf or fw. Anyone missing from this list still
+ * appears on the page, grouped under Squad at the bottom, so an unknown
+ * player is never dropped.
+ */
+function ew_player_positions() {
+	return array(
+		// 'Scott Loach' => 'gk',
+	);
+}
+
 function ew_squad_shortcode() {
 	ob_start();
 	?>
-<div class="ew-squad" data-team="<?php echo esc_attr( EW_TEAM ); ?>">
+<div class="ew-squad" data-team="<?php echo esc_attr( EW_TEAM ); ?>"
+	data-positions="<?php echo esc_attr( (string) wp_json_encode( ew_player_positions() ) ); ?>">
 	<div class="ew-sq-top"><p class="ew-loading">Loading the squad…</p></div>
 	<div class="ew-sq-body"></div>
 	<p class="ew-credit">Updated as each match is recorded. The list covers every player who has featured
@@ -1791,13 +1813,12 @@ a.ew-tm-card:hover{border-color:#CC0000;box-shadow:0 2px 10px rgba(0,0,0,.07)}
 a.ew-tm-card.is-external:hover{border-color:#b5b5b5;box-shadow:0 2px 10px rgba(0,0,0,.05)}
 .ew-tm-name{font-weight:600;font-size:15px}
 .ew-tm-note{font-size:11px;color:#8a8a8a}
-.ew-sq-lead{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;margin:0 0 32px}
-.ew-sq-star{background:#fff;border:1px solid #e6e6e6;border-top:3px solid #CC0000;border-radius:4px;padding:18px 20px}
-.ew-sq-star b{display:block;font-family:Anton,sans-serif;font-size:40px;line-height:1;color:#CC0000}
-.ew-sq-star em{display:block;font-style:normal;font-weight:600;font-size:16px;margin:8px 0 2px}
-.ew-sq-star i{display:block;font-style:normal;font-size:12px;color:#8a8a8a}
-.ew-sq-sub{font-family:Anton,sans-serif;font-size:15px;letter-spacing:.08em;text-transform:uppercase;
- color:#6b6b6b;margin:0 0 10px}
+/* The position headings, measured off the reference: Anton 40px bold in
+   near-black, 24px of air under each one. */
+.ew-sq-group{font-family:Anton,"Instrument Sans",sans-serif;font-size:40px;font-weight:700;
+ line-height:1.05;letter-spacing:normal;text-transform:uppercase;color:#101010;margin:48px 0 24px}
+.ew-sq-group:first-child{margin-top:0}
+@media(max-width:820px){.ew-sq-group{font-size:30px;margin:36px 0 18px}}
 /* The senior sides along the top, each with its own squad underneath. */
 /* The reference carries the side tabs in a full-width white strip sitting
    flush under the red band, 62px tall, its contents on the same 1248 column
@@ -1888,16 +1909,7 @@ function build(apps,gls){
   };
  });
 
- var scorers=rows.slice().filter(function(r){return r.goals>0;})
-   .sort(function(x,y){return y.goals-x.goals;}).slice(0,3);
-
- top.innerHTML=scorers.length
-  ? '<div class="ew-sq-lead">'+scorers.map(function(r){
-      return '<div class="ew-sq-star"><b>'+r.goals+'</b><em>'+esc(r.name)+'</em>'
-           +'<i>'+r.goals+(r.goals===1?' goal':' goals')+' in '+r.apps
-           +(r.apps===1?' appearance':' appearances')+'</i></div>';
-    }).join('')+'</div>'
-  : '';
+ top.innerHTML='';
 
  rows.sort(function(x,y){
   if(y.apps!==x.apps){return y.apps-x.apps;}
@@ -1906,9 +1918,25 @@ function build(apps,gls){
 
  function slug(n){return n.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
 
- body.innerHTML='<h3 class="ew-sq-sub">First-team squad</h3>'
-  +'<ul class="ew-sq-grid">'
-  +rows.map(function(r){
+ // The reference lists the squad under Goalkeepers, Defenders, Midfielders
+ // and Forwards. Anyone the position list does not name keeps their place on
+ // the page in a group at the end rather than disappearing from it.
+ var POS={};
+ try{POS=JSON.parse(root.getAttribute('data-positions')||'{}');}catch(e){}
+ var key={};
+ Object.keys(POS).forEach(function(n){key[n.toLowerCase().trim()]=POS[n];});
+
+ var groups=[['gk','Goalkeepers'],['df','Defenders'],['mf','Midfielders'],
+             ['fw','Forwards'],['','Squad']];
+ var bucket={};
+ groups.forEach(function(g){bucket[g[0]]=[];});
+ rows.forEach(function(r){
+  var k=key[r.name.toLowerCase().trim()];
+  if(!bucket[k]){k='';}
+  bucket[k].push(r);
+ });
+
+ function card(r){
     return '<li class="ew-sq-card">'
      +'<span class="ew-sq-shot">'
        +'<img src="/wp-content/uploads/ew-players/'+slug(r.name)+'.jpg" alt="" loading="lazy"'
@@ -1920,8 +1948,13 @@ function build(apps,gls){
      +'<span class="ew-sq-stats"><em>'+r.apps+'</em> apps'
      +(r.goals?' &middot; <em>'+r.goals+'</em> '+(r.goals===1?'goal':'goals'):'')+'</span>'
      +'</li>';
+ }
+
+ body.innerHTML=groups.filter(function(g){return bucket[g[0]].length;})
+  .map(function(g){
+    return '<h2 class="ew-sq-group">'+g[1]+'</h2>'
+      +'<ul class="ew-sq-grid">'+bucket[g[0]].map(card).join('')+'</ul>';
   }).join('')
-  +'</ul>'
   +'<p class="ew-key" style="margin-top:14px">Shirt numbers are the number each player has worn most often.'
   +' <span class="ew-sq-armband">C</span> marks a player who has captained the side.</p>';
 }
@@ -1976,7 +2009,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.46.0';
+const EW_FWP_VERSION = '2.47.0';
 
 /*
  * Parts loader.
