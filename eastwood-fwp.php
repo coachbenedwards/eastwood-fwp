@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.39.0
+ * Version: 2.40.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1954,7 +1954,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.39.0';
+const EW_FWP_VERSION = '2.40.0';
 
 /*
  * Parts loader.
@@ -2936,7 +2936,7 @@ function ew_tickets_content() {
 
 <div class="ew-cta">
 	<h3>Ask about tickets</h3>
-	<p><a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
+	<p><a href="mailto:info@eastwoodfc.com">info@eastwoodfc.com</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
 </div>
 
 </div>
@@ -2979,7 +2979,7 @@ function ew_matchday_content() {
 
 <div class="ew-cta">
 	<h3>Any questions before you come</h3>
-	<p><a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
+	<p><a href="mailto:info@eastwoodfc.com">info@eastwoodfc.com</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
 </div>
 
 </div>
@@ -2997,7 +2997,7 @@ function ew_pitchhire_content() {
 
 <h2>Booking</h2>
 
-<p>Call 01773 432414 or email info@eastwoodcfc.co.uk and tell us what you need and when. Changing rooms and the Pitchside Bar can be hired alongside the pitch.</p>
+<p>Call 01773 432414 or email info@eastwoodfc.com and tell us what you need and when. Changing rooms and the Pitchside Bar can be hired alongside the pitch.</p>
 
 <p>Bookings are honoured unless a rearranged Eastwood home game lands on a slot you have already booked. If that happens you get a credit and first refusal on a new date.</p>
 
@@ -3027,7 +3027,7 @@ function ew_pitchhire_content() {
 
 <div class="ew-cta">
 	<h3>Check availability</h3>
-	<p><a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
+	<p><a href="mailto:info@eastwoodfc.com">info@eastwoodfc.com</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
 </div>
 
 </div>
@@ -3963,7 +3963,7 @@ function ew_contact_content() {
 
 <div class="ew-cta">
 	<h3>Get in touch</h3>
-	<p><a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
+	<p><a href="mailto:info@eastwoodfc.com">info@eastwoodfc.com</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
 </div>
 
 <h2>Who's who</h2>
@@ -3975,7 +3975,7 @@ function ew_contact_content() {
 	<div class="ew-person"><b>Sarah Robertson-Staples</b><span>Treasurer and Safeguarding Officer</span></div>
 </div>
 
-<p>Everything reaches us at <a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> — hospitality and
+<p>Everything reaches us at <a href="mailto:info@eastwoodfc.com">info@eastwoodfc.com</a> — hospitality and
 tickets, venue and pitch hire, sponsorship, junior and youth team enquiries, academy places, and anything about
 working here.</p>
 
@@ -4004,7 +4004,7 @@ Wales, company number 09196902.</p>
 	<li><b>Registered name:</b> Eastwood Community Football Club CIC</li>
 	<li><b>Company number:</b> 09196902</li>
 	<li><b>Registered office:</b> Coronation Park, Chewton Street, Eastwood, Nottinghamshire NG16 3HB</li>
-	<li><b>Contact:</b> <a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a>, 01773 432414</li>
+	<li><b>Contact:</b> <a href="mailto:info@eastwoodfc.com">info@eastwoodfc.com</a>, 01773 432414</li>
 </ul>
 
 <h2>What a community interest company means</h2>
@@ -4039,7 +4039,7 @@ behaviour of an adult at the club, or about anything that does not feel right, s
 <div class="ew-cta">
 	<h3>Contact the Safeguarding Officer</h3>
 	<p>Mark it for the attention of the Safeguarding Officer.</p>
-	<p><a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
+	<p><a href="mailto:info@eastwoodfc.com">info@eastwoodfc.com</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
 </div>
 
 <p>You do not need to be certain, and you do not need proof. If something is worrying you, tell us. It is our job
@@ -4112,7 +4112,7 @@ keep a record of club business. We do not add you to a mailing list because you 
 <h2>Your rights</h2>
 
 <p>Under UK data protection law you can ask us what information we hold about you, ask us to correct it, or ask
-us to delete it. Write to <a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> and we will respond
+us to delete it. Write to <a href="mailto:info@eastwoodfc.com">info@eastwoodfc.com</a> and we will respond
 within a month. If you are not satisfied with how we have handled it, you can complain to the Information
 Commissioner's Office at ico.org.uk.</p>
 
@@ -4141,7 +4141,7 @@ commercially without asking us first.</p>
 <p>We keep this site as accurate as we can, but things change. Kick-off times move, fixtures are rearranged and
 prices are reviewed. Nothing on this site is a guarantee, and for anything that matters — travelling to a game,
 booking the pitch, turning up for a trial — check with us first on 01773 432414 or
-<a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a>.</p>
+<a href="mailto:info@eastwoodfc.com">info@eastwoodfc.com</a>.</p>
 
 <h2>Match data</h2>
 
@@ -4163,7 +4163,7 @@ are confirmed by us directly, and the terms we send with your booking are the on
 <h2>Getting in touch</h2>
 
 <p>If something on this site is wrong, tell us and we will fix it:
-<a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a>.</p>
+<a href="mailto:info@eastwoodfc.com">info@eastwoodfc.com</a>.</p>
 
 </div>
 HTML;
@@ -4264,7 +4264,7 @@ events.</p>
 	<h3>Start a conversation</h3>
 	<p>Tell us about your business and what you want out of it, and we will come back with something specific
 		rather than a tier.</p>
-	<p><a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
+	<p><a href="mailto:info@eastwoodfc.com">info@eastwoodfc.com</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
 </div>
 
 </div>
@@ -4313,7 +4313,7 @@ makes this work for a football party or a company tournament as easily as a birt
 <div class="ew-cta">
 	<h3>Talk to us about your event</h3>
 	<p>Tell us what you have in mind and we will work out whether we can do it properly.</p>
-	<p><a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
+	<p><a href="mailto:info@eastwoodfc.com">info@eastwoodfc.com</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
 </div>
 
 </div>
@@ -4352,7 +4352,7 @@ function ew_academy_content() {
 <div class="ew-cta">
 	<h3>Enquire about the Academy</h3>
 	<p>Eastwood Football Club, Coronation Park, Chewton Street, Eastwood, Nottinghamshire NG16 3HB</p>
-	<p><a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
+	<p><a href="mailto:info@eastwoodfc.com">info@eastwoodfc.com</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
 </div>
 
 </div>
@@ -4496,7 +4496,7 @@ function ew_team_markup( $group, $team ) {
 	<div class="ew-cta">
 		<h3>Contact the club</h3>
 		<p>Eastwood Football Club, Coronation Park, Chewton Street, Eastwood, Nottinghamshire NG16 3HB</p>
-		<p><a href="mailto:info@eastwoodcfc.co.uk">info@eastwoodcfc.co.uk</a> &nbsp;·&nbsp;
+		<p><a href="mailto:info@eastwoodfc.com">info@eastwoodfc.com</a> &nbsp;·&nbsp;
 			<a href="tel:+441773432414">01773 432414</a></p>
 	</div>
 

@@ -431,15 +431,45 @@ function ew_hb_panel( $m, $opts = array() ) {
 }
 
 /** A season's worth of panels, broken by month the way a calendar reads. */
+/**
+ * A season, grouped by month.
+ *
+ * Only the first few are rendered open. The reference shows seven cards on
+ * this page, not a season, and for good reason: each card asks for two club
+ * crests and a competition badge, and the host answers a burst of those with
+ * 429, so the crests inside the cards quietly fail to arrive. The remainder
+ * sits in a closed block — a lazy image inside a hidden element is never
+ * requested — and opens on a click.
+ */
+const EW_LIST_OPEN = 8;
+
 function ew_hb_list( $matches, $opts, $empty ) {
 	if ( ! $matches ) {
 		return '<p class="ewp-empty is-center">' . esc_html( $empty ) . '</p>';
 	}
 
+	$total = count( $matches );
+	$limit = EW_LIST_OPEN;
+	$rest  = max( 0, $total - $limit );
+	$i     = 0;
+	$split = false;
+
 	$out   = '';
 	$month = '';
 	$open  = false;
 	foreach ( $matches as $m ) {
+		// Everything past the limit goes behind the control, starting on a
+		// clean month heading so the closed block reads as a continuation.
+		if ( ! $split && $rest && $i === $limit ) {
+			if ( $open ) { $out .= '</ul>'; $open = false; }
+			$out  .= '<p class="ewp-moreWrap"><button type="button" class="ewp-more"'
+				. ' data-ew-more aria-expanded="false">'
+				. 'Show the rest of the season <b>' . (int) $rest . '</b></button></p>';
+			$out  .= '<div class="ewp-rest" data-ew-rest hidden>';
+			$month = '';
+			$split = true;
+		}
+		$i++;
 		$ts  = strtotime( (string) ( $m['date'] ?? '' ) );
 		$key = $ts ? date_i18n( 'F Y', $ts ) : '';
 		if ( $key !== $month ) {
@@ -455,6 +485,9 @@ function ew_hb_list( $matches, $opts, $empty ) {
 	}
 	if ( $open ) {
 		$out .= '</ul>';
+	}
+	if ( $split ) {
+		$out .= '</div>';
 	}
 	return $out;
 }
@@ -1539,6 +1572,15 @@ function ew_hb_css() {
 .ewp-rowFoot b{font-size:13px;font-weight:700;letter-spacing:.02em;color:#101010}
 .ewp-rowFoot i{font-style:normal;font-size:12px;color:#8a8a8a}
 .ewp-rowFoot i::before{content:"\2014";margin-right:7px;color:#c9c9c9}
+.ewp-moreWrap{margin:18px 0 0;text-align:center}
+.ewp-more{display:inline-flex;align-items:center;gap:9px;min-height:50px;padding:12px 26px;
+ background:#fff;border:1px solid #d9d9dd;border-radius:8px;cursor:pointer;
+ font-family:"Instrument Sans",system-ui,sans-serif;font-size:15px;font-weight:700;
+ letter-spacing:.02em;text-transform:uppercase;color:#101010}
+.ewp-more:hover{border-color:#CC0000;color:#CC0000}
+.ewp-more b{font-weight:700;color:#8a8a8a}
+.ewp-more:hover b{color:#CC0000}
+.ewp-rest[hidden]{display:none}
 .ewp-rowTop{display:flex;align-items:center;gap:16px;min-height:81px;padding:16px;background:#fafafa;
  border-bottom:1px solid #efefef}
 .ewp-rowTop b{font-family:"Instrument Sans",system-ui,sans-serif;font-weight:400;font-size:20px;
@@ -1843,6 +1885,20 @@ function ew_hb_js() {
   });
  });
 })();
+ /* Open the rest of the season. The cards are already in the page but
+    hidden, so their crests have not been requested yet; revealing them
+    lets the browser fetch that handful rather than the whole season. */
+ [].forEach.call(document.querySelectorAll('[data-ew-more]'), function(btn){
+  btn.addEventListener('click', function(){
+   var box = btn.parentNode.nextElementSibling;
+   if (!box || !box.hasAttribute('data-ew-rest')) { return; }
+   var open = !box.hasAttribute('hidden');
+   if (open) { box.setAttribute('hidden',''); } else { box.removeAttribute('hidden'); }
+   btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+   btn.firstChild.nodeValue = open ? 'Show the rest of the season ' : 'Hide the rest of the season ';
+  });
+ });
+
  /* next-match countdown */
  [].forEach.call(document.querySelectorAll('.ewp-bannerClock'), function(el){
   var ko = parseInt(el.getAttribute('data-ko'), 10) * 1000;
