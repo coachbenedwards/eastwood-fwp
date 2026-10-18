@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.34.0
+ * Version: 2.35.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1044,7 +1044,8 @@ function ew_chrome_css() {
 	return '
 /* Every inner page has exactly one h1 and it is the page title. White on
    red, full bleed, text lined up with the 1248px column. */
-h1.elementor-heading-title{
+h1.elementor-heading-title,
+.ewshop h1{
  background:#CC0000;color:#fff !important;
  font-family:Anton,"Instrument Sans",sans-serif !important;
  font-size:56px !important;font-weight:700 !important;line-height:1.02;
@@ -1053,8 +1054,21 @@ h1.elementor-heading-title{
  padding:70px max(16px,calc(50vw - 624px)) 34px !important;
 }
 @media(max-width:820px){
- h1.elementor-heading-title{font-size:38px !important;padding:32px 16px 34px !important}
+ h1.elementor-heading-title,
+ .ewshop h1{font-size:38px !important;padding:32px 16px 34px !important}
 }
+
+/* The Shop page keeps its markup in the page itself and arrived from
+   elsewhere wearing Inter at 40px in an 1120px column — the only page on the
+   site using neither the club typeface nor its width. The band selector
+   above now covers its title; the rest is squared up here so the page
+   content never has to be edited to keep up. */
+.ewshop{max-width:1248px !important;padding:0 max(16px,calc(50vw - 624px)) 64px !important;
+ font-family:"Instrument Sans",system-ui,sans-serif !important}
+.ewshop h1{margin:0 calc(50% - 50vw) 34px !important}
+.ewshop .lede{font-size:17px;color:#5c5c5c;margin:0 0 34px}
+.ewshop-grid{grid-template-columns:repeat(auto-fill,minmax(288px,1fr)) !important;gap:14px !important}
+.ewshop-card{border-radius:8px !important}
 
 /* The news hero collapses to 88px because its own min-height class never
    made it into the captured stylesheet — the image inside is absolutely
@@ -2718,11 +2732,15 @@ function ew_rewrite_nav( $html ) {
 
 function ew_prose_css_inline() {
 	return '
-.ew-prose{max-width:820px;margin:0 auto;padding:0 16px 56px;
+.ew-prose{max-width:1248px;margin:0 auto;padding:0 max(16px,calc(50vw - 624px)) 64px;
  font-family:"Instrument Sans",system-ui,sans-serif;color:#111}
+/* The reference holds a 1248px column on every page, so these do too.
+   A 1248px line of body copy is too long to read comfortably, so the
+   column is wide and the paragraphs inside it are not. */
+.ew-prose > p,.ew-prose > ul,.ew-prose > ol,.ew-prose .ew-lede{max-width:72ch}
 .ew-prose *{box-sizing:border-box}
 .ew-prose .ew-lede{font-size:19px;line-height:1.55;color:#333;margin:0 0 28px}
-.ew-prose h2{font-family:Anton,"Instrument Sans",sans-serif;font-size:22px;letter-spacing:.04em;
+.ew-prose h2{font-family:Anton,"Instrument Sans",sans-serif;font-size:30px;letter-spacing:.03em;
  text-transform:uppercase;margin:40px 0 14px;padding:0 0 10px;border-bottom:2px solid #e3e3e3}
 .ew-prose p{font-size:16px;line-height:1.65;margin:0 0 16px}
 .ew-prose ul{margin:0 0 20px;padding-left:20px}
