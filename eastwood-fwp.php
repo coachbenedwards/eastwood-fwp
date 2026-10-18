@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.58.0
+ * Version: 2.59.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1856,6 +1856,30 @@ function ew_squad_details() {
 	);
 }
 
+/**
+ * Players who have featured this season but are no longer in the squad.
+ *
+ * The squad is built from the appearances feed, which by its nature keeps
+ * anyone who has played a minute all season. A player who has left is still
+ * in that data and has to be named here to come off the page. Their
+ * appearances and goals are untouched and still count in the season record;
+ * this list governs the squad page only.
+ *
+ * Matching ignores case and treats a curly apostrophe and a straight one as
+ * the same character, because the feed uses the curly one.
+ */
+function ew_squad_departed() {
+	return array(
+		'Steven Johnson-Fikula',
+		'Revarnelle James',
+		'Kieren Fenton',
+		'L’Varn Brandy',
+		'Rashaan Frances',
+		'Harry Wood',
+		'Bradley Gascoigne',
+	);
+}
+
 /** The position half of the list, for the grouping. */
 function ew_player_positions() {
 	$out = array();
@@ -2152,7 +2176,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.58.0';
+const EW_FWP_VERSION = '2.59.0';
 
 /*
  * Parts loader.
