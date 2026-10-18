@@ -19,7 +19,7 @@
  *   [eastwood_home_hero]
  *   [eastwood_home_fixtures title="Fixtures & Results"]
  *   [eastwood_home_discover title="Discover Eastwood"]
- *   Matchday | /eastwood-tickets/ | Tickets, prices and hospitality
+ *   Matchday | /tickets/ | Tickets, prices and hospitality
  *   [/eastwood_home_discover]
  *   [eastwood_home_news title="Latest News" count="4"]
  *
@@ -536,7 +536,7 @@ function ew_hb_hero_sc( $atts ) {
 add_shortcode( 'eastwood_home_hero', 'ew_hb_hero_sc' );
 
 /* ------------------------------------------------------------------
- * [eastwood_home_banner cta="Buy Tickets" cta_url="/eastwood-tickets/"]
+ * [eastwood_home_banner cta="Buy Tickets" cta_url="/tickets/"]
  * The next fixture, full width, directly under the header. The words on
  * the buttons are editor-side; everything else comes from the feed.
  * ------------------------------------------------------------------ */
@@ -545,9 +545,9 @@ function ew_hb_banner_sc( $atts ) {
 	$atts = shortcode_atts(
 		array(
 			'cta'            => 'Buy Tickets',
-			'cta_url'        => '/eastwood-tickets/',
+			'cta_url'        => '/tickets/',
 			'hosp'           => 'Book Hospitality',
-			'hosp_url'       => '/eastwood-hospitality/',
+			'hosp_url'       => '/hospitality/',
 			'centre'         => 'Match Centre',
 			'centre_url'     => '/match/',
 			'image'          => ew_hb_asset( 'banner/scarf.jpg' ),
@@ -709,9 +709,9 @@ function ew_hb_fixtures_sc( $atts, $content = '' ) {
 			'layout'     => 'list',
 			'hero'       => 'no',
 			'cta'        => 'Buy Tickets',
-			'cta_url'    => '/eastwood-tickets/',
+			'cta_url'    => '/tickets/',
 			'hosp'       => 'Book Hospitality',
-			'hosp_url'   => '/eastwood-hospitality/',
+			'hosp_url'   => '/hospitality/',
 			'centre'     => 'Match Centre',
 			'centre_url' => '/match/',
 			'featured'       => 'Live streamed on',
@@ -902,7 +902,7 @@ function ew_hb_upcoming_sc( $atts, $content = '' ) {
 			'all'     => 'View all matches',
 			'all_url' => '/matches/',
 			'cta'     => 'Buy tickets',
-			'cta_url' => '/eastwood-tickets/',
+			'cta_url' => '/tickets/',
 		),
 		$atts,
 		'eastwood_home_upcoming'
@@ -1885,8 +1885,8 @@ function ew_home_preview_content() {
 		. "Club Scarf | /shop/ | \u00a312.00\n"
 		. "[/eastwood_home_shop]\n\n"
 		. "[eastwood_home_discover title=\"Discover Eastwood\"]\n"
-		. "Matchday | /eastwood-tickets/ | Tickets, prices and hospitality\n"
-		. "The Venue | /eastwood-hospitality/ | Function room and bar hire\n"
+		. "Matchday | /tickets/ | Tickets, prices and hospitality\n"
+		. "The Venue | /hospitality/ | Function room and bar hire\n"
 		. "Pitch Hire | /pitch-hire/ | Floodlit 3G, all year round\n"
 		. "Academy | /academy/ | Full-time football and education\n"
 		. "Sponsorship | /sponsorship/ | Partner with the club\n"

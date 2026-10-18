@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.32.0
+ * Version: 2.33.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1186,11 +1186,13 @@ function ew_rewrite_markup( $html ) {
 
 	// The slugs lost their "eastwood-" prefix; the captured header and
 	// footer still carry the old ones in markup we do not own.
-	$html = str_replace(
-		array( '/eastwood-matches/', '/eastwood-news/' ),
-		array( '/matches/', '/news/' ),
-		$html
-	);
+	$find    = array();
+	$replace = array();
+	foreach ( ew_moved_slugs() as $from => $to ) {
+		$find[]    = '/' . $from . '/';
+		$replace[] = '/' . $to . '/';
+	}
+	$html = str_replace( $find, $replace, $html );
 
 	// Icons. The captured markup hard-codes fill="red" on the <use>, which
 	// would flood-fill an outline icon, so the stroke attributes go on in
@@ -1597,7 +1599,7 @@ add_action( 'wp_enqueue_scripts', 'ew_matches_assets', 20 );
 function ew_teams_roster() {
 	return array(
 		'Senior Men' => array(
-			array( 'name' => '1st Team',         'pitchero' => 140091, 'url' => '/eastwood-squad/' ),
+			array( 'name' => '1st Team',         'pitchero' => 140091, 'url' => '/squad/' ),
 			array( 'name' => 'U21',              'pitchero' => 188320 ),
 			array( 'name' => 'Academy',          'pitchero' => 166249 ),  // page: /teams/academy/
 			array( 'name' => 'Development Team', 'pitchero' => 286212 ),
@@ -2107,13 +2109,58 @@ add_action( 'rest_api_init', function () {
 	) );
 } );
 
+/**
+ * Every address that lost its "eastwood-" prefix, old slug to new.
+ *
+ * Eastwood TV keeps its prefix: the channel is called Eastwood TV, so the
+ * word is part of the name rather than a leftover from the page tree.
+ */
+function ew_moved_slugs() {
+	return array(
+		'eastwood-matches'     => 'matches',
+		'eastwood-news'        => 'news',
+		'eastwood-teams'       => 'teams',
+		'eastwood-squad'       => 'squad',
+		'eastwood-tickets'     => 'tickets',
+		'eastwood-hospitality' => 'hospitality',
+		'eastwood-home-v2'     => 'home-v2',
+	);
+}
+
+/**
+ * Rename the pages once, rather than asking someone to edit seven of them by
+ * hand and hope the menus keep up. A page is only touched when it still
+ * carries the old slug and nothing else has claimed the new one, so running
+ * this again after the fact changes nothing.
+ */
+const EW_SLUG_RENAME = '1';
+
+add_action( 'init', function () {
+	if ( get_option( 'ew_slug_rename' ) === EW_SLUG_RENAME ) {
+		return;
+	}
+	foreach ( ew_moved_slugs() as $from => $to ) {
+		$page = get_page_by_path( $from );
+		if ( ! $page ) {
+			continue;
+		}
+		$taken = get_page_by_path( $to );
+		if ( $taken && (int) $taken->ID !== (int) $page->ID ) {
+			continue;
+		}
+		wp_update_post( array( 'ID' => $page->ID, 'post_name' => $to ) );
+	}
+	update_option( 'ew_slug_rename', EW_SLUG_RENAME );
+	flush_rewrite_rules( false );
+}, 20 );
+
 /* The old addresses, kept alive for anything already pointing at them. */
 add_action( 'template_redirect', function () {
 	$path = trim( (string) wp_parse_url( $_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH ), '/' );
-	$moved = array(
-		'eastwood-matches' => '/matches/',
-		'eastwood-news'    => '/news/',
-	);
+	$moved = array();
+	foreach ( ew_moved_slugs() as $from => $to ) {
+		$moved[ $from ] = '/' . $to . '/';
+	}
 	$first = explode( '/', $path )[0];
 	if ( isset( $moved[ $first ] ) ) {
 		$rest = substr( $path, strlen( $first ) );
@@ -2211,15 +2258,15 @@ add_filter( 'pre_get_document_title', function ( $title ) {
  * there. The moment somebody edits a page by hand, we leave it alone.
  * ------------------------------------------------------------------ */
 
-const EW_PAGES_V = '9';
+const EW_PAGES_V = '10';
 
 function ew_owned_pages() {
 	$pages = array(
-		'eastwood-teams' => array(
+		'teams' => array(
 			'title'   => 'Teams',
 			'content' => '[eastwood_teams]',
 		),
-		'eastwood-squad' => array(
+		'squad' => array(
 			'title'   => 'First Team Squad',
 			'content' => '[eastwood_squad]',
 		),
@@ -2235,11 +2282,11 @@ function ew_owned_pages() {
 			'title'   => 'Matches',
 			'content' => '[eastwood_matches]',
 		),
-		'eastwood-tickets' => array(
+		'tickets' => array(
 			'title'   => 'Matchday',
 			'content' => ew_matchday_content(),
 		),
-		'eastwood-hospitality' => array(
+		'hospitality' => array(
 			'title'   => 'The Venue',
 			'content' => ew_venue_content(),
 		),
@@ -4323,7 +4370,7 @@ function ew_team_markup( $group, $team ) {
 	?>
 <div class="ew-prose ew-team">
 
-	<p class="ew-teamCrumb"><a href="<?php echo esc_url( home_url( '/eastwood-teams/' ) ); ?>">Teams</a>
+	<p class="ew-teamCrumb"><a href="<?php echo esc_url( home_url( '/teams/' ) ); ?>">Teams</a>
 		<span>/</span> <?php echo esc_html( $group ); ?></p>
 
 	<h1 class="ew-teamTitle"><?php echo esc_html( $name ); ?></h1>
@@ -4336,9 +4383,9 @@ function ew_team_markup( $group, $team ) {
 		card is recorded as the league publishes it.</p>
 
 	<div class="ew-teamLinks">
-		<a href="<?php echo esc_url( home_url( '/eastwood-squad/' ) ); ?>">Squad and season stats</a>
+		<a href="<?php echo esc_url( home_url( '/squad/' ) ); ?>">Squad and season stats</a>
 		<a href="<?php echo esc_url( home_url( '/matches/' ) ); ?>">Fixtures, results and table</a>
-		<a href="<?php echo esc_url( home_url( '/eastwood-tickets/' ) ); ?>">Matchday and tickets</a>
+		<a href="<?php echo esc_url( home_url( '/tickets/' ) ); ?>">Matchday and tickets</a>
 	</div>
 
 	<?php elseif ( $is_acad ) : ?>
@@ -4442,7 +4489,7 @@ add_action( 'template_redirect', function () {
 		nocache_headers();
 		get_header();
 		echo '<div class="ew-prose"><p style="margin:60px 0">We have no team by that name. '
-			. '<a href="' . esc_url( home_url( '/eastwood-teams/' ) ) . '">All teams</a></p></div>';
+			. '<a href="' . esc_url( home_url( '/teams/' ) ) . '">All teams</a></p></div>';
 		get_footer();
 		exit;
 	}
