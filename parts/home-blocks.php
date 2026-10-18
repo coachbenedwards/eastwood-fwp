@@ -321,6 +321,7 @@ function ew_hb_panel( $m, $opts = array() ) {
 			'featured'       => '',
 			'featured_icon'  => '',
 			'featured_label' => '',
+			'featured_note'  => '',
 		),
 		$opts
 	);
@@ -414,6 +415,9 @@ function ew_hb_panel( $m, $opts = array() ) {
 		<?php endif; ?>
 		<?php if ( '' !== $opts['featured_label'] ) : ?>
 		<b><?php echo esc_html( $opts['featured_label'] ); ?></b>
+		<?php endif; ?>
+		<?php if ( '' !== $opts['featured_note'] ) : ?>
+		<i><?php echo esc_html( $opts['featured_note'] ); ?></i>
 		<?php endif; ?>
 	</div>
 	<?php endif; ?>
@@ -549,6 +553,9 @@ function ew_hb_banner_sc( $atts ) {
 			'featured_url'   => 'https://www.youtube.com/@eastwoodfootballclub',
 			'featured_icon'  => ew_hb_asset( 'banner/play.png' ),
 			'featured_label' => 'YouTube',
+			// Which home games are streamed is not published yet, so the card
+			// says so rather than implying every tie is covered.
+			'featured_note'  => 'Not announced yet',
 		),
 		$atts,
 		'eastwood_home_banner'
@@ -667,6 +674,9 @@ function ew_hb_banner_sc( $atts ) {
 				<b><?php echo esc_html( $atts['featured_label'] ); ?></b>
 				<?php endif; ?>
 			<?php if ( '' !== $feat_url ) : ?></a><?php endif; ?>
+			<?php if ( '' !== $atts['featured_note'] ) : ?>
+			<i><?php echo esc_html( $atts['featured_note'] ); ?></i>
+			<?php endif; ?>
 		</p>
 		<?php endif; ?>
 	</div>
@@ -704,6 +714,9 @@ function ew_hb_fixtures_sc( $atts, $content = '' ) {
 			'featured'       => 'Featured On',
 			'featured_icon'  => ew_hb_asset( 'banner/play.png' ),
 			'featured_label' => 'YouTube',
+			// Which home games are streamed is not published yet, so the card
+			// says so rather than implying every tie is covered.
+			'featured_note'  => 'Not announced yet',
 		),
 		$atts,
 		'eastwood_home_fixtures'
@@ -722,6 +735,7 @@ function ew_hb_fixtures_sc( $atts, $content = '' ) {
 		'featured'       => $atts['featured'],
 		'featured_icon'  => $atts['featured_icon'],
 		'featured_label' => $atts['featured_label'],
+		'featured_note'  => $atts['featured_note'],
 	);
 
 	$tabs = array( 'fixtures' => 'Fixtures', 'results' => 'Results', 'table' => 'Table' );
@@ -1405,6 +1419,8 @@ function ew_hb_css() {
 .ewp-bannerFeat a{display:inline-flex;align-items:center;gap:8px;text-decoration:none;color:#fff}
 .ewp-bannerFeat img{height:22px;width:auto;display:block}
 .ewp-bannerFeat b{font-size:13px;font-weight:700;letter-spacing:.04em}
+.ewp-bannerFeat > i{font-style:normal;font-size:12px;color:rgba(255,255,255,.6)}
+.ewp-bannerFeat > i::before{content:"\2014";margin-right:7px;color:rgba(255,255,255,.35)}
 .ewp-bannerFeat a:hover b{text-decoration:underline}
 .ewp-bannerCta a:hover{border-color:#fff}
 @media(max-width:760px){
@@ -1511,6 +1527,8 @@ function ew_hb_css() {
 .ewp-rowFoot span{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#101010}
 .ewp-rowFoot img{height:18px;width:auto;display:block}
 .ewp-rowFoot b{font-size:13px;font-weight:700;letter-spacing:.02em;color:#101010}
+.ewp-rowFoot i{font-style:normal;font-size:12px;color:#8a8a8a}
+.ewp-rowFoot i::before{content:"\2014";margin-right:7px;color:#c9c9c9}
 .ewp-rowTop{display:flex;align-items:center;gap:16px;min-height:81px;padding:16px;background:#fafafa;
  border-bottom:1px solid #efefef}
 .ewp-rowTop b{font-family:"Instrument Sans",system-ui,sans-serif;font-weight:400;font-size:20px;
