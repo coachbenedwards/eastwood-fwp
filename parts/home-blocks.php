@@ -280,7 +280,7 @@ function ew_hb_card( $m, $done = false, $cta = array() ) {
 				loading="lazy" decoding="async"
 				onerror="this.style.visibility='hidden'">
 			<span class="ewp-cardText">
-				<span class="ewp-kicker">First Team</span>
+				<span class="ewp-kicker">Men&rsquo;s First Team</span>
 				<b><?php echo esc_html( $opp['name'] ?? '' ); ?></b>
 				<?php if ( $done ) : ?>
 				<span class="ewp-score is-<?php echo esc_attr( $res ); ?>"><i><?php echo esc_html( $res ); ?></i>
@@ -1623,27 +1623,51 @@ function ew_hb_css() {
 .ewp-rowMore .ewp-ico{width:24px;height:24px}
 
 /* The next fixtures as one thin band directly under the nav, which is the
-   first thing the reference puts on its homepage. The same card the rail
-   uses, flattened, so a change to how a fixture reads happens once. */
-.ewp-strip{position:relative;background:#fff;border-bottom:1px solid rgba(0,0,0,.09)}
+   first thing the reference puts on its homepage.
+
+   Measured off the reference at 1440: the band is 109px and full width,
+   cells are 322px butted together with a hairline between them, the date
+   runs across the whole top of each cell on a 41px tint rather than sitting
+   in a box of its own, the crest is 48px, and the next game carries a red
+   rule along the bottom. Every number below is one of those. */
+.ewp-strip{position:relative;background:#fff;
+ margin:0 calc(50% - 50vw);padding:0 0 0 52px;
+ border-bottom:1px solid rgba(0,0,0,.09)}
 .ewp-stripList{display:flex;list-style:none;margin:0;padding:0;overflow-x:auto;
  scroll-behavior:smooth;scroll-snap-type:x proximity;scrollbar-width:none;-ms-overflow-style:none}
 .ewp-stripList::-webkit-scrollbar{display:none}
-.ewp-strip .ewp-slide{flex:0 0 288px;scroll-snap-align:start;border-right:1px solid rgba(0,0,0,.09)}
-.ewp-strip .ewp-card{display:flex;flex-direction:column;justify-content:center;gap:5px;
- min-height:109px;height:100%;padding:12px 18px;background:none;border:0;border-radius:0;box-shadow:none}
-.ewp-strip .ewp-cardTop{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0}
-.ewp-strip .ewp-when b{font-size:14px}
-.ewp-strip .ewp-when i{font-size:15px}
-.ewp-strip .ewp-cardBody{display:flex;align-items:center;gap:10px;margin:0}
-.ewp-strip .ewp-cardBody img{width:28px;height:28px;object-fit:contain;flex:none}
-.ewp-strip .ewp-kicker{font-size:9px}
-.ewp-strip .ewp-cardText b{font-size:17px;line-height:1.1}
-.ewp-strip .ewp-venue{font-size:11px}
+.ewp-strip .ewp-slide{flex:0 0 322px;scroll-snap-align:start;
+ border-right:1px solid rgba(0,0,0,.09);position:relative}
+/* The reference marks the next game with a red rule along the bottom. */
+.ewp-strip .ewp-slide:first-child{box-shadow:inset 0 -4px 0 #CC0000}
+.ewp-strip .ewp-card{display:flex;flex-direction:column;gap:0;min-height:109px;height:100%;
+ padding:0;background:#fff;border:0;border-radius:0;box-shadow:none}
+/* The date runs the full width of the cell on a tint, not in an inset box. */
+.ewp-strip .ewp-cardTop{display:flex;align-items:center;justify-content:space-between;
+ gap:10px;margin:0;padding:0 16px;min-height:41px;background:rgba(0,0,0,.03);border:0;border-radius:0}
+.ewp-strip .ewp-when{display:flex;align-items:baseline;gap:8px}
+.ewp-strip .ewp-when b{font-size:15px}
+.ewp-strip .ewp-when i{font-size:15px;font-weight:400;color:#5c5c5c}
+.ewp-strip .ewp-ha{width:22px;height:22px;flex:none;border:0;border-radius:50%;
+ display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;line-height:1}
+.ewp-strip .ewp-ha.is-home{background:#CC0000;color:#fff}
+.ewp-strip .ewp-ha.is-away{background:#e4e4e4;color:#333}
+.ewp-strip .ewp-cardBody{display:flex;align-items:center;gap:12px;margin:0;padding:0 16px;flex:1}
+.ewp-strip .ewp-cardBody img{width:48px;height:48px;object-fit:contain;flex:none}
+.ewp-strip .ewp-cardText{min-width:0}
+.ewp-strip .ewp-kicker{font-size:10px;font-weight:700;letter-spacing:1px;
+ color:#212121;text-transform:uppercase}
+.ewp-strip .ewp-cardText b{font-size:19px;line-height:1.15;display:block;
+ white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ewp-strip .ewp-venue{font-size:12px;color:#5c5c5c}
 .ewp-stripNext{position:absolute;right:0;top:0;height:100%;width:46px;border:0;cursor:pointer;
  background:linear-gradient(90deg,rgba(255,255,255,0),#fff 42%);font-size:26px;color:#101010;line-height:1}
 .ewp-stripNext:focus-visible{outline:2px solid #CC0000;outline-offset:-3px}
-@media(max-width:700px){.ewp-strip .ewp-slide{flex:0 0 234px}.ewp-stripNext{display:none}}
+@media(max-width:700px){
+ .ewp-strip{padding-left:0}
+ .ewp-strip .ewp-slide{flex:0 0 264px}
+ .ewp-stripNext{display:none}
+}
 
 /* The slot the reference gives over to one big promotional graphic. Ours is
    type rather than artwork, because artwork would have to be made for every
