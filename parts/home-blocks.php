@@ -317,6 +317,10 @@ function ew_hb_panel( $m, $opts = array() ) {
 			'hosp_url'   => '',
 			'centre'     => '',
 			'centre_url' => '',
+			// the strip across the foot, where the reference names a broadcaster
+			'featured'       => '',
+			'featured_icon'  => '',
+			'featured_label' => '',
 		),
 		$opts
 	);
@@ -326,21 +330,32 @@ function ew_hb_panel( $m, $opts = array() ) {
 	$at_home = (int) ( $home['id'] ?? 0 ) === (int) EW_TEAM;
 	$ts      = strtotime( (string) ( $m['date'] ?? '' ) . ' ' . (string) ( $m['time'] ?? '15:00' ) );
 	$comp    = (string) ( $m['competition']['name'] ?? '' );
+	$comp_id = (int) ( $m['competition']['id'] ?? 0 );
+	$badge   = $comp_id ? ew_comp_badge( $comp_id ) : '';
 	$venue   = $at_home ? 'Coronation Park' : (string) ( $m['venue'] ?? '' );
 
 	ob_start();
 	?>
 <li class="ewp-row">
 	<div class="ewp-rowTop">
+		<?php if ( '' !== $badge ) : ?>
+		<span class="ewp-rowBadge"><img src="<?php echo esc_url( $badge ); ?>" alt=""
+			onerror="this.parentNode.remove()"></span>
+		<?php endif; ?>
 		<b><?php echo esc_html( $ts ? date_i18n( 'D j M', $ts ) : '' ); ?></b>
 		<?php if ( $opts['done'] ) : ?>
 		<i>FT</i>
 		<?php elseif ( $ts ) : ?>
 		<i><?php echo esc_html( date_i18n( 'H:i', $ts ) ); ?></i>
 		<?php endif; ?>
-		<?php if ( '' !== $comp ) : ?>
-		<span class="ewp-rowComp"><?php echo esc_html( $comp ); ?></span>
-		<?php endif; ?>
+		<span class="ewp-rowRight">
+			<?php if ( '' !== $comp ) : ?>
+			<span class="ewp-rowComp"><?php echo esc_html( $comp ); ?></span>
+			<?php endif; ?>
+			<a class="ewp-rowMore" title="More info" aria-label="More info" href="<?php
+				echo esc_url( home_url( $opts['centre_url'] . (int) ( $m['id'] ?? 0 ) . '/' ) ); ?>"><?php
+				echo ew_hb_icon( 'info' ); // phpcs:ignore ?></a>
+		</span>
 	</div>
 
 	<div class="ewp-rowBody">
@@ -369,13 +384,15 @@ function ew_hb_panel( $m, $opts = array() ) {
 
 		<?php if ( ! $opts['done'] && $at_home && ( '' !== $opts['cta'] || '' !== $opts['hosp'] ) ) : ?>
 		<p class="ewp-rowCta">
-			<?php if ( '' !== $opts['cta'] ) : ?>
-			<a class="is-primary" href="<?php echo esc_url( home_url( $opts['cta_url'] ) ); ?>"><?php
-				echo esc_html( $opts['cta'] ); ?></a>
-			<?php endif; ?>
 			<?php if ( '' !== $opts['hosp'] ) : ?>
 			<a href="<?php echo esc_url( home_url( $opts['hosp_url'] ) ); ?>"><?php
-				echo esc_html( $opts['hosp'] ); ?></a>
+				echo ew_hb_icon( 'dine' ); // phpcs:ignore ?><span><?php
+				echo esc_html( $opts['hosp'] ); ?></span></a>
+			<?php endif; ?>
+			<?php if ( '' !== $opts['cta'] ) : ?>
+			<a class="is-primary" href="<?php echo esc_url( home_url( $opts['cta_url'] ) ); ?>"><?php
+				echo ew_hb_icon( 'ticket' ); // phpcs:ignore ?><span><?php
+				echo esc_html( $opts['cta'] ); ?></span></a>
 			<?php endif; ?>
 		</p>
 		<?php endif; ?>
@@ -383,9 +400,23 @@ function ew_hb_panel( $m, $opts = array() ) {
 		<?php if ( '' !== $opts['centre'] ) : ?>
 		<p class="ewp-rowCentre"><a href="<?php
 			echo esc_url( home_url( $opts['centre_url'] . (int) ( $m['id'] ?? 0 ) . '/' ) ); ?>"><?php
-			echo esc_html( $opts['centre'] ); ?></a></p>
+			echo ew_hb_icon( 'ball' ); // phpcs:ignore ?><span><?php
+			echo esc_html( $opts['centre'] ); ?></span></a></p>
 		<?php endif; ?>
 	</div>
+
+	<?php if ( ! $opts['done'] && '' !== $opts['featured'] ) : ?>
+	<div class="ewp-rowFoot">
+		<span><?php echo esc_html( $opts['featured'] ); ?></span>
+		<?php if ( '' !== $opts['featured_icon'] ) : ?>
+		<img src="<?php echo esc_url( $opts['featured_icon'] ); ?>" alt=""
+			onerror="this.remove()">
+		<?php endif; ?>
+		<?php if ( '' !== $opts['featured_label'] ) : ?>
+		<b><?php echo esc_html( $opts['featured_label'] ); ?></b>
+		<?php endif; ?>
+	</div>
+	<?php endif; ?>
 </li>
 	<?php
 	return ob_get_clean();
@@ -670,6 +701,9 @@ function ew_hb_fixtures_sc( $atts, $content = '' ) {
 			'hosp_url'   => '/eastwood-hospitality/',
 			'centre'     => 'Match Centre',
 			'centre_url' => '/match/',
+			'featured'       => 'Featured On',
+			'featured_icon'  => ew_hb_asset( 'banner/play.png' ),
+			'featured_label' => 'YouTube',
 		),
 		$atts,
 		'eastwood_home_fixtures'
@@ -685,6 +719,9 @@ function ew_hb_fixtures_sc( $atts, $content = '' ) {
 		'hosp_url'   => $atts['hosp_url'],
 		'centre'     => $atts['centre'],
 		'centre_url' => $atts['centre_url'],
+		'featured'       => $atts['featured'],
+		'featured_icon'  => $atts['featured_icon'],
+		'featured_label' => $atts['featured_label'],
 	);
 
 	$tabs = array( 'fixtures' => 'Fixtures', 'results' => 'Results', 'table' => 'Table' );
@@ -1460,37 +1497,59 @@ function ew_hb_css() {
 .ewp-credit{max-width:1248px;margin:0 auto;padding:26px 16px 44px;text-align:center;
  font-size:12px;color:#9a9aa3}
 .ewp-rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
-.ewp-row{background:#fff;border-radius:6px;overflow:hidden}
-.ewp-rowTop{display:flex;align-items:center;gap:9px;padding:14px 22px;background:#fafafa;
+.ewp-row{background:#fff;border-radius:8px;overflow:hidden}
+/* The strip is 81px on the reference, with the competition crest in a 48px
+   box, the date at 20px regular and the kick-off at 20px bold. */
+.ewp-rowBadge{display:flex;align-items:center;justify-content:center;
+ width:48px;height:48px;flex:none;margin-right:4px}
+.ewp-rowBadge img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;display:block}
+.ewp-rowRight{display:flex;align-items:center;gap:12px;margin-left:auto;min-width:0}
+.ewp-rowMore{display:flex;align-items:center;flex:none;color:#212121;opacity:.6}
+.ewp-rowMore:hover{opacity:1}
+.ewp-rowFoot{display:flex;align-items:center;justify-content:center;gap:10px;
+ min-height:49px;padding:10px 16px;background:#fafafa;border-top:1px solid rgba(200,200,200,.3)}
+.ewp-rowFoot span{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#101010}
+.ewp-rowFoot img{height:18px;width:auto;display:block}
+.ewp-rowFoot b{font-size:13px;font-weight:700;letter-spacing:.02em;color:#101010}
+.ewp-rowTop{display:flex;align-items:center;gap:16px;min-height:81px;padding:16px;background:#fafafa;
  border-bottom:1px solid #efefef}
-.ewp-rowTop b{font-family:Anton,"Instrument Sans",sans-serif;font-size:17px;letter-spacing:.03em;
+.ewp-rowTop b{font-family:"Instrument Sans",system-ui,sans-serif;font-weight:400;font-size:20px;
+ letter-spacing:normal;
  text-transform:uppercase;color:#111}
-.ewp-rowTop i{font-style:normal;font-size:16px;font-weight:700;color:#111}
-.ewp-rowComp{margin-left:auto;font-size:10px;font-weight:600;letter-spacing:.14em;
+.ewp-rowTop i{font-style:normal;font-size:20px;font-weight:700;color:#101010;margin-left:-4px}
+.ewp-rowComp{font-size:14px;font-weight:400;letter-spacing:.025em;white-space:nowrap;
+ overflow:hidden;text-overflow:ellipsis;min-width:0;
  text-transform:uppercase;color:#9a9aa3;text-align:right}
-.ewp-rowBody{padding:20px 22px 24px;text-align:center}
-.ewp-rowWhere{margin:0 0 16px;font-size:10px;font-weight:600;letter-spacing:.2em;
+.ewp-rowBody{padding:26px 22px 30px;text-align:center}
+.ewp-rowWhere{margin:0 0 22px;font-size:10px;font-weight:400;letter-spacing:normal;
  text-transform:uppercase;color:#9a9aa3}
-.ewp-rowWhere em{font-style:normal;color:#111;margin-right:9px}
+.ewp-rowWhere em{font-style:normal;font-weight:700;color:#101010;margin-right:9px}
 
 .ewp-tie{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:18px}
-.ewp-tieName{font-family:Anton,"Instrument Sans",sans-serif;font-size:40px;line-height:1.02;
+.ewp-tieName{font-family:Anton,"Instrument Sans",sans-serif;font-weight:700;font-size:40px;
+ line-height:1.02;letter-spacing:normal;
  letter-spacing:.01em;text-transform:uppercase;color:#111}
 .ewp-tieName{text-align:center}
-.ewp-tieMid{display:flex;align-items:center;gap:18px}
-.ewp-tieMid img{width:62px;height:62px;object-fit:contain;flex:none}
-.ewp-tieV{font-family:Anton,sans-serif;font-size:22px;color:#111;font-weight:400}
+.ewp-tieMid{display:flex;align-items:center;gap:22px}
+.ewp-tieMid img{width:80px;height:80px;object-fit:contain;flex:none}
+.ewp-tieV{font-family:"Instrument Sans",system-ui,sans-serif;font-size:48px;line-height:1;
+ color:#101010;font-weight:700}
 .ewp-tieScore{font-family:Anton,sans-serif;font-size:26px;color:#111;font-weight:400;white-space:nowrap}
 
-.ewp-rowCta{margin:20px 0 0;display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
-.ewp-rowCta a{display:inline-block;padding:12px 24px;border-radius:4px;font-size:13px;
+.ewp-rowCta{margin:26px 0 0;display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.ewp-rowCta a{display:inline-flex;align-items:center;justify-content:center;gap:10px;
+ min-height:50px;padding:12px 14px;border-radius:8px;text-transform:uppercase;font-size:16px;
  font-weight:700;letter-spacing:.03em;text-decoration:none;border:1px solid #CC0000;color:#CC0000}
 .ewp-rowCta a.is-primary{background:#CC0000;color:#fff}
 .ewp-rowCta a:hover{background:#CC0000;color:#fff}
-.ewp-rowCentre{margin:18px 0 0}
-.ewp-rowCentre a{font-size:16px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
+.ewp-rowCentre{margin:16px 0 0}
+.ewp-rowCentre a{display:inline-flex;align-items:center;justify-content:center;gap:10px;
+ min-height:50px;padding:12px 14px;color:#3d0000;
+ font-size:16px;font-weight:700;letter-spacing:normal;text-transform:uppercase;
  color:#111;text-decoration:none}
-.ewp-rowCentre a:hover{text-decoration:underline}
+.ewp-rowCentre a:hover span{text-decoration:underline}
+.ewp-rowCentre .ewp-ico,.ewp-rowCta .ewp-ico{width:24px;height:24px}
+.ewp-rowMore .ewp-ico{width:24px;height:24px}
 
 /* The club sides, on white above everything else, the Forest shape. */
 .ewp-teamBar{background:#fff}
