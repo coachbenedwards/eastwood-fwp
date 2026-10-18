@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.45.0
+ * Version: 2.46.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1044,6 +1044,25 @@ function ew_chrome_css() {
 	return '
 /* Every inner page has exactly one h1 and it is the page title. White on
    red, full bleed, text lined up with the 1248px column. */
+/*
+ * THE COLUMN.
+ *
+ * The reference lays 1248px of content between 96px margins at 1440. That
+ * cannot come from a max-width here: every one of these pages sits inside an
+ * Elementor row measuring 1200px, which clamps anything wider before it
+ * starts. So each container runs the full width of the viewport and its
+ * children carry the column padding instead -- which is exactly how the red
+ * title band below already lands its text on 1248.
+ *
+ * The negative margin reads 50% of the Elementor row minus half the viewport,
+ * so it works out to whatever that row happens to be and needs no number of
+ * its own.
+ */
+.ew-prose > *,.ewshop > *,.ew-teams-index > *,
+.ew-squad > *,.ew-matches > *,.ew-tv > *{
+ padding-left:max(16px,calc(50vw - 624px));
+ padding-right:max(16px,calc(50vw - 624px))}
+
 h1.elementor-heading-title,
 .ewshop h1{
  background:#CC0000;color:#fff !important;
@@ -1066,7 +1085,7 @@ h1.elementor-heading-title,
    site using neither the club typeface nor its width. The band selector
    above now covers its title; the rest is squared up here so the page
    content never has to be edited to keep up. */
-.ewshop{max-width:1280px !important;margin:0 auto !important;padding:0 16px 64px !important;
+.ewshop{max-width:none !important;margin:0 calc(50% - 50vw) !important;padding:0 0 64px !important;
  font-family:"Instrument Sans",system-ui,sans-serif !important}
 .ewshop h1{margin:0 calc(50% - 50vw) 34px !important}
 .ewshop .lede{font-size:17px;color:#5c5c5c;margin:0 0 34px}
@@ -1413,7 +1432,7 @@ function ew_matches_assets() {
 	if ( ! ew_uses_shortcode( $post, 'eastwood_matches' ) ) { return; }
 
 	$css = '
-.ew-matches{max-width:1280px;margin:0 auto;padding:0 16px 64px;font-family:"Instrument Sans",system-ui,sans-serif;color:#111}
+.ew-matches{margin:0 calc(50% - 50vw);padding:0 0 64px;font-family:"Instrument Sans",system-ui,sans-serif;color:#111}
 .ew-matches *{box-sizing:border-box}
 .ew-tabs{display:flex;gap:2px;margin:0 0 24px;border-bottom:2px solid #e3e3e3}
 .ew-tabs button{appearance:none;background:none;border:0;border-bottom:3px solid transparent;margin-bottom:-2px;
@@ -1754,7 +1773,7 @@ function ew_teams_assets() {
 	if ( ! $teams && ! $squad ) { return; }
 
 	$css = '
-.ew-teams-index,.ew-squad{max-width:1280px;margin:0 auto;padding:0 16px 64px;
+.ew-teams-index,.ew-squad{margin:0 calc(50% - 50vw);padding:0 0 64px;
  font-family:"Instrument Sans",system-ui,sans-serif;color:#111}
 .ew-teams-index *,.ew-squad *{box-sizing:border-box}
 .ew-tm-group{margin:0 0 40px}
@@ -1785,8 +1804,7 @@ a.ew-tm-card.is-external:hover{border-color:#b5b5b5;box-shadow:0 2px 10px rgba(0
    as everything else. Ours sat inside the content column as a plain white
    box with a gap above it. */
 .ew-tm-bar{background:#fff;min-height:62px;display:flex;align-items:center;
- margin:0 calc(50% - 50vw) 32px;padding:0 max(16px,calc(50vw - 624px));
- box-shadow:inset 0 -1px 0 rgba(0,0,0,.08)}
+ margin:0 0 32px;box-shadow:inset 0 -1px 0 rgba(0,0,0,.08)}
 .ew-tm-bar .ewp-teamTabs{width:100%}
 .ew-teams-index [hidden]{display:none}
 .ew-tm-side{margin:0 0 42px}
@@ -1958,7 +1976,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.45.0';
+const EW_FWP_VERSION = '2.46.0';
 
 /*
  * Parts loader.
@@ -2622,7 +2640,7 @@ function ew_tv_assets() {
 	if ( ! ew_uses_shortcode( $post, 'eastwood_tv' ) ) { return; }
 
 	$css = '
-.ew-tv{max-width:1280px;margin:0 auto;padding:0 16px 64px;font-family:"Instrument Sans",system-ui,sans-serif;color:#111}
+.ew-tv{margin:0 calc(50% - 50vw);padding:0 0 64px;font-family:"Instrument Sans",system-ui,sans-serif;color:#111}
 .ew-tv *{box-sizing:border-box}
 .ew-tv-hero{margin:0 0 44px}
 .ew-tv-player{position:relative;padding-top:56.25%;background:#000;border-radius:4px;overflow:hidden}
@@ -2757,7 +2775,7 @@ function ew_rewrite_nav( $html ) {
 
 function ew_prose_css_inline() {
 	return '
-.ew-prose{max-width:1280px;margin:0 auto;padding:0 16px 64px;
+.ew-prose{margin:0 calc(50% - 50vw);padding:0 0 64px;
  font-family:"Instrument Sans",system-ui,sans-serif;color:#111}
 /* The reference holds a 1248px column on every page, so these do too.
    A 1248px line of body copy is too long to read comfortably, so the
