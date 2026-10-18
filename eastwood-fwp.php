@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.60.0
+ * Version: 2.61.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -2176,7 +2176,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.60.0';
+const EW_FWP_VERSION = '2.61.0';
 
 /*
  * Parts loader.
@@ -4826,3 +4826,92 @@ add_action( 'template_redirect', function () {
 	get_footer();
 	exit;
 }, 7 );
+
+
+/* ------------------------------------------------------------------
+ * The page that says you are lost.
+ *
+ * The captured 404 renders the header, a news story and the footer, and
+ * says "Page not found" only in the browser tab. Nothing on the page tells
+ * anyone they have the wrong address, so a mistyped URL reads as a broken
+ * site. That is not a hypothetical: it happened twice in one afternoon,
+ * both times reported as the homepage being broken.
+ *
+ * This replaces it with the same red band every other page opens with, a
+ * plain sentence, and the places somebody was most likely heading for.
+ * ------------------------------------------------------------------ */
+
+function ew_404_destinations() {
+	return array(
+		'Home'     => '/',
+		'Matches'  => '/matches/',
+		'Teams'    => '/teams/',
+		'News'     => '/news/',
+		'Tickets'  => '/tickets/',
+		'Matchday' => '/matchday/',
+		'Shop'     => '/shop/',
+		'Contact'  => '/contact/',
+	);
+}
+
+function ew_404_css() {
+	return '
+.ew-404 h1{background:#CC0000;color:#fff;font-family:Anton,"Instrument Sans",sans-serif;
+ font-size:56px;font-weight:700;line-height:1;letter-spacing:.01em;text-transform:uppercase;
+ margin:0 calc(50% - 50vw) 0;padding:88px max(16px,calc(50vw - 624px)) 16px}
+.ew-404 .ew-prose{padding-top:40px}
+.ew-404-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(186px,1fr));
+ gap:8px;margin:0 0 32px}
+.ew-404-link{display:flex;align-items:center;min-height:62px;padding:0 20px;background:#fff;
+ border:1px solid #e6e6e6;border-left:3px solid #CC0000;border-radius:4px;
+ font-weight:600;font-size:16px;color:#111;text-decoration:none;
+ transition:border-color .15s,box-shadow .15s}
+.ew-404-link:hover{border-color:#CC0000;box-shadow:0 2px 10px rgba(0,0,0,.07)}
+.ew-404-link:focus-visible{outline:2px solid #CC0000;outline-offset:3px}
+@media(max-width:820px){
+ .ew-404 h1{font-size:38px;padding:34px 16px 30px}
+ .ew-404 .ew-prose{padding-top:28px}
+}
+';
+}
+
+function ew_404_markup() {
+	ob_start();
+	?>
+<div class="ew-404">
+	<h1>Page not found</h1>
+	<div class="ew-prose">
+		<p class="ew-lede">There is nothing at this address. It may have moved, or the link that
+			brought you here may have a mistake in it.</p>
+		<h2>Where you might have been going</h2>
+		<div class="ew-404-grid">
+			<?php foreach ( ew_404_destinations() as $label => $path ) : ?>
+			<a class="ew-404-link" href="<?php echo esc_url( home_url( $path ) ); ?>"><?php
+				echo esc_html( $label ); ?></a>
+			<?php endforeach; ?>
+		</div>
+		<p class="ew-credit">If a link on this site sent you here, tell us at
+			<a href="mailto:info@eastwoodfc.com">info@eastwoodfc.com</a> and we will put it right.</p>
+	</div>
+</div>
+	<?php
+	return trim( ob_get_clean() );
+}
+
+add_action( 'template_redirect', function () {
+	if ( is_admin() || is_feed() || is_embed() || ! is_404() ) {
+		return;
+	}
+
+	status_header( 404 );
+	nocache_headers();
+
+	add_action( 'wp_head', function () {
+		echo '<style id="ew-404-css">' . ew_prose_css_inline() . ew_404_css() . '</style>'; // phpcs:ignore
+	}, 20 );
+
+	get_header();
+	echo ew_404_markup(); // phpcs:ignore WordPress.Security.EscapeOutput
+	get_footer();
+	exit;
+}, 9 );
