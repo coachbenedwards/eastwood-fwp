@@ -209,11 +209,17 @@ function ew_hb_teams( $content ) {
 			'id'    => isset( $parts[1] ) ? (int) preg_replace( '/[^0-9]/', '', $parts[1] ) : 0,
 		);
 	}
+	foreach ( $teams as $i => $t ) {
+		if ( 0 === strcasecmp( trim( (string) $t['label'] ), 'Reserves' ) ) {
+			$teams[ $i ]['label'] = 'Development';
+		}
+	}
+
 	if ( ! $teams ) {
 		$teams = array(
 			array( 'label' => "Men's First Team", 'id' => (int) EW_TEAM ),
 			array( 'label' => "Women's First Team", 'id' => 0 ),
-			array( 'label' => 'Reserves', 'id' => 0 ),
+			array( 'label' => 'Development', 'id' => 0 ),
 			array( 'label' => 'Under 21s', 'id' => 0 ),
 		);
 	}
@@ -1636,12 +1642,13 @@ function ew_hb_css() {
    There is no red rule under the next game -- that was my own invention,
    and it is gone. Every number below is one of those measurements. */
 .ewp-strip{position:relative;background:#fff;
- margin:0 calc(50% - 50vw);padding:0 102px 0 52px;
+ margin:0 calc(50% - 50vw);padding:0 0 0 52px;
  border-bottom:1px solid rgba(0,0,0,.09)}
-.ewp-stripList{display:flex;list-style:none;margin:0;padding:0;overflow-x:auto;
+.ewp-stripList{display:flex;list-style:none;margin:0;padding:0;overflow-x:auto;cursor:grab;
  scroll-behavior:smooth;scroll-snap-type:x proximity;scrollbar-width:none;-ms-overflow-style:none}
 .ewp-stripList::-webkit-scrollbar{display:none}
-.ewp-strip .ewp-slide{flex:0 0 25%;max-width:25%;scroll-snap-align:start;
+.ewp-strip .ewp-slide{flex:0 0 calc((100% - 102px)/4);max-width:calc((100% - 102px)/4);
+ scroll-snap-align:start;
  border-right:1px solid rgba(0,0,0,.09);position:relative}
 .ewp-strip .ewp-card{display:flex;flex-direction:column;gap:0;min-height:109px;height:100%;
  padding:0;background:#fff;border:0;border-radius:0;box-shadow:none}
@@ -1668,19 +1675,35 @@ function ew_hb_css() {
 .ewp-strip .ewp-cardText b{font-size:18px;line-height:1;display:block;
  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ewp-strip .ewp-venue{font-size:14px;line-height:16px;color:#101010}
-.ewp-stripNext{position:absolute;right:0;top:0;height:100%;width:102px;border:0;cursor:pointer;
- background:linear-gradient(90deg,rgba(255,255,255,0),#fff 42%);font-size:26px;color:#101010;line-height:1}
-.ewp-stripNext:focus-visible{outline:2px solid #CC0000;outline-offset:-3px}
+/* Elementor wraps every widget in a container that adds 10px above and
+   below. On the reference nothing sits between the nav, the band and the
+   bar under it, and that 10px was reading as a stray line under the
+   strip. The block cancels its own wrapper rather than relying on anyone
+   remembering to zero it in the editor. */
+.e-con-inner:has(> .elementor-widget .ewp-strip),
+.e-con-inner:has(> .elementor-widget .ewp-promo){padding-top:0;padding-bottom:0;gap:0}
+.e-con:has(> .e-con-inner > .elementor-widget .ewp-strip),
+.e-con:has(> .e-con-inner > .elementor-widget .ewp-promo){padding-top:0;padding-bottom:0}
+
 @media(max-width:1100px){
- .ewp-strip{padding-right:72px}
- .ewp-strip .ewp-slide{flex:0 0 33.3333%;max-width:33.3333%}
- .ewp-stripNext{width:72px}
+ .ewp-strip .ewp-slide{flex:0 0 calc((100% - 72px)/3);max-width:calc((100% - 72px)/3)}
 }
 @media(max-width:700px){
  .ewp-strip{padding:0}
  .ewp-strip .ewp-slide{flex:0 0 264px;max-width:264px}
- .ewp-stripNext{display:none}
 }
+
+/* The bar the reference runs under the strip. One line, one link, and
+   both come from Promo bar in the admin menu so anyone can change them.
+   Measured off the reference: 36px tall, 18px Anton in caps on #CC0000,
+   7px above and below the line. */
+.ewp-promo{display:block;background:#CC0000;color:#fff;text-decoration:none;
+ margin:0 calc(50% - 50vw)}
+.ewp-promo b{display:block;padding:7px 16px;text-align:center;font-weight:400;
+ font-family:Anton,sans-serif;font-size:18px;line-height:22px;
+ text-transform:uppercase;letter-spacing:.01em;color:#fff}
+.ewp-promo:hover b{text-decoration:underline}
+.ewp-promo:focus-visible{outline:3px solid #fff;outline-offset:-5px}
 
 /* The slot the reference gives over to one big promotional graphic. Ours is
    type rather than artwork, because artwork would have to be made for every
@@ -1997,22 +2020,48 @@ function ew_hb_js() {
   });
  });
 
- /* The fixtures strip scrolls sideways on its own; the arrow is for a mouse.
-    It hides itself once there is nothing further to scroll to. */
- [].forEach.call(document.querySelectorAll('[data-ew-strip-next]'), function(btn){
-  var list = btn.parentNode.querySelector('.ewp-stripList');
-  if (!list) { return; }
-  var sync = function(){
-   var more = list.scrollWidth - list.clientWidth - list.scrollLeft > 8;
-   btn.style.display = more ? '' : 'none';
-  };
-  btn.addEventListener('click', function(){
-   var cell = list.querySelector('.ewp-slide');
-   list.scrollLeft += cell ? cell.getBoundingClientRect().width : 280;
+ /* Drag the strip, the way the reference does. There is no arrow on it
+    and no scrollbar, so without this a mouse has no way to reach the
+    games off the right-hand side -- a trackpad and a finger already do.
+    A press that moves less than five pixels is a click on the card, not
+    a drag, so the fixture links keep working. */
+ [].forEach.call(document.querySelectorAll('.ewp-stripList'), function(list){
+  var down = false, moved = 0, startX = 0, startLeft = 0;
+
+  list.addEventListener('pointerdown', function(e){
+   if (e.button) { return; }
+   down = true; moved = 0;
+   startX = e.clientX; startLeft = list.scrollLeft;
+   list.style.scrollBehavior = 'auto';
   });
-  list.addEventListener('scroll', sync);
-  window.addEventListener('resize', sync);
-  sync();
+
+  list.addEventListener('pointermove', function(e){
+   if (!down) { return; }
+   var dx = e.clientX - startX;
+   if (Math.abs(dx) > moved) { moved = Math.abs(dx); }
+   if (moved > 5) {
+    if (list.setPointerCapture && e.pointerId !== undefined) {
+     try { list.setPointerCapture(e.pointerId); } catch (err) {}
+    }
+    list.style.cursor = 'grabbing';
+    list.scrollLeft = startLeft - dx;
+   }
+  });
+
+  var stop = function(){
+   down = false;
+   list.style.cursor = '';
+   list.style.scrollBehavior = '';
+  };
+  list.addEventListener('pointerup', stop);
+  list.addEventListener('pointercancel', stop);
+  list.addEventListener('pointerleave', stop);
+
+  // The click that ends a drag would otherwise open whichever fixture
+  // happened to be under the finger when it stopped.
+  list.addEventListener('click', function(e){
+   if (moved > 5) { e.preventDefault(); e.stopPropagation(); moved = 0; }
+  }, true);
  });
 
  /* next-match countdown */
@@ -2047,13 +2096,13 @@ function ew_home_preview_content() {
 		. "[eastwood_home_fixtures title=\"Fixtures &amp; Results\" count=\"8\"]\n"
 		. "Men's First Team | 2059\n"
 		. "Women's First Team |\n"
-		. "Reserves |\n"
+		. "Development |\n"
 		. "Under 21s |\n"
 		. "[/eastwood_home_fixtures]\n\n"
 		. "[eastwood_home_upcoming title=\"Upcoming Matches\" count=\"3\"]\n"
 		. "Men's First Team | 2059\n"
 		. "Women's First Team |\n"
-		. "Reserves |\n"
+		. "Development |\n"
 		. "Under 21s |\n"
 		. "[/eastwood_home_upcoming]\n\n"
 		. "[eastwood_home_shop title=\"Get Kitted Out\" all_url=\"/shop/\"]\n"
@@ -2113,11 +2162,181 @@ function ew_hb_strip_sc( $atts ) {
 		$out .= ew_hb_card( $m, false );
 	}
 	$out .= '</ul>';
-	$out .= '<button type="button" class="ewp-stripNext" data-ew-strip-next aria-label="More fixtures">&#8250;</button>';
 	$out .= '</section>';
+	$out .= ew_promo_bar_html();
 	return $out;
 }
 add_shortcode( 'eastwood_home_strip', 'ew_hb_strip_sc' );
+
+/* ------------------------------------------------------------------
+ * The promo bar.
+ *
+ * One line of type on a red band, the whole thing a link. The reference
+ * runs one directly under its fixtures strip and changes it whenever the
+ * shop does, so the point of this one is that changing it needs nobody
+ * technical: Promo bar in the admin menu has a switch, a line of text and
+ * a link, and that is the whole screen.
+ *
+ * It draws itself under the fixtures strip, where the reference puts it.
+ * [eastwood_promo_bar] puts the same bar anywhere else.
+ * ------------------------------------------------------------------ */
+
+/** The three things anyone can change, with sane empties. */
+function ew_promo_settings() {
+	$saved = get_option( 'ew_promo', array() );
+	return array(
+		'on'   => ! empty( $saved['on'] ),
+		'text' => isset( $saved['text'] ) ? (string) $saved['text'] : '',
+		'url'  => isset( $saved['url'] ) ? (string) $saved['url'] : '',
+	);
+}
+
+/**
+ * The bar, or nothing at all.
+ *
+ * Nothing is the right answer more often than not: switched off, or on
+ * with no words in it. A bar with no text is a red stripe nobody meant.
+ */
+function ew_promo_bar_html() {
+	static $drawn = false;
+
+	$cfg = ew_promo_settings();
+	if ( ! $cfg['on'] || '' === trim( $cfg['text'] ) ) {
+		return '';
+	}
+
+	// Twice on one page is always a mistake, never a layout.
+	if ( $drawn ) {
+		return '';
+	}
+	$drawn = true;
+
+	$url = '' === trim( $cfg['url'] ) ? '#' : $cfg['url'];
+
+	return '<a class="ewp ewp-promo" href="' . esc_url( $url ) . '">'
+		. '<b>' . esc_html( $cfg['text'] ) . '</b></a>';
+}
+
+function ew_promo_bar_sc() {
+	return ew_promo_bar_html();
+}
+add_shortcode( 'eastwood_promo_bar', 'ew_promo_bar_sc' );
+
+/* --- The screen someone else uses ---------------------------------- */
+
+add_action( 'admin_menu', function () {
+	// Its own item in the sidebar rather than a tab inside Settings.
+	// Somebody who has been told "change the red bar" should be able to
+	// find it without being told where to look.
+	add_menu_page(
+		'Promo bar', 'Promo bar', 'edit_pages', 'ew-promo',
+		'ew_promo_admin_page', 'dashicons-megaphone', 31
+	);
+} );
+
+add_action( 'admin_init', function () {
+	register_setting( 'ew_promo_group', 'ew_promo', array(
+		'type'              => 'array',
+		'sanitize_callback' => 'ew_promo_sanitise',
+		'default'           => array(),
+	) );
+} );
+
+// Saving goes through options.php, which asks for manage_options unless
+// told otherwise. The people who will actually use this screen are
+// editors, so the save has to accept the same capability the menu does.
+add_filter( 'option_page_capability_ew_promo_group', function () {
+	return 'edit_pages';
+} );
+
+function ew_promo_sanitise( $in ) {
+	$in = (array) $in;
+	$url = trim( (string) ( $in['url'] ?? '' ) );
+
+	return array(
+		'on'   => empty( $in['on'] ) ? 0 : 1,
+		'text' => sanitize_text_field( (string) ( $in['text'] ?? '' ) ),
+		// A path typed as "/shop/" is the common case and is kept as one.
+		'url'  => '' === $url ? '' : esc_url_raw( $url ),
+	);
+}
+
+function ew_promo_admin_page() {
+	if ( ! current_user_can( 'edit_pages' ) ) {
+		return;
+	}
+	$cfg = ew_promo_settings();
+	?>
+	<div class="wrap">
+		<h1>Promo bar</h1>
+		<p style="max-width:46em;font-size:14px">
+			The red bar across the top of the homepage, under the fixtures.
+			Switch it on, write the line, point it at a page. It changes the
+			moment you save &mdash; there is nothing else to do.
+		</p>
+
+		<h2 style="margin-top:28px">What it looks like now</h2>
+		<?php if ( $cfg['on'] && '' !== trim( $cfg['text'] ) ) : ?>
+			<div style="max-width:900px;border:1px solid #c3c4c7;background:#fff">
+				<a href="#" onclick="return false" style="display:block;background:#CC0000;
+					color:#fff;text-decoration:none">
+					<b style="display:block;padding:7px 16px;text-align:center;font-weight:400;
+						font-family:Anton,Impact,sans-serif;font-size:18px;line-height:22px;
+						text-transform:uppercase;color:#fff"><?php
+						echo esc_html( $cfg['text'] ); ?></b>
+				</a>
+			</div>
+		<?php else : ?>
+			<p style="color:#646970"><em>Nothing is showing on the site at the
+				moment.</em></p>
+		<?php endif; ?>
+
+		<form method="post" action="options.php" style="margin-top:28px">
+			<?php settings_fields( 'ew_promo_group' ); ?>
+			<table class="form-table" role="presentation">
+				<tr>
+					<th scope="row">Show the bar</th>
+					<td>
+						<label>
+							<input type="checkbox" name="ew_promo[on]" value="1"
+								<?php checked( $cfg['on'] ); ?>>
+							Yes, show it on the site
+						</label>
+						<p class="description">Untick to take it down. Nothing is
+							lost &mdash; the words and the link stay here.</p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="ew-promo-text">The line</label></th>
+					<td>
+						<input type="text" id="ew-promo-text" name="ew_promo[text]"
+							class="regular-text" style="width:28em"
+							value="<?php echo esc_attr( $cfg['text'] ); ?>"
+							placeholder="20% off training wear | Shop now">
+						<p class="description">It is printed in capitals whatever you
+							type. Keep it short &mdash; it has to fit on one line on a
+							phone.</p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="ew-promo-url">Where it goes</label></th>
+					<td>
+						<input type="text" id="ew-promo-url" name="ew_promo[url]"
+							class="regular-text" style="width:28em"
+							value="<?php echo esc_attr( $cfg['url'] ); ?>"
+							placeholder="/shop/">
+						<p class="description">A page on this site, written as
+							<code>/shop/</code>, or a full web address somewhere
+							else.</p>
+					</td>
+				</tr>
+			</table>
+			<?php submit_button( 'Save the bar' ); ?>
+		</form>
+	</div>
+	<?php
+}
+
 
 
 /* ------------------------------------------------------------------
