@@ -144,6 +144,17 @@ function ew_hb_lines( $content ) {
 	return $out;
 }
 
+/**
+ * A competition's own badge, the way the reference site puts a league mark
+ * in the corner of a fixture. Football Web Pages publishes club crests but
+ * no competition graphics, so these are dropped in by hand at
+ * wp-content/uploads/ew-comps/<competition-id>.png. Until one exists the
+ * markup hides the image and the competition's name carries it instead.
+ */
+function ew_comp_badge( $id ) {
+	return content_url( '/uploads/ew-comps/' . (int) $id . '.png' );
+}
+
 /** A file shipped inside the plugin, addressed from parts/. */
 function ew_hb_asset( $rel ) {
 	return plugins_url( 'assets/' . ltrim( $rel, '/' ), dirname( __DIR__ ) . '/eastwood-fwp.php' );
@@ -468,8 +479,8 @@ function ew_hb_banner_sc( $atts ) {
 			'cta_url'        => '/eastwood-tickets/',
 			'hosp'           => 'Book Hospitality',
 			'hosp_url'       => '/eastwood-hospitality/',
-			'centre'         => '',
-			'centre_url'     => '/eastwood-matches/',
+			'centre'         => 'Match Centre',
+			'centre_url'     => '/match/',
 			'image'          => ew_hb_asset( 'banner/scarf.jpg' ),
 			'countdown'      => 'yes',
 			'featured'       => 'Featured On',
@@ -494,7 +505,9 @@ function ew_hb_banner_sc( $atts ) {
 	$away    = (array) ( $next['away-team'] ?? array() );
 	$at_home = (int) ( $home['id'] ?? 0 ) === (int) EW_TEAM;
 	$ts      = strtotime( (string) ( $next['date'] ?? '' ) . ' ' . (string) ( $next['time'] ?? '15:00' ) );
-	$comp    = (string) ( $next['competition']['name'] ?? '' );
+	$comp     = (string) ( $next['competition']['name'] ?? '' );
+	$comp_id  = (int) ( $next['competition']['id'] ?? 0 );
+	$match_id = (int) ( $next['id'] ?? 0 );
 
 	ob_start();
 	?>
@@ -503,11 +516,25 @@ function ew_hb_banner_sc( $atts ) {
 	echo '' !== $atts['image']
 		? ' style="background-image:url(' . esc_url( $atts['image'] ) . ')"'
 		: ''; ?>>
-	<div class="ewp-bannerInner">
-		<?php if ( '' !== $comp ) : ?>
-		<p class="ewp-bannerComp"><?php echo esc_html( $comp ); ?></p>
+	<div class="ewp-bannerBar">
+		<span class="ewp-bannerComp">
+			<?php if ( $comp_id ) : ?>
+			<img src="<?php echo esc_url( ew_comp_badge( $comp_id ) ); ?>" alt=""
+				onerror="this.remove()">
+			<?php endif; ?>
+			<?php if ( '' !== $comp ) : ?><em><?php echo esc_html( $comp ); ?></em><?php endif; ?>
+		</span>
+		<?php if ( $ts ) : ?>
+		<span class="ewp-bannerWhen"><b><?php echo esc_html( date_i18n( 'D j M', $ts ) ); ?></b>
+			<i><?php echo esc_html( date_i18n( 'H:i', $ts ) ); ?></i></span>
 		<?php endif; ?>
+		<?php if ( $match_id && '' !== $atts['centre'] ) : ?>
+		<a class="ewp-bannerMore" href="<?php
+			echo esc_url( home_url( $atts['centre_url'] . $match_id . '/' ) ); ?>">More info</a>
+		<?php endif; ?>
+	</div>
 
+	<div class="ewp-bannerInner">
 		<p class="ewp-bannerWhere">
 			<em><?php echo $at_home ? 'Home' : 'Away'; ?></em>
 			<?php echo esc_html( (string) ( $next['venue'] ?? '' ) ); ?>
@@ -522,11 +549,6 @@ function ew_hb_banner_sc( $atts ) {
 				onerror="this.style.visibility='hidden'">
 			<span class="ewp-bannerName"><?php echo esc_html( (string) ( $away['name'] ?? '' ) ); ?></span>
 		</div>
-
-		<?php if ( $ts ) : ?>
-		<p class="ewp-bannerWhen"><?php echo esc_html( date_i18n( 'D j M', $ts ) ); ?>
-			<b><?php echo esc_html( date_i18n( 'H:i', $ts ) ); ?></b></p>
-		<?php endif; ?>
 
 		<?php if ( $ts && 'no' !== $atts['countdown'] ) : ?>
 		<div class="ewp-bannerClock" data-ko="<?php echo esc_attr( (string) $ts ); ?>" aria-hidden="true">
@@ -546,11 +568,13 @@ function ew_hb_banner_sc( $atts ) {
 			<a href="<?php echo esc_url( home_url( $atts['hosp_url'] ) ); ?>"><?php
 				echo esc_html( $atts['hosp'] ); ?></a>
 			<?php endif; ?>
-			<?php if ( '' !== $atts['centre'] ) : ?>
-			<a href="<?php echo esc_url( home_url( $atts['centre_url'] ) ); ?>"><?php
-				echo esc_html( $atts['centre'] ); ?></a>
-			<?php endif; ?>
 		</p>
+
+		<?php if ( $match_id && '' !== $atts['centre'] ) : ?>
+		<p class="ewp-bannerCentre"><a href="<?php
+			echo esc_url( home_url( $atts['centre_url'] . $match_id . '/' ) ); ?>"><?php
+			echo esc_html( $atts['centre'] ); ?></a></p>
+		<?php endif; ?>
 
 		<?php if ( '' !== $atts['featured']
 			&& ( '' !== $atts['featured_icon'] || '' !== $atts['featured_label'] ) ) : ?>
@@ -1227,11 +1251,30 @@ function ew_hb_css() {
    band: 1248px wide, with the background showing either side. */
 .ewp-bannerWrap{background:#f3f3f3;padding:26px 16px 30px}
 .ewp-banner{max-width:1248px;margin:0 auto;border-radius:6px;overflow:hidden;
- background:#CC0000;color:#fff;padding:30px 16px 34px;text-align:center}
+ background:#CC0000;color:#fff;text-align:center}
 .ewp-banner.has-img{position:relative;background-size:cover;background-position:center;
- background-repeat:no-repeat;padding:52px 16px 56px}
+ background-repeat:no-repeat}
 .ewp-banner.has-img::before{content:"";position:absolute;inset:0;background:rgba(10,8,8,.5)}
-.ewp-banner .ewp-bannerInner{position:relative}
+.ewp-banner .ewp-bannerInner{position:relative;padding:14px 16px 48px}
+
+/* The strip across the top: whose competition, when, and the way in. */
+.ewp-bannerBar{position:relative;display:flex;align-items:center;gap:14px;
+ padding:18px 22px;text-align:left}
+.ewp-bannerComp{display:flex;align-items:center;gap:11px;min-width:0}
+.ewp-bannerComp img{height:34px;width:auto;display:block;flex:none}
+.ewp-bannerComp em{font-style:normal;font-size:10px;font-weight:600;letter-spacing:.14em;
+ text-transform:uppercase;color:rgba(255,255,255,.72);line-height:1.3}
+.ewp-bannerWhen{display:flex;align-items:baseline;gap:9px;white-space:nowrap}
+.ewp-bannerWhen b{font-family:Anton,"Instrument Sans",sans-serif;font-size:17px;
+ letter-spacing:.03em;text-transform:uppercase;color:#fff;font-weight:400}
+.ewp-bannerWhen i{font-style:normal;font-size:16px;font-weight:700;color:#fff}
+.ewp-bannerMore{margin-left:auto;font-size:12px;font-weight:600;letter-spacing:.08em;
+ text-transform:uppercase;color:rgba(255,255,255,.78);text-decoration:none;white-space:nowrap}
+.ewp-bannerMore:hover{color:#fff}
+.ewp-bannerCentre{position:relative;margin:16px 0 0}
+.ewp-bannerCentre a{font-size:15px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
+ color:#fff;text-decoration:none}
+.ewp-bannerCentre a:hover{text-decoration:underline}
 .ewp-bannerClock{display:flex;justify-content:center;gap:30px;margin:4px 0 24px}
 .ewp-bannerClock span{display:block;text-align:center}
 .ewp-bannerClock b{display:block;font-family:Anton,"Instrument Sans",sans-serif;font-size:32px;
@@ -1241,6 +1284,10 @@ function ew_hb_css() {
 @media(max-width:760px){
  .ewp-bannerClock{gap:18px}
  .ewp-bannerClock b{font-size:22px}
+ .ewp-bannerBar{flex-wrap:wrap;gap:8px 12px;padding:14px 16px}
+ .ewp-bannerComp img{height:26px}
+ .ewp-bannerMore{margin-left:0}
+ .ewp-banner .ewp-bannerInner{padding:10px 16px 34px}
 }
 .ewp-bannerInner{max-width:1180px;margin:0 auto}
 .ewp-bannerComp{margin:0 0 14px;font-size:11px;font-weight:700;letter-spacing:.14em;
@@ -1277,7 +1324,10 @@ function ew_hb_css() {
 .ewp{font-family:"Instrument Sans",system-ui,sans-serif;color:#111}
 .ewp *{box-sizing:border-box}
 .ewp-wrap{max-width:1180px;margin:0 auto;padding:0 16px}
-.ewp-fixtures .ewp-wrap{max-width:1248px}
+/* Break out of whatever container the page puts this in, so the column is
+   1248px and lines up with the title band above it. */
+.ewp-fixtures{width:100vw;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw)}
+.ewp-fixtures .ewp-wrap{max-width:1280px}
 .ewp-h2{font-family:Anton,"Instrument Sans",sans-serif;font-size:54px;letter-spacing:.02em;
  line-height:1.02;text-transform:uppercase;margin:0 0 26px;text-align:center;color:#111}
 .ewp-h2.is-light{color:#fff}
