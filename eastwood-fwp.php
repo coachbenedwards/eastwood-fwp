@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.48.0
+ * Version: 2.49.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -2045,7 +2045,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.48.0';
+const EW_FWP_VERSION = '2.49.0';
 
 /*
  * Parts loader.
@@ -3214,6 +3214,7 @@ function ew_history_content() {
 	<div class="ew-tl"><b>2023–25</b><span>Martin Ball &amp; Daryll Thomas</span></div>
 	<div class="ew-tl"><b>2025</b><span>Aaron O'Connor <i>(interim)</i></span></div>
 	<div class="ew-tl"><b>2025–26</b><span>Willis Francis</span></div>
+	<div class="ew-tl"><b>2026–</b><span>Billy Bennett &amp; Kieren Fenton</span></div>
 </div>
 
 <h2>FA Youth Cup</h2>
