@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.47.0
+ * Version: 2.48.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1769,15 +1769,40 @@ function ew_player_positions() {
 	);
 }
 
+/**
+ * Players who have featured this season but are no longer in the squad.
+ *
+ * The squad is built from the appearances feed, which by its nature keeps
+ * anyone who has played a minute all season. A player who has left is still
+ * in that data and has to be named here to come off the page. Their
+ * appearances and goals are untouched and still count in the season record;
+ * this list governs the squad page only.
+ *
+ * Matching ignores case and treats a curly apostrophe and a straight one as
+ * the same character, because the feed uses the curly one.
+ */
+function ew_squad_departed() {
+	return array(
+		'Steven Johnson-Fikula',
+		'Revarnelle James',
+		'Kieren Fenton',
+		'L’Varn Brandy',
+		'Rashaan Frances',
+		'Harry Wood',
+		'Bradley Gascoigne',
+	);
+}
+
 function ew_squad_shortcode() {
 	ob_start();
 	?>
 <div class="ew-squad" data-team="<?php echo esc_attr( EW_TEAM ); ?>"
-	data-positions="<?php echo esc_attr( (string) wp_json_encode( ew_player_positions() ) ); ?>">
+	data-positions="<?php echo esc_attr( (string) wp_json_encode( ew_player_positions() ) ); ?>"
+	data-departed="<?php echo esc_attr( (string) wp_json_encode( ew_squad_departed() ) ); ?>">
 	<div class="ew-sq-top"><p class="ew-loading">Loading the squad…</p></div>
 	<div class="ew-sq-body"></div>
-	<p class="ew-credit">Updated as each match is recorded. The list covers every player who has featured
-		for the first team this season.</p>
+	<p class="ew-credit">The current first-team squad, with appearances and goals from this season.
+		Updated as each match is recorded.</p>
 </div>
 	<?php
 	return trim( ob_get_clean() );
@@ -1921,17 +1946,28 @@ function build(apps,gls){
  // The reference lists the squad under Goalkeepers, Defenders, Midfielders
  // and Forwards. Anyone the position list does not name keeps their place on
  // the page in a group at the end rather than disappearing from it.
+ // The feed spells at least one name with a curly apostrophe, so names are
+ // compared with the apostrophes levelled and the spacing collapsed.
+ function nkey(n){return String(n||'').toLowerCase()
+   .replace(/[\u2018\u2019\u02bc\u00b4`]/g,"'").replace(/\s+/g,' ').trim();}
+
  var POS={};
  try{POS=JSON.parse(root.getAttribute('data-positions')||'{}');}catch(e){}
  var key={};
- Object.keys(POS).forEach(function(n){key[n.toLowerCase().trim()]=POS[n];});
+ Object.keys(POS).forEach(function(n){key[nkey(n)]=POS[n];});
+
+ var GONE={};
+ try{(JSON.parse(root.getAttribute('data-departed')||'[]')||[])
+   .forEach(function(n){GONE[nkey(n)]=1;});}catch(e){}
+ rows=rows.filter(function(r){return !GONE[nkey(r.name)];});
+ if(!rows.length){return fail('No squad to show just now.');}
 
  var groups=[['gk','Goalkeepers'],['df','Defenders'],['mf','Midfielders'],
              ['fw','Forwards'],['','Squad']];
  var bucket={};
  groups.forEach(function(g){bucket[g[0]]=[];});
  rows.forEach(function(r){
-  var k=key[r.name.toLowerCase().trim()];
+  var k=key[nkey(r.name)];
   if(!bucket[k]){k='';}
   bucket[k].push(r);
  });
@@ -2009,7 +2045,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.47.0';
+const EW_FWP_VERSION = '2.48.0';
 
 /*
  * Parts loader.
