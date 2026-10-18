@@ -1326,9 +1326,8 @@ function ew_matches_shortcode( $atts ) {
 		return '';
 	}
 
-	$out  = ew_hb_banner_sc( array( 'countdown' => 'yes' ) );
-	$out .= ew_hb_fixtures_sc(
-		array( 'title' => '', 'open' => $open ),
+	$out = ew_hb_fixtures_sc(
+		array( 'title' => '', 'open' => $open, 'hero' => 'yes' ),
 		"Men's First Team | " . EW_TEAM . "\nWomen's First Team |\nReserves |\nUnder 21s |"
 	);
 	$out .= '<p class="ewp-credit">Fixtures, results and standings supplied by Football Web Pages.</p>';

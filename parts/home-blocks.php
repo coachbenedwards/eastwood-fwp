@@ -599,6 +599,7 @@ function ew_hb_fixtures_sc( $atts, $content = '' ) {
 			'count'      => '0',
 			'open'       => 'fixtures',
 			'layout'     => 'list',
+			'hero'       => 'no',
 			'cta'        => 'Buy Tickets',
 			'cta_url'    => '/eastwood-tickets/',
 			'hosp'       => 'Book Hospitality',
@@ -683,6 +684,11 @@ function ew_hb_fixtures_sc( $atts, $content = '' ) {
 				<div class="ewp-panel<?php echo $list ? ' ewp-wrap' : ''; ?>"
 					data-pv-panel="fixtures"<?php echo 'fixtures' === $open ? '' : ' hidden'; ?>>
 					<?php
+					// Forest put the next game, enlarged, between the tabs and
+					// the list — inside Fixtures, not above the whole section.
+					if ( 'no' !== $atts['hero'] && (int) $team['id'] === (int) EW_TEAM ) {
+						echo ew_hb_banner_sc( array() ); // phpcs:ignore
+					}
 					$show = $n ? array_slice( $todo, 0, $n ) : $todo;
 					echo $list // phpcs:ignore
 						? ew_hb_list( $show, $opts, 'No fixtures published yet.' )
@@ -1346,6 +1352,7 @@ function ew_hb_css() {
 /* The matches page: a month, then one full-width panel per fixture.
    Same tie layout as the banner, white instead of a photograph. */
 .ewp-month{margin:30px 0 14px;text-align:center;font-size:18px;font-weight:700;color:#212121}
+.ewp-panel > .ewp-bannerWrap{margin:0 0 6px;padding-left:0;padding-right:0}
 .ewp-credit{max-width:1248px;margin:0 auto;padding:26px 16px 44px;text-align:center;
  font-size:12px;color:#9a9aa3}
 .ewp-rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
