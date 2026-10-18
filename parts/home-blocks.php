@@ -161,6 +161,31 @@ function ew_comp_badge( $id ) {
 	return file_exists( $ship ) ? ew_hb_asset( 'comps/' . $id . '.png' ) : '';
 }
 
+/**
+ * The small line icons the big fixture uses. Drawn inline so they take the
+ * colour of the text beside them and need no extra request.
+ */
+function ew_hb_icon( $name ) {
+	$open = '<svg class="ewp-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+		. ' stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
+	$paths = array(
+		// a lowercase i in a ring, the way a site marks more detail
+		'info'   => '<circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 7.6v.1"/>',
+		// a ticket with a torn middle
+		'ticket' => '<path d="M3 8.5V6.6A1.6 1.6 0 0 1 4.6 5h14.8A1.6 1.6 0 0 1 21 6.6v1.9'
+			. 'a3.5 3.5 0 0 0 0 7v1.9a1.6 1.6 0 0 1-1.6 1.6H4.6A1.6 1.6 0 0 1 3 17.4v-1.9'
+			. 'a3.5 3.5 0 0 0 0-7Z"/><path d="M14 7.5v2"/><path d="M14 14.5v2"/>',
+		// a cloche, for hospitality
+		'dine'   => '<path d="M3.5 17.5h17"/><path d="M4.8 14.5a7.2 7.2 0 0 1 14.4 0"/>'
+			. '<path d="M12 7.3V5.6"/><circle cx="12" cy="4.4" r="1.1"/>',
+		// a football, for the match centre
+		'ball'   => '<circle cx="12" cy="12" r="9"/><path d="m12 7.4 3.6 2.6-1.4 4.3H9.8L8.4 10Z"/>'
+			. '<path d="M12 3v4.4"/><path d="m3.4 9.6 5 .4"/><path d="m20.6 9.6-5 .4"/>'
+			. '<path d="m6.6 19.3 3.2-4.9"/><path d="m17.4 19.3-3.2-4.9"/>',
+	);
+	return isset( $paths[ $name ] ) ? $open . $paths[ $name ] . '</svg>' : '';
+}
+
 /** A file shipped inside the plugin, addressed from parts/. */
 function ew_hb_asset( $rel ) {
 	return plugins_url( 'assets/' . ltrim( $rel, '/' ), dirname( __DIR__ ) . '/eastwood-fwp.php' );
@@ -529,16 +554,21 @@ function ew_hb_banner_sc( $atts ) {
 			<img src="<?php echo esc_url( $comp_img ); ?>" alt=""
 				onerror="this.remove()">
 			<?php endif; ?>
-			<?php if ( '' !== $comp ) : ?><em><?php echo esc_html( $comp ); ?></em><?php endif; ?>
 		</span>
 		<?php if ( $ts ) : ?>
 		<span class="ewp-bannerWhen"><b><?php echo esc_html( date_i18n( 'D j M', $ts ) ); ?></b>
 			<i><?php echo esc_html( date_i18n( 'H:i', $ts ) ); ?></i></span>
 		<?php endif; ?>
-		<?php if ( $match_id && '' !== $atts['centre'] ) : ?>
-		<a class="ewp-bannerMore" href="<?php
-			echo esc_url( home_url( $atts['centre_url'] . $match_id . '/' ) ); ?>">More info</a>
-		<?php endif; ?>
+		<span class="ewp-bannerRight">
+			<?php if ( '' !== $comp ) : ?>
+			<em class="ewp-bannerCompName"><?php echo esc_html( $comp ); ?></em>
+			<?php endif; ?>
+			<?php if ( $match_id && '' !== $atts['centre'] ) : ?>
+			<a class="ewp-bannerMore" title="More info" aria-label="More info" href="<?php
+				echo esc_url( home_url( $atts['centre_url'] . $match_id . '/' ) ); ?>"><?php
+				echo ew_hb_icon( 'info' ); // phpcs:ignore ?></a>
+			<?php endif; ?>
+		</span>
 	</div>
 
 	<div class="ewp-bannerInner">
@@ -569,18 +599,21 @@ function ew_hb_banner_sc( $atts ) {
 		<p class="ewp-bannerCta">
 			<?php if ( $at_home && '' !== $atts['cta'] ) : ?>
 			<a class="is-primary" href="<?php echo esc_url( home_url( $atts['cta_url'] ) ); ?>"><?php
-				echo esc_html( $atts['cta'] ); ?></a>
+				echo ew_hb_icon( 'ticket' ); // phpcs:ignore ?><span><?php
+				echo esc_html( $atts['cta'] ); ?></span></a>
 			<?php endif; ?>
 			<?php if ( $at_home && '' !== $atts['hosp'] ) : ?>
 			<a href="<?php echo esc_url( home_url( $atts['hosp_url'] ) ); ?>"><?php
-				echo esc_html( $atts['hosp'] ); ?></a>
+				echo ew_hb_icon( 'dine' ); // phpcs:ignore ?><span><?php
+				echo esc_html( $atts['hosp'] ); ?></span></a>
 			<?php endif; ?>
 		</p>
 
 		<?php if ( $match_id && '' !== $atts['centre'] ) : ?>
 		<p class="ewp-bannerCentre"><a href="<?php
 			echo esc_url( home_url( $atts['centre_url'] . $match_id . '/' ) ); ?>"><?php
-			echo esc_html( $atts['centre'] ); ?></a></p>
+			echo ew_hb_icon( 'ball' ); // phpcs:ignore ?><span><?php
+			echo esc_html( $atts['centre'] ); ?></span></a></p>
 		<?php endif; ?>
 
 		<?php if ( '' !== $atts['featured']
@@ -1262,61 +1295,74 @@ function ew_hb_css() {
 .ewp-banner.has-img{position:relative;background-size:cover;background-position:center;
  background-repeat:no-repeat}
 .ewp-banner.has-img::before{content:"";position:absolute;inset:0;background:rgba(10,8,8,.5)}
-.ewp-banner .ewp-bannerInner{position:relative;padding:14px 16px 20px}
+.ewp-banner .ewp-bannerInner{position:relative;padding:14px 16px 28px}
 
 /* The strip across the top: whose competition, when, and the way in. */
 .ewp-bannerBar{position:relative;display:flex;align-items:center;gap:14px;
- padding:18px 22px;text-align:left}
-.ewp-bannerComp{display:flex;align-items:center;gap:11px;min-width:0}
-.ewp-bannerComp img{height:34px;width:auto;display:block;flex:none}
+ padding:16px 22px;text-align:left}
+/* The competition and kick-off also appear lower down in the older layout,
+   where they carry margins. Inside the strip they must not. */
+.ewp-bannerBar .ewp-bannerComp,.ewp-bannerBar .ewp-bannerWhen{margin:0}
+.ewp-bannerComp{display:flex;align-items:center;gap:11px;min-width:0;flex:none}
+.ewp-bannerComp img{height:40px;width:auto;display:block;flex:none}
+.ewp-bannerRight{display:flex;align-items:center;gap:14px;margin-left:auto;min-width:0}
+.ewp-bannerCompName{font-style:normal;font-size:10px;font-weight:600;letter-spacing:.16em;
+ text-transform:uppercase;color:rgba(255,255,255,.72);text-align:right;line-height:1.3;
+ white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ewp-ico{width:19px;height:19px;flex:none;display:block}
 .ewp-bannerComp em{font-style:normal;font-size:10px;font-weight:600;letter-spacing:.14em;
  text-transform:uppercase;color:rgba(255,255,255,.72);line-height:1.3}
 .ewp-bannerWhen{display:flex;align-items:baseline;gap:9px;white-space:nowrap}
-.ewp-bannerWhen b{font-family:Anton,"Instrument Sans",sans-serif;font-size:17px;
+.ewp-bannerWhen b{font-family:Anton,"Instrument Sans",sans-serif;font-size:20px;
  letter-spacing:.03em;text-transform:uppercase;color:#fff;font-weight:400}
-.ewp-bannerWhen i{font-style:normal;font-size:16px;font-weight:700;color:#fff}
-.ewp-bannerMore{margin-left:auto;font-size:12px;font-weight:600;letter-spacing:.08em;
+.ewp-bannerWhen i{font-style:normal;font-size:20px;font-weight:700;color:#fff}
+.ewp-bannerMore{display:flex;align-items:center;flex:none;
  text-transform:uppercase;color:rgba(255,255,255,.78);text-decoration:none;white-space:nowrap}
 .ewp-bannerMore:hover{color:#fff}
-.ewp-bannerCentre{position:relative;margin:16px 0 0}
-.ewp-bannerCentre a{font-size:15px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
+.ewp-bannerCentre{position:relative;margin:28px 0 0}
+.ewp-bannerCentre a{display:inline-flex;align-items:center;gap:10px;
+ font-size:15px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
  color:#fff;text-decoration:none}
-.ewp-bannerCentre a:hover{text-decoration:underline}
-.ewp-bannerClock{display:flex;justify-content:center;gap:30px;margin:4px 0 24px}
+.ewp-bannerCentre a:hover span{text-decoration:underline}
+.ewp-bannerCentre .ewp-ico{width:21px;height:21px}
+.ewp-bannerClock{display:flex;justify-content:center;gap:34px;margin:40px 0 28px}
 .ewp-bannerClock span{display:block;text-align:center}
-.ewp-bannerClock b{display:block;font-family:Anton,"Instrument Sans",sans-serif;font-size:32px;
+.ewp-bannerClock b{display:block;font-family:Anton,"Instrument Sans",sans-serif;font-size:24px;
  line-height:1;color:#fff}
-.ewp-bannerClock i{display:block;margin-top:5px;font-style:normal;font-size:9px;letter-spacing:.17em;
+.ewp-bannerClock i{display:block;margin-top:7px;font-style:normal;font-size:12px;letter-spacing:.14em;
  text-transform:uppercase;color:rgba(255,255,255,.62)}
 @media(max-width:760px){
  .ewp-bannerClock{gap:18px}
- .ewp-bannerClock b{font-size:22px}
+ .ewp-bannerClock b{font-size:20px}
  .ewp-bannerBar{flex-wrap:wrap;gap:8px 12px;padding:14px 16px}
  .ewp-bannerComp img{height:26px}
- .ewp-bannerMore{margin-left:0}
+ .ewp-bannerRight{margin-left:0;width:100%;justify-content:space-between}
+ .ewp-bannerCompName{white-space:normal;text-align:left}
+ .ewp-bannerCta a{min-height:46px;padding:0 20px}
  .ewp-banner .ewp-bannerInner{padding:10px 16px 16px}
  .ewp-bannerFeat{margin-top:28px}
 }
 .ewp-bannerInner{max-width:1180px;margin:0 auto}
 .ewp-bannerComp{margin:0 0 14px;font-size:11px;font-weight:700;letter-spacing:.14em;
  text-transform:uppercase;color:rgba(255,255,255,.78)}
-.ewp-bannerWhere{margin:0 0 20px;font-size:10px;font-weight:600;letter-spacing:.2em;
+.ewp-bannerWhere{margin:0 0 30px;font-size:11px;font-weight:600;letter-spacing:.2em;
  text-transform:uppercase;color:rgba(255,255,255,.72)}
 .ewp-bannerWhere em{font-style:normal;color:#fff;margin-right:10px}
-.ewp-bannerTie{display:flex;align-items:center;justify-content:center;gap:20px;flex-wrap:wrap}
-.ewp-bannerName{font-family:Anton,"Instrument Sans",sans-serif;font-size:40px;line-height:1;
+.ewp-bannerTie{display:flex;align-items:center;justify-content:center;gap:24px;flex-wrap:wrap}
+.ewp-bannerName{font-family:Anton,"Instrument Sans",sans-serif;font-size:48px;line-height:1;
  letter-spacing:.01em;text-transform:uppercase}
-.ewp-bannerTie img{width:76px;height:76px;object-fit:contain}
-.ewp-bannerV{font-family:Anton,sans-serif;font-size:18px;color:rgba(255,255,255,.6)}
+.ewp-bannerTie img{width:80px;height:80px;object-fit:contain}
+.ewp-bannerV{font-family:Anton,sans-serif;font-size:22px;color:rgba(255,255,255,.75)}
 .ewp-bannerWhen{margin:20px 0 22px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;
  color:rgba(255,255,255,.85)}
 .ewp-bannerWhen b{margin-left:6px}
-.ewp-bannerCta{margin:0;display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
-.ewp-bannerCta a{display:inline-block;padding:13px 26px;font-size:12px;font-weight:700;
+.ewp-bannerCta{margin:0;display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+.ewp-bannerCta a{display:inline-flex;align-items:center;justify-content:center;gap:11px;
+ min-height:50px;padding:0 28px;font-size:13px;font-weight:700;
  letter-spacing:.12em;text-transform:uppercase;text-decoration:none;color:#fff;
  border:1px solid rgba(255,255,255,.55)}
 .ewp-bannerCta a.is-primary{background:#fff;color:#CC0000;border-color:#fff}
-.ewp-bannerFeat{display:flex;align-items:center;justify-content:center;gap:11px;margin:40px 0 0}
+.ewp-bannerFeat{display:flex;align-items:center;justify-content:center;gap:11px;margin:46px 0 0}
 .ewp-bannerFeat > span{font-size:10px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;
  color:rgba(255,255,255,.62)}
 .ewp-bannerFeat a{display:inline-flex;align-items:center;gap:8px;text-decoration:none;color:#fff}
