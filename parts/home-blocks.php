@@ -341,6 +341,7 @@ function ew_hb_panel( $m, $opts = array() ) {
 	<div class="ewp-rowTop">
 		<?php if ( '' !== $badge ) : ?>
 		<span class="ewp-rowBadge"><img src="<?php echo esc_url( $badge ); ?>" alt=""
+			loading="lazy" decoding="async"
 			onerror="this.parentNode.remove()"></span>
 		<?php endif; ?>
 		<b><?php echo esc_html( $ts ? date_i18n( 'D j M', $ts ) : '' ); ?></b>
@@ -369,6 +370,7 @@ function ew_hb_panel( $m, $opts = array() ) {
 			<span class="ewp-tieName"><?php echo esc_html( (string) ( $home['name'] ?? '' ) ); ?></span>
 			<span class="ewp-tieMid">
 				<img src="<?php echo esc_url( ew_home_badge( $home['id'] ?? 0 ) ); ?>" alt=""
+					loading="lazy" decoding="async"
 					onerror="this.style.visibility='hidden'">
 				<?php if ( $opts['done'] ) : ?>
 				<b class="ewp-tieScore"><?php
@@ -378,6 +380,7 @@ function ew_hb_panel( $m, $opts = array() ) {
 				<b class="ewp-tieV">V</b>
 				<?php endif; ?>
 				<img src="<?php echo esc_url( ew_home_badge( $away['id'] ?? 0 ) ); ?>" alt=""
+					loading="lazy" decoding="async"
 					onerror="this.style.visibility='hidden'">
 			</span>
 			<span class="ewp-tieName"><?php echo esc_html( (string) ( $away['name'] ?? '' ) ); ?></span>
@@ -1758,6 +1761,22 @@ function ew_hb_css() {
 
 function ew_hb_js() {
 	return <<<'JS'
+/* A crest that came back 429 is not a missing crest, it is a throttled one.
+   Give each failed badge a single retry a moment later before giving up,
+   so a burst of requests does not leave a card permanently blank. */
+(function(){
+ document.addEventListener('error', function(e){
+  var img = e.target;
+  if (!img || img.tagName !== 'IMG' || img.dataset.ewRetried) { return; }
+  if (!/\/(ew-badges|ew-comps|comps)\//.test(img.src)) { return; }
+  img.dataset.ewRetried = '1';
+  var src = img.src;
+  setTimeout(function(){
+   img.style.visibility = '';
+   img.src = src + (src.indexOf('?') > -1 ? '&' : '?') + 'r=1';
+  }, 1200 + Math.random() * 1800);
+ }, true);
+})();
 (function(){
  var roots=[].slice.call(document.querySelectorAll('.ewp-fixtures, .ewp-upcoming, .ew-teams-index'));
  roots.forEach(function(root){
