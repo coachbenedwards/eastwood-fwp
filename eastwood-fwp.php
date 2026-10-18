@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.49.0
+ * Version: 2.50.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1726,8 +1726,7 @@ function ew_teams_shortcode() {
 		<?php if ( 'squad' === $kind ) : ?>
 		<?php echo ew_squad_shortcode(); // phpcs:ignore ?>
 		<?php elseif ( 'grassroots' === $kind ) : ?>
-		<p class="ew-credit">Twenty-nine teams play out of Coronation Park, from under-7s upwards.
-			New players are welcome across every section &mdash;
+		<p class="ew-credit">New players are welcome across every section &mdash;
 			<a href="mailto:grassroots@eastwoodfc.com">grassroots@eastwoodfc.com</a>.</p>
 		<?php else : ?>
 		<p class="ew-credit"><?php echo esc_html( $side ); ?> squad details are being added.</p>
@@ -1801,8 +1800,6 @@ function ew_squad_shortcode() {
 	data-departed="<?php echo esc_attr( (string) wp_json_encode( ew_squad_departed() ) ); ?>">
 	<div class="ew-sq-top"><p class="ew-loading">Loading the squad…</p></div>
 	<div class="ew-sq-body"></div>
-	<p class="ew-credit">The current first-team squad, with appearances and goals from this season.
-		Updated as each match is recorded.</p>
 </div>
 	<?php
 	return trim( ob_get_clean() );
@@ -1917,7 +1914,7 @@ function build(apps,gls){
  var rows=players.map(function(p){
   var a=p.appearances||[];
   // Shirt numbers are per match at this level, not fixed squad numbers,
-  // so show the one worn most often and say so on the page.
+  // so the one shown is whichever the player has worn most often.
   var tally={},best=null;
   a.forEach(function(x){
    if(!x.shirt){return;}
@@ -1990,9 +1987,7 @@ function build(apps,gls){
   .map(function(g){
     return '<h2 class="ew-sq-group">'+g[1]+'</h2>'
       +'<ul class="ew-sq-grid">'+bucket[g[0]].map(card).join('')+'</ul>';
-  }).join('')
-  +'<p class="ew-key" style="margin-top:14px">Shirt numbers are the number each player has worn most often.'
-  +' <span class="ew-sq-armband">C</span> marks a player who has captained the side.</p>';
+  }).join('');
 }
 
 Promise.all([
@@ -2045,7 +2040,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.49.0';
+const EW_FWP_VERSION = '2.50.0';
 
 /*
  * Parts loader.
@@ -3158,83 +3153,21 @@ a.ew-wall-item:hover{border-color:#CC0000;box-shadow:0 2px 10px rgba(0,0,0,.07)}
 }
 add_action( 'wp_enqueue_scripts', 'ew_commercial_assets', 21 );
 
-/* ------------------------------------------------------------------
- * Club History.
+/**
+ * The club history page.
  *
- * Deliberately not carried over from the old Pitchero article, which
- * was written under the previous ownership and has aged badly: it
- * names a different owner, announces an academy as "scheduled for next
- * year" that now exists and runs, counts 28 junior teams against
- * today's 22, and presents the Benfica and Mango Football arrangements
- * as current without anybody having checked whether they still are.
- *
- * What is here instead comes from records rather than prose: the
- * manager list the club keeps, its FA Youth Cup results, and the
- * club's own announcements from this year. The one thing missing is
- * the story of the change of ownership, which is Ben's to tell and is
- * not invented here.
- *
- * Published without a navigation link on purpose — where it belongs in
- * the menu is still open.
- * ------------------------------------------------------------------ */
-
+ * The previous version carried a founding date, a list of 2026 milestones,
+ * the first team managers going back to 2014, an FA Youth Cup record season
+ * by season and a count of the teams the club runs. Ben does not believe
+ * that material is right, so none of it is published while it is unverified.
+ * It is not lost: it is in this file up to and including the commit that
+ * replaced it, and can be restored a section at a time as each is confirmed.
+ */
 function ew_history_content() {
 	return <<<'HTML'
 <div class="ew-prose">
 
-<p class="ew-lede">Eastwood Community Football Club was founded in 2014 and plays at Coronation Park on Chewton Street. The Red Badgers.</p>
-
-<h2>Where the club is now</h2>
-
-<p>2026 has been the busiest year in the club's short history.</p>
-
-<ul>
-	<li><b>A kit deal with Nike</b>, announced in May, covering the first team, training wear, the academy and the junior sides — the club's stated reason being that if the ambition is to build the best club in Nottinghamshire, the standards have to match at every level.</li>
-	<li><b>A five-year ground-share with Punjab United</b>, who play their home games at Coronation Park. Punjab United were founded in 1966 and marked their 60th anniversary in the same year the partnership began.</li>
-	<li><b>A new beer garden and outdoor viewing area</b>, opened in June for the World Cup and built as a social space for the town rather than only for matchdays.</li>
-	<li><b>The academy</b>, a full-time elite programme combining football development with a BTEC Level 3, now running at Coronation Park.</li>
-	<li><b>This Is Eastwood</b>, the club's own documentary series, following the first team through the season with a new episode every week.</li>
-</ul>
-
-<h2>First team managers</h2>
-
-<div class="ew-timeline">
-	<div class="ew-tl"><b>2014</b><span>Tony Clarke</span></div>
-	<div class="ew-tl"><b>2014–16</b><span>Paul MacFarlane</span></div>
-	<div class="ew-tl"><b>2016</b><span>Matt McCaul</span></div>
-	<div class="ew-tl"><b>2016–17</b><span>Jez Corthorn &amp; Jonathan Wass</span></div>
-	<div class="ew-tl"><b>2017–19</b><span>Dave Marlow &amp; Jonathan Wass</span></div>
-	<div class="ew-tl"><b>2019</b><span>David Lilley <i>(interim)</i></span></div>
-	<div class="ew-tl"><b>2019–21</b><span>James Jepson</span></div>
-	<div class="ew-tl"><b>2021</b><span>Alexander Shayler <i>(interim)</i></span></div>
-	<div class="ew-tl"><b>2021</b><span>Stephen Kirkham</span></div>
-	<div class="ew-tl"><b>2021–22</b><span>Alexander Shayler &amp; Paul Rockley</span></div>
-	<div class="ew-tl"><b>2022</b><span>Paul Rockley</span></div>
-	<div class="ew-tl"><b>2022–23</b><span>Nick Labbate</span></div>
-	<div class="ew-tl"><b>2023–25</b><span>Martin Ball &amp; Daryll Thomas</span></div>
-	<div class="ew-tl"><b>2025</b><span>Aaron O'Connor <i>(interim)</i></span></div>
-	<div class="ew-tl"><b>2025–26</b><span>Willis Francis</span></div>
-	<div class="ew-tl"><b>2026–</b><span>Billy Bennett &amp; Kieren Fenton</span></div>
-</div>
-
-<h2>FA Youth Cup</h2>
-
-<p>The club's junior section has entered the FA Youth Cup every season since 2017 bar one, reaching the second qualifying round three times.</p>
-
-<ul>
-	<li><b>2017/18</b> — beat Deeping Rangers 5–2, out to Belper Town in the first qualifying round</li>
-	<li><b>2018/19</b> — out to Cleethorpes Town in the preliminary round</li>
-	<li><b>2019/20</b> — past Lutterworth Athletic and West Bridgford to the second qualifying round</li>
-	<li><b>2020/21</b> — out to Mickleover Sports</li>
-	<li><b>2021/22</b> — out to Grantham Town</li>
-	<li><b>2023/24</b> — through against Dunkirk, beat Boston United 3–0 away, out to Heather St John</li>
-	<li><b>2024/25</b> — beat Deeping Rangers 5–0 and Alfreton Town 2–0, out to Gresley in the second qualifying round</li>
-	<li><b>2025/26</b> — beat Ilkeston Town 2–1, out to Aylestone Park</li>
-</ul>
-
-<h2>One club, one community</h2>
-
-<p>Eastwood runs 29 teams across senior, junior, mini and girls' football, from the first team down to the Soccer School. That breadth is the point of the place: the first team is the shop window, but most of what happens at Coronation Park in a given week has nothing to do with it.</p>
+<p class="ew-lede">Coming soon.</p>
 
 </div>
 HTML;
