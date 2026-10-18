@@ -410,7 +410,7 @@ function ew_hb_panel( $m, $opts = array() ) {
 		<?php endif; ?>
 	</div>
 
-	<?php if ( ! $opts['done'] && '' !== $opts['featured'] ) : ?>
+	<?php if ( ! $opts['done'] && $at_home && '' !== $opts['featured'] ) : ?>
 	<div class="ewp-rowFoot">
 		<span><?php echo esc_html( $opts['featured'] ); ?></span>
 		<?php if ( '' !== $opts['featured_icon'] ) : ?>
@@ -692,7 +692,7 @@ function ew_hb_banner_sc( $atts ) {
 			echo esc_html( $atts['centre'] ); ?></span></a></p>
 		<?php endif; ?>
 
-		<?php if ( '' !== $atts['featured']
+		<?php if ( $at_home && '' !== $atts['featured']
 			&& ( '' !== $atts['featured_icon'] || '' !== $atts['featured_label'] ) ) : ?>
 		<p class="ewp-bannerFeat">
 			<span><?php echo esc_html( $atts['featured'] ); ?></span>
