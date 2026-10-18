@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.53.0
+ * Version: 2.54.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1381,6 +1381,16 @@ function ew_rewrite_markup( $html ) {
 		$html
 	);
 
+	/*
+	 * One shop card carries a stray </p> straight after its opening anchor,
+	 * which closes the link immediately: the card ends up outside it, so the
+	 * product is not clickable and the link has no name. The markup is in
+	 * the shop plugin rather than this one, so it is corrected on the way
+	 * out. Harmless once that source is fixed, because then there is nothing
+	 * left to match.
+	 */
+	$html = preg_replace( '#(<a\b[^>]*class="ewshop-card"[^>]*>)</p>#', '$1', $html );
+
 	return ew_rewrite_nav( $html );
 }
 
@@ -2073,7 +2083,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.53.0';
+const EW_FWP_VERSION = '2.54.0';
 
 /*
  * Parts loader.
@@ -2331,6 +2341,52 @@ add_action( 'init', function () {
 	}
 	update_option( 'ew_retired_pages', EW_RETIRE_V );
 }, 21 );
+
+/**
+ * A description for search engines, taken from the words already on the page.
+ *
+ * Not one page on the site had one, so a search engine wrote its own from
+ * whatever text it found first. This takes the page lede instead, which is
+ * the sentence each page already opens with, so nothing is invented and
+ * nothing has to be kept in step by hand.
+ *
+ * A page with no lede, or one too short to say anything (the club history
+ * page currently reads "Coming soon"), gets nothing rather than something
+ * useless. Those need a line written for them.
+ */
+function ew_meta_description( $content ) {
+	$text = '';
+	if ( preg_match( '#<p[^>]*class="[^"]*ew-lede[^"]*"[^>]*>(.*?)</p>#s', $content, $m ) ) {
+		$text = $m[1];
+	} elseif ( preg_match( '#<p[^>]*>(.*?)</p>#s', $content, $m ) ) {
+		$text = $m[1];
+	}
+	$text = trim( preg_replace( '#\s+#', ' ', wp_strip_all_tags( $text ) ) );
+	if ( mb_strlen( $text ) < 50 ) {
+		return '';
+	}
+	if ( mb_strlen( $text ) > 158 ) {
+		$cut  = mb_substr( $text, 0, 158 );
+		$stop = mb_strrpos( $cut, ' ' );
+		$text = rtrim( false === $stop ? $cut : mb_substr( $cut, 0, $stop ), ' ,;:' ) . '…';
+	}
+	return $text;
+}
+
+add_action( 'wp_head', function () {
+	if ( ! is_singular() ) {
+		return;
+	}
+	$post = get_post();
+	if ( ! $post ) {
+		return;
+	}
+	$desc = ew_meta_description( (string) $post->post_content );
+	if ( '' === $desc ) {
+		return;
+	}
+	echo '<meta name="description" content="' . esc_attr( $desc ) . '">' . "\n";
+}, 1 );
 
 /* The old addresses, kept alive for anything already pointing at them. */
 add_action( 'template_redirect', function () {
@@ -3698,7 +3754,13 @@ add_action( 'template_redirect', function () {
 	}
 
 	add_action( 'wp_head', function () {
-		echo '<style id="ew-home">' . ew_home_css() . '</style>';
+		/*
+		 * This used to be id="ew-home", which is also the id of the star in
+		 * the icon sprite. The stylesheet is printed in the head and the
+		 * sprite much further down, so the <use href="#ew-home"> drawing the
+		 * star resolved to this style element and drew nothing at all.
+		 */
+		echo '<style id="ew-home-css">' . ew_home_css() . '</style>';
 	}, 20 );
 
 	get_header();

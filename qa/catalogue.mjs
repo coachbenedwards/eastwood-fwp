@@ -35,7 +35,7 @@ export const CATALOGUE = {
   'repeated-id': {
     certainty: 'certain',
     why: 'Two elements share one id. Invalid markup; anchors, labels and assistive tech resolve to whichever came first.',
-    fix: 'Make the second one unique, or drop the id if nothing points at it.',
+    fix: 'In our own markup, make it unique. In markup we did not write, look before renaming: a CSS rule on #thing styles every element carrying that id, so renaming the second copy can strip the styling off the one people actually see. Where the duplicate is unreachable anyway, recording it as accepted beats a blind fix.',
   },
   'link-with-no-name': {
     certainty: 'certain',
