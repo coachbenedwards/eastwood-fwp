@@ -1532,7 +1532,10 @@ function ew_hb_css() {
 .ewp-rowFoot{display:flex;align-items:center;justify-content:center;gap:10px;
  min-height:49px;padding:10px 16px;background:#fafafa;border-top:1px solid rgba(200,200,200,.3)}
 .ewp-rowFoot span{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#101010}
-.ewp-rowFoot img{height:18px;width:auto;display:block}
+/* The play mark is white artwork, drawn for the dark hero. On this strip
+   it sits on near-white and disappears, so it is flattened to black.
+   brightness(0) keeps the alpha and ignores the source colour. */
+.ewp-rowFoot img{height:18px;width:auto;display:block;filter:brightness(0)}
 .ewp-rowFoot b{font-size:13px;font-weight:700;letter-spacing:.02em;color:#101010}
 .ewp-rowFoot i{font-style:normal;font-size:12px;color:#8a8a8a}
 .ewp-rowFoot i::before{content:"\2014";margin-right:7px;color:#c9c9c9}
