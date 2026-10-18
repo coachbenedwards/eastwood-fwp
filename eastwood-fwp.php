@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.40.0
+ * Version: 2.41.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1954,7 +1954,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.40.0';
+const EW_FWP_VERSION = '2.41.0';
 
 /*
  * Parts loader.
@@ -4039,7 +4039,7 @@ behaviour of an adult at the club, or about anything that does not feel right, s
 <div class="ew-cta">
 	<h3>Contact the Safeguarding Officer</h3>
 	<p>Mark it for the attention of the Safeguarding Officer.</p>
-	<p><a href="mailto:info@eastwoodfc.com">info@eastwoodfc.com</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
+	<p><a href="mailto:safeguarding@eastwoodfc.com">safeguarding@eastwoodfc.com</a> &nbsp;·&nbsp; <a href="tel:+441773432414">01773 432414</a></p>
 </div>
 
 <p>You do not need to be certain, and you do not need proof. If something is worrying you, tell us. It is our job
