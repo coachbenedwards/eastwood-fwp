@@ -8,7 +8,7 @@
  *
  *   node qa/sweep.mjs                 the lot
  *   node qa/sweep.mjs --fast          chromium at one width, for a deploy gate
- *   node qa/sweep.mjs --gate          exit 1 on anything not in the baseline
+ *   node qa/sweep.mjs --gate          exit 1 on a new CERTAIN finding
  *   node qa/sweep.mjs --update-baseline
  *
  * Needs playwright. Chromium alone covers Chrome, Edge and Chrome on Android.
@@ -17,6 +17,7 @@
  * than failing the run, so a partial matrix never reads as a clean one.
  */
 import { chromium, firefox, webkit } from 'playwright';
+import { CATALOGUE, certaintyOf, adviceFor } from './catalogue.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -192,6 +193,11 @@ async function run() {
   const perEngine = PAGES.length * engines.filter(e => !skipped.includes(e[0])).length;
   const sitewide = new Set([...tally].filter(([, n]) => n >= perEngine - 1).map(([k]) => k));
 
+  const dress = f => {
+    const a = adviceFor(f.type);
+    return { ...f, certainty: certaintyOf(f.type), why: a.why, fix: a.fix, ask: a.ask };
+  };
+
   const report = {
     ranAt: new Date().toISOString(),
     base: BASE,
@@ -200,11 +206,12 @@ async function run() {
     engines: engines.map(e => e[0]).filter(e => !skipped.includes(e)),
     enginesSkipped: skipped,
     widths: widths.map(w => `${w[0]} ${w[1]}`),
-    sitewide: [...sitewide].map(k => ({ type: k.split('|')[0], detail: k.split('|').slice(1).join('|') })),
+    sitewide: [...sitewide]
+      .map(k => dress({ type: k.split('|')[0], detail: k.split('|').slice(1).join('|') })),
     perPage: PAGES.map(p => ({
       page: p,
       findings: findings.filter(f => f.page === p && !sitewide.has(key(f)))
-        .map(f => ({ type: f.type, detail: f.detail, engine: f.engine, width: f.width })),
+        .map(f => dress({ type: f.type, detail: f.detail, engine: f.engine, width: f.width })),
     })).filter(x => x.findings.length),
     failedRequests,
   };
@@ -216,22 +223,53 @@ async function run() {
   console.log('');
   console.log(`  ${report.pages} pages · ${report.engines.join(', ') || 'no engines'}`
     + `${skipped.length ? ` (skipped ${skipped.join(', ')})` : ''} · ${report.seconds}s`);
-  console.log('');
-  if (report.sitewide.length) {
-    console.log('  SITEWIDE — in the shared header or footer, so on every page');
-    report.sitewide.forEach(f => console.log(`    ${f.type.padEnd(34)} ${f.detail}`));
-    console.log('');
-  }
-  if (report.perPage.length) {
-    console.log('  PAGE BY PAGE');
-    report.perPage.forEach(p => {
-      console.log(`    ${p.page}`);
-      p.findings.forEach(f => console.log(`      ${f.type.padEnd(32)} ${f.detail}`
-        + (f.width ? `  [${f.width}]` : '')));
+  const everything = [
+    ...report.sitewide.map(f => ({ ...f, where: 'every page' })),
+    ...report.perPage.flatMap(p => p.findings.map(f => ({ ...f, where: p.page }))),
+  ];
+  const certain = everything.filter(f => f.certainty === 'certain');
+  const check   = everything.filter(f => f.certainty !== 'certain');
+
+  const byType = list => {
+    const m = new Map();
+    list.forEach(f => {
+      if (!m.has(f.type)) m.set(f.type, []);
+      m.get(f.type).push(f);
     });
+    return m;
+  };
+
+  console.log('');
+  if (certain.length) {
+    console.log(`  WRONG — ${certain.length} finding${certain.length === 1 ? '' : 's'}, no judgement needed`);
+    console.log('  ' + '-'.repeat(70));
+    for (const [type, list] of byType(certain)) {
+      const a = adviceFor(type);
+      console.log(`\n  ${type}  (${list.length})`);
+      console.log(`    why   ${a.why}`);
+      console.log(`    fix   ${a.fix}`);
+      list.slice(0, 6).forEach(f => console.log(`          · ${f.detail}  [${f.where}]`));
+      if (list.length > 6) console.log(`          · and ${list.length - 6} more`);
+    }
     console.log('');
   }
-  if (!report.sitewide.length && !report.perPage.length) console.log('  Nothing found.\n');
+
+  if (check.length) {
+    console.log(`  CHECK FIRST — ${check.length} finding${check.length === 1 ? '' : 's'} that may be deliberate`);
+    console.log('  ' + '-'.repeat(70));
+    for (const [type, list] of byType(check)) {
+      const a = adviceFor(type);
+      console.log(`\n  ${type}  (${list.length})`);
+      console.log(`    why   ${a.why}`);
+      if (a.ask) console.log(`    ask   ${a.ask}`);
+      console.log(`    fix   ${a.fix}`);
+      list.slice(0, 6).forEach(f => console.log(`          · ${f.detail || '(no detail)'}  [${f.where}]`));
+      if (list.length > 6) console.log(`          · and ${list.length - 6} more`);
+    }
+    console.log('');
+  }
+
+  if (!everything.length) console.log('  Nothing found.\n');
 
   /* The gate compares against what has already been seen and accepted, so it
      only ever fails on something new. */
@@ -240,6 +278,11 @@ async function run() {
     ...report.sitewide.map(f => `${f.type}|${f.detail}`),
     ...report.perPage.flatMap(p => p.findings.map(f => `${p.page}|${f.type}|${f.detail}`)),
   ])].sort();
+  const certainKeys = new Set([
+    ...report.sitewide.filter(f => f.certainty === 'certain').map(f => `${f.type}|${f.detail}`),
+    ...report.perPage.flatMap(p => p.findings.filter(f => f.certainty === 'certain')
+      .map(f => `${p.page}|${f.type}|${f.detail}`)),
+  ]);
 
   if (updating) {
     writeFileSync(baselinePath, JSON.stringify(current, null, 1));
@@ -249,13 +292,22 @@ async function run() {
   if (gate) {
     const known = existsSync(baselinePath) ? JSON.parse(readFileSync(baselinePath, 'utf8')) : [];
     const fresh = current.filter(c => !known.includes(c));
-    if (fresh.length) {
-      console.log(`  GATE FAILED — ${fresh.length} new since the baseline:`);
-      fresh.forEach(f => console.log(`    ${f}`));
+    // Only something definitely wrong stops a release. A check-first finding
+    // is reported and waits for a person; it never blocks on its own.
+    const blocking = fresh.filter(f => certainKeys.has(f));
+    const waiting = fresh.filter(f => !certainKeys.has(f));
+    if (waiting.length) {
+      console.log(`  ${waiting.length} new finding${waiting.length === 1 ? '' : 's'} to look at, not blocking:`);
+      waiting.forEach(f => console.log(`    ${f}`));
+      console.log('');
+    }
+    if (blocking.length) {
+      console.log(`  GATE FAILED — ${blocking.length} new and definitely wrong:`);
+      blocking.forEach(f => console.log(`    ${f}`));
       console.log('');
       return 1;
     }
-    console.log('  Gate passed: nothing new since the baseline.\n');
+    console.log('  Gate passed: nothing new that is definitely wrong.\n');
   }
   return 0;
 }

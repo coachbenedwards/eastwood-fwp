@@ -27,15 +27,37 @@ Point it somewhere else with `QA_BASE=https://staging.example.com`.
 An engine that is not installed is skipped, named in the output and listed in
 the report, so a partial matrix never reads as a clean one.
 
+## Two kinds of finding
+
+Every finding is one of two kinds, and the difference matters more than the
+checks do.
+
+**Wrong.** The markup is wrong whatever anyone intended. There is no design
+choice under which a link should announce itself as something the page does
+not say, or an image should have no alt attribute at all. These come with the
+fix and can be done without asking.
+
+**Check first.** Probably wrong, but the same symptom can be a deliberate
+choice, so a person looks before anything changes. A page with no h1 might be
+an oversight or might be a deliberate visual landing page. A dead link might
+be broken or might be waiting on a URL nobody has yet. Each of these comes
+with the question to answer, not just the fix.
+
+Fixing a check-first finding without asking means changing something that was
+never broken, which is worse than leaving it. So `--gate` fails on a new
+**wrong** finding only. A check-first finding is reported, named as not
+blocking, and waits.
+
+`qa/catalogue.mjs` holds which kind each check is, why it matters and the
+suggested fix. Change the tier there, not in the sweep.
+
 ## What comes back
 
-`qa/reports/latest.json`, and the same thing readably on stdout, split into:
-
-- **Sitewide** — anything appearing on nearly every page, which means it lives
-  in the shared header or footer. On the first run this was thirty of the
-  thirty-five findings. Without this split the five that matter are buried.
-- **Page by page** — everything else.
-- **Failed requests** — anything the page asked for and did not get.
+`qa/reports/latest.json`, and the same thing readably on stdout. Findings on
+nearly every page are reported once as sitewide rather than once per page,
+because they live in the shared header or footer — on the first run that was
+thirty of thirty-five, and without the split the five that were page-specific
+were buried.
 
 Images are not loaded. None of the checks depend on them, and the host
 rate-limits them, which otherwise shows up as failures that are not real.
