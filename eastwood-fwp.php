@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.54.0
+ * Version: 2.55.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -406,6 +406,46 @@ add_action( 'rest_api_init', function () {
 	) );
 } );
 
+/**
+ * Fixtures the league has changed that the feed has not caught up with.
+ *
+ * Football Web Pages is the source for everything on the fixtures page, and
+ * when the league moves a game the feed can keep the old one for a while. A
+ * match id listed here is dropped everywhere fixtures are read, so the site
+ * never shows a game that is not happening.
+ *
+ * Take an id out again once the feed agrees: leaving one here after the fact
+ * would hide a real fixture. The id is in the match-centre address for that
+ * game, /match/<id>/.
+ */
+function ew_stale_matches() {
+	return array(
+		// 24 Oct 2026, Clay Cross Town v Eastwood. The league moved it; the
+		// same afternoon now holds Eastwood v Deeping Rangers, which the feed
+		// also carries, so both were showing.
+		585757,
+	);
+}
+
+/**
+ * Apply every correction we keep over the feed, in one place, so server-side
+ * reads and the browser-side proxy cannot drift apart.
+ */
+function ew_fwp_corrections( $data ) {
+	$data = ew_fwp_fix_names( $data );
+
+	$stale = ew_stale_matches();
+	if ( $stale && ! empty( $data['fixtures-results']['matches'] ) ) {
+		$data['fixtures-results']['matches'] = array_values( array_filter(
+			(array) $data['fixtures-results']['matches'],
+			function ( $m ) use ( $stale ) {
+				return ! in_array( (int) ( $m['id'] ?? 0 ), $stale, true );
+			}
+		) );
+	}
+	return $data;
+}
+
 function ew_fwp_proxy( WP_REST_Request $req ) {
 	$allowed = array(
 		'fixtures-results', 'league-table', 'team', 'teams', 'goalscorers',
@@ -451,7 +491,7 @@ function ew_fwp_proxy( WP_REST_Request $req ) {
 
 	$hit = get_transient( $cache );
 	if ( false !== $hit ) {
-		return new WP_REST_Response( json_decode( $hit, true ), 200 );
+		return new WP_REST_Response( ew_fwp_corrections( (array) json_decode( $hit, true ) ), 200 );
 	}
 
 	$res = wp_remote_get( $url, array(
@@ -469,7 +509,7 @@ function ew_fwp_proxy( WP_REST_Request $req ) {
 	}
 
 	set_transient( $cache, $body, 5 * MINUTE_IN_SECONDS );
-	return new WP_REST_Response( json_decode( $body, true ), 200 );
+	return new WP_REST_Response( ew_fwp_corrections( (array) json_decode( $body, true ) ), 200 );
 }
 
 /**
@@ -2083,7 +2123,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.54.0';
+const EW_FWP_VERSION = '2.55.0';
 
 /*
  * Parts loader.
@@ -3393,7 +3433,7 @@ function ew_fwp_fetch( $endpoint, $args = array() ) {
 		}
 	}
 
-	$data = ew_fwp_fix_names( $data );
+	$data = ew_fwp_corrections( $data );
 
 	set_transient( $key, $data, empty( $data ) ? 2 * MINUTE_IN_SECONDS : 10 * MINUTE_IN_SECONDS );
 	return $data;
