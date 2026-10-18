@@ -1631,6 +1631,11 @@ function ew_hb_css() {
  text-transform:uppercase;color:#6f6f6f;transition:color .15s}
 .ewp-teamTabs button:hover{color:#101010}
 .ewp-teamTabs button[aria-selected="true"]{color:#101010;border-bottom-color:#CC0000}
+/* Clicking a tab left a blue focus ring from the browser sitting on it.
+   Keyboard users still need to see where they are, so the ring is kept for
+   them and drawn in club red rather than that blue. */
+.ewp-teamTabs button:focus{outline:none}
+.ewp-teamTabs button:focus-visible{outline:2px solid #CC0000;outline-offset:3px;border-radius:2px}
 
 /* Fixtures / Results / Table, centred under them. */
 .ewp-tabs{display:flex;justify-content:center;gap:26px;margin:0 0 26px}

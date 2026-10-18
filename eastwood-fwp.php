@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.44.0
+ * Version: 2.45.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1048,10 +1048,13 @@ h1.elementor-heading-title,
 .ewshop h1{
  background:#CC0000;color:#fff !important;
  font-family:Anton,"Instrument Sans",sans-serif !important;
- font-size:56px !important;font-weight:700 !important;line-height:1.02;
+ font-size:56px !important;font-weight:700 !important;line-height:1;
  letter-spacing:.01em;text-transform:uppercase;
  margin:0 calc(50% - 50vw) !important;
- padding:70px max(16px,calc(50vw - 624px)) 34px !important;
+ /* Measured off the reference: the band is 160px and the title sits low in
+    it, 88px of red above the cap height and 16px below the baseline. Ours
+    was 70/34, which centred the title and read as floating. */
+ padding:88px max(16px,calc(50vw - 624px)) 16px !important;
 }
 @media(max-width:820px){
  h1.elementor-heading-title,
@@ -1063,7 +1066,7 @@ h1.elementor-heading-title,
    site using neither the club typeface nor its width. The band selector
    above now covers its title; the rest is squared up here so the page
    content never has to be edited to keep up. */
-.ewshop{max-width:1248px !important;padding:0 max(16px,calc(50vw - 624px)) 64px !important;
+.ewshop{max-width:1280px !important;margin:0 auto !important;padding:0 16px 64px !important;
  font-family:"Instrument Sans",system-ui,sans-serif !important}
 .ewshop h1{margin:0 calc(50% - 50vw) 34px !important}
 .ewshop .lede{font-size:17px;color:#5c5c5c;margin:0 0 34px}
@@ -1410,7 +1413,7 @@ function ew_matches_assets() {
 	if ( ! ew_uses_shortcode( $post, 'eastwood_matches' ) ) { return; }
 
 	$css = '
-.ew-matches{max-width:1100px;margin:0 auto;padding:0 16px 56px;font-family:"Instrument Sans",system-ui,sans-serif;color:#111}
+.ew-matches{max-width:1280px;margin:0 auto;padding:0 16px 64px;font-family:"Instrument Sans",system-ui,sans-serif;color:#111}
 .ew-matches *{box-sizing:border-box}
 .ew-tabs{display:flex;gap:2px;margin:0 0 24px;border-bottom:2px solid #e3e3e3}
 .ew-tabs button{appearance:none;background:none;border:0;border-bottom:3px solid transparent;margin-bottom:-2px;
@@ -1678,10 +1681,12 @@ function ew_teams_shortcode() {
 	 * others say so rather than showing an empty grid.
 	 */
 	$sides = array(
-		"Men's First Team" => 'squad',
+		"Men's First Team"   => 'squad',
 		"Women's First Team" => '',
-		'Reserves' => '',
-		'Under 21s' => '',
+		'Reserves'           => '',
+		'Under 21s'          => '',
+		'Academy'            => '',
+		'Grassroots'         => 'grassroots',
 	);
 	?>
 	<div class="ewp ewp-teamBar ew-tm-bar">
@@ -1701,31 +1706,23 @@ function ew_teams_shortcode() {
 		echo 0 === $si ? '' : ' hidden'; ?>>
 		<?php if ( 'squad' === $kind ) : ?>
 		<?php echo ew_squad_shortcode(); // phpcs:ignore ?>
+		<?php elseif ( 'grassroots' === $kind ) : ?>
+		<p class="ew-credit">Twenty-nine teams play out of Coronation Park, from under-7s upwards.
+			New players are welcome across every section &mdash;
+			<a href="mailto:grassroots@eastwoodfc.com">grassroots@eastwoodfc.com</a>.</p>
 		<?php else : ?>
 		<p class="ew-credit"><?php echo esc_html( $side ); ?> squad details are being added.</p>
 		<?php endif; ?>
 	</div>
 	<?php endforeach; ?>
 
-	<?php foreach ( ew_teams_roster() as $group => $teams ) : ?>
-	<section class="ew-tm-group">
-		<h2 class="ew-tm-head"><?php echo esc_html( $group ); ?><span><?php echo count( $teams ); ?></span></h2>
-		<div class="ew-tm-grid">
-			<?php
-			foreach ( $teams as $team ) :
-				list( $url, $external ) = ew_teams_link( $team );
-				$tag = $url ? 'a' : 'div';
-				?>
-			<<?php echo $tag; ?> class="ew-tm-card"
-				<?php if ( $url ) : ?>href="<?php echo esc_url( $url ); ?>"<?php endif; ?>>
-				<span class="ew-tm-name"><?php echo esc_html( $team['name'] ); ?></span>
-			</<?php echo $tag; ?>>
-			<?php endforeach; ?>
-		</div>
-	</section>
-	<?php endforeach; ?>
-	<p class="ew-credit">Twenty-nine teams play out of Coronation Park. New players are welcome across every
-		section &mdash; <a href="mailto:grassroots@eastwoodfc.com">grassroots@eastwoodfc.com</a>.</p>
+	<?php
+	/*
+	 * The full twenty-nine-team directory used to print here. It sat outside
+	 * the panels, so every tab showed it underneath whichever side had been
+	 * picked. It is out until it has a tab of its own to sit in.
+	 */
+	?>
 </div>
 	<?php
 	return trim( ob_get_clean() );
@@ -1757,7 +1754,7 @@ function ew_teams_assets() {
 	if ( ! $teams && ! $squad ) { return; }
 
 	$css = '
-.ew-teams-index,.ew-squad{max-width:1100px;margin:0 auto;padding:0 16px 56px;
+.ew-teams-index,.ew-squad{max-width:1280px;margin:0 auto;padding:0 16px 64px;
  font-family:"Instrument Sans",system-ui,sans-serif;color:#111}
 .ew-teams-index *,.ew-squad *{box-sizing:border-box}
 .ew-tm-group{margin:0 0 40px}
@@ -1783,7 +1780,14 @@ a.ew-tm-card.is-external:hover{border-color:#b5b5b5;box-shadow:0 2px 10px rgba(0
 .ew-sq-sub{font-family:Anton,sans-serif;font-size:15px;letter-spacing:.08em;text-transform:uppercase;
  color:#6b6b6b;margin:0 0 10px}
 /* The senior sides along the top, each with its own squad underneath. */
-.ew-tm-bar{background:#fff;margin:0 0 26px}
+/* The reference carries the side tabs in a full-width white strip sitting
+   flush under the red band, 62px tall, its contents on the same 1248 column
+   as everything else. Ours sat inside the content column as a plain white
+   box with a gap above it. */
+.ew-tm-bar{background:#fff;min-height:62px;display:flex;align-items:center;
+ margin:0 calc(50% - 50vw) 32px;padding:0 max(16px,calc(50vw - 624px));
+ box-shadow:inset 0 -1px 0 rgba(0,0,0,.08)}
+.ew-tm-bar .ewp-teamTabs{width:100%}
 .ew-teams-index [hidden]{display:none}
 .ew-tm-side{margin:0 0 42px}
 .ew-teams-index .ew-squad{max-width:none;margin:0;padding:0}
@@ -1954,7 +1958,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.44.0';
+const EW_FWP_VERSION = '2.45.0';
 
 /*
  * Parts loader.
@@ -2618,7 +2622,7 @@ function ew_tv_assets() {
 	if ( ! ew_uses_shortcode( $post, 'eastwood_tv' ) ) { return; }
 
 	$css = '
-.ew-tv{max-width:1100px;margin:0 auto;padding:0 16px 56px;font-family:"Instrument Sans",system-ui,sans-serif;color:#111}
+.ew-tv{max-width:1280px;margin:0 auto;padding:0 16px 64px;font-family:"Instrument Sans",system-ui,sans-serif;color:#111}
 .ew-tv *{box-sizing:border-box}
 .ew-tv-hero{margin:0 0 44px}
 .ew-tv-player{position:relative;padding-top:56.25%;background:#000;border-radius:4px;overflow:hidden}
@@ -2753,7 +2757,7 @@ function ew_rewrite_nav( $html ) {
 
 function ew_prose_css_inline() {
 	return '
-.ew-prose{max-width:1248px;margin:0 auto;padding:0 max(16px,calc(50vw - 624px)) 64px;
+.ew-prose{max-width:1280px;margin:0 auto;padding:0 16px 64px;
  font-family:"Instrument Sans",system-ui,sans-serif;color:#111}
 /* The reference holds a 1248px column on every page, so these do too.
    A 1248px line of body copy is too long to read comfortably, so the
