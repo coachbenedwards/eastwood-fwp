@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.41.0
+ * Version: 2.42.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1954,7 +1954,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.41.0';
+const EW_FWP_VERSION = '2.42.0';
 
 /*
  * Parts loader.
@@ -3971,8 +3971,7 @@ function ew_contact_content() {
 <div class="ew-people">
 	<div class="ew-person"><b>Ben Edwards</b><span>Chair and Club Owner</span></div>
 	<div class="ew-person"><b>Stephen Kirkham</b><span>Managing Director</span></div>
-	<div class="ew-person"><b>Zander Shayler</b><span>Secretary, Fixture Secretary and Director of Operations</span></div>
-	<div class="ew-person"><b>Sarah Robertson-Staples</b><span>Treasurer and Safeguarding Officer</span></div>
+	<div class="ew-person"><b>Zander Shayler</b><span>Secretary, Director of Operations and Safeguarding Officer</span></div>
 </div>
 
 <p>Everything reaches us at <a href="mailto:info@eastwoodfc.com">info@eastwoodfc.com</a> — hospitality and
@@ -4033,8 +4032,8 @@ than any result, and everyone at the club shares that responsibility.</p>
 
 <h2>Raising a concern with the club</h2>
 
-<p>Our Safeguarding Officer is <b>Sarah Robertson-Staples</b>. Any concern about a child's welfare, about the
-behaviour of an adult at the club, or about anything that does not feel right, should go to her.</p>
+<p>Our Safeguarding Officer is <b>Zander Shayler</b>. Any concern about a child's welfare, about the
+behaviour of an adult at the club, or about anything that does not feel right, should go to him.</p>
 
 <div class="ew-cta">
 	<h3>Contact the Safeguarding Officer</h3>
