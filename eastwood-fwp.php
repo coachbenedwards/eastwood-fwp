@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.33.0
+ * Version: 2.34.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1046,13 +1046,14 @@ function ew_chrome_css() {
    red, full bleed, text lined up with the 1248px column. */
 h1.elementor-heading-title{
  background:#CC0000;color:#fff !important;
- font-family:Anton,"Instrument Sans",sans-serif;font-size:70px;line-height:1.02;
+ font-family:Anton,"Instrument Sans",sans-serif !important;
+ font-size:56px !important;font-weight:700 !important;line-height:1.02;
  letter-spacing:.01em;text-transform:uppercase;
  margin:0 calc(50% - 50vw) !important;
- padding:52px max(16px,calc(50vw - 624px)) 54px !important;
+ padding:70px max(16px,calc(50vw - 624px)) 34px !important;
 }
 @media(max-width:820px){
- h1.elementor-heading-title{font-size:38px;padding:32px 16px 34px !important}
+ h1.elementor-heading-title{font-size:38px !important;padding:32px 16px 34px !important}
 }
 
 /* The news hero collapses to 88px because its own min-height class never

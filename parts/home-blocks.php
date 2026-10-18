@@ -276,6 +276,7 @@ function ew_hb_card( $m, $done = false, $cta = array() ) {
 		</span>
 		<span class="ewp-cardBody">
 			<img src="<?php echo esc_url( ew_home_badge( $opp['id'] ?? 0 ) ); ?>" alt=""
+				loading="lazy" decoding="async"
 				onerror="this.style.visibility='hidden'">
 			<span class="ewp-cardText">
 				<span class="ewp-kicker">First Team</span>
@@ -521,7 +522,8 @@ function ew_hb_hero_sc( $atts ) {
 <section class="ewp ewp-hero">
 	<a href="<?php echo esc_url( get_permalink( $lead ) ); ?>">
 		<?php if ( has_post_thumbnail( $lead ) ) : ?>
-		<img src="<?php echo esc_url( get_the_post_thumbnail_url( $lead, 'full' ) ); ?>" alt="">
+		<img src="<?php echo esc_url( get_the_post_thumbnail_url( $lead, 'full' ) ); ?>" alt=""
+			decoding="async">
 		<?php endif; ?>
 		<span class="ewp-heroText">
 			<span class="ewp-heroKicker"><?php echo esc_html( $kicker ); ?></span>
@@ -861,6 +863,7 @@ function ew_hb_table( $team_id ) {
 			<td><?php echo esc_html( $t['position'] ?? '' ); ?></td>
 			<td class="ewp-club">
 				<img src="<?php echo esc_url( ew_home_badge( $t['id'] ?? 0 ) ); ?>" alt=""
+					loading="lazy" decoding="async"
 					onerror="this.style.visibility='hidden'"><?php echo esc_html( $t['name'] ?? '' ); ?></td>
 			<td><?php echo esc_html( $a['played'] ?? '' ); ?></td>
 			<td class="ewp-opt"><?php echo esc_html( $a['won'] ?? '' ); ?></td>
@@ -1312,7 +1315,8 @@ function ew_hb_news_sc( $atts ) {
 			<a class="ewp-newsCard" href="<?php echo esc_url( get_permalink( $p ) ); ?>">
 				<span class="ewp-newsImg">
 					<?php if ( has_post_thumbnail( $p ) ) : ?>
-					<img src="<?php echo esc_url( get_the_post_thumbnail_url( $p, 'large' ) ); ?>" alt="">
+					<img src="<?php echo esc_url( get_the_post_thumbnail_url( $p, 'large' ) ); ?>" alt=""
+						loading="lazy" decoding="async">
 					<?php endif; ?>
 				</span>
 				<span class="ewp-newsText">
