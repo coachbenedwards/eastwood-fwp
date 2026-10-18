@@ -96,6 +96,7 @@ function ew_home_blocks_present() {
 	foreach ( array( 'eastwood_home_banner', 'eastwood_home_hero', 'eastwood_home_fixtures',
 		'eastwood_home_upcoming', 'eastwood_home_shop', 'eastwood_home_tiles',
 		'eastwood_home_sponsors', 'eastwood_home_discover', 'eastwood_home_news',
+		'eastwood_home_strip', 'eastwood_home_live',
 		'eastwood_matches', 'eastwood_teams', 'eastwood_squad' ) as $tag ) {
 		foreach ( $hay as $text ) {
 			if ( '' !== $text && false !== strpos( $text, '[' . $tag ) ) {
@@ -1621,6 +1622,61 @@ function ew_hb_css() {
 .ewp-rowCentre .ewp-ico,.ewp-rowCta .ewp-ico{width:24px;height:24px}
 .ewp-rowMore .ewp-ico{width:24px;height:24px}
 
+/* The next fixtures as one thin band directly under the nav, which is the
+   first thing the reference puts on its homepage. The same card the rail
+   uses, flattened, so a change to how a fixture reads happens once. */
+.ewp-strip{position:relative;background:#fff;border-bottom:1px solid rgba(0,0,0,.09)}
+.ewp-stripList{display:flex;list-style:none;margin:0;padding:0;overflow-x:auto;
+ scroll-behavior:smooth;scroll-snap-type:x proximity;scrollbar-width:none;-ms-overflow-style:none}
+.ewp-stripList::-webkit-scrollbar{display:none}
+.ewp-strip .ewp-slide{flex:0 0 288px;scroll-snap-align:start;border-right:1px solid rgba(0,0,0,.09)}
+.ewp-strip .ewp-card{display:flex;flex-direction:column;justify-content:center;gap:5px;
+ min-height:109px;height:100%;padding:12px 18px;background:none;border:0;border-radius:0;box-shadow:none}
+.ewp-strip .ewp-cardTop{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0}
+.ewp-strip .ewp-when b{font-size:14px}
+.ewp-strip .ewp-when i{font-size:15px}
+.ewp-strip .ewp-cardBody{display:flex;align-items:center;gap:10px;margin:0}
+.ewp-strip .ewp-cardBody img{width:28px;height:28px;object-fit:contain;flex:none}
+.ewp-strip .ewp-kicker{font-size:9px}
+.ewp-strip .ewp-cardText b{font-size:17px;line-height:1.1}
+.ewp-strip .ewp-venue{font-size:11px}
+.ewp-stripNext{position:absolute;right:0;top:0;height:100%;width:46px;border:0;cursor:pointer;
+ background:linear-gradient(90deg,rgba(255,255,255,0),#fff 42%);font-size:26px;color:#101010;line-height:1}
+.ewp-stripNext:focus-visible{outline:2px solid #CC0000;outline-offset:-3px}
+@media(max-width:700px){.ewp-strip .ewp-slide{flex:0 0 234px}.ewp-stripNext{display:none}}
+
+/* The slot the reference gives over to one big promotional graphic. Ours is
+   type rather than artwork, because artwork would have to be made for every
+   game. Red while the game is on, black while it is still to come. */
+.ewp-live{background:#101010;color:#fff}
+.ewp-live.is-live{background:#CC0000}
+.ewp-liveInner{max-width:1280px;margin:0 auto;padding:38px 16px;
+ display:flex;align-items:stretch;gap:26px;flex-wrap:wrap}
+.ewp-liveLeft{flex:1 1 380px;min-width:0;display:flex;flex-direction:column;justify-content:center}
+.ewp-liveEyebrow{display:flex;align-items:center;gap:10px;margin:0 0 12px;
+ font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.85)}
+.ewp-liveDot{width:9px;height:9px;border-radius:50%;background:#CC0000;flex:none}
+.ewp-live.is-live .ewp-liveDot{background:#fff;box-shadow:0 0 0 4px rgba(255,255,255,.28)}
+.ewp-liveHead{font-family:Anton,"Instrument Sans",sans-serif;font-weight:400;
+ font-size:clamp(40px,7vw,86px);line-height:.84;letter-spacing:.004em;
+ text-transform:uppercase;margin:0;color:#fff}
+.ewp-liveHead em{display:block;font-style:normal;font-size:.3em;letter-spacing:.26em;margin:.55em 0 .2em}
+.ewp-liveHead strong{display:block;font-weight:400;font-size:1.46em;line-height:.78}
+.ewp-liveLines{display:flex;flex-wrap:wrap;gap:0;margin:24px 0 0;padding:0;list-style:none}
+.ewp-liveLines li{font-size:15px;font-weight:600;padding:0 15px;border-left:1px solid rgba(255,255,255,.4)}
+.ewp-liveLines li:first-child{padding-left:0;border-left:0}
+.ewp-liveRight{flex:0 0 auto;display:flex;flex-direction:column;gap:14px;justify-content:center}
+.ewp-liveFix{background:rgba(0,0,0,.3);padding:20px 24px;min-width:250px}
+.ewp-live.is-live .ewp-liveFix{background:#101010}
+.ewp-liveComp{margin:0 0 9px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.72)}
+.ewp-liveTie{font-family:Anton,"Instrument Sans",sans-serif;font-size:25px;line-height:1.1;
+ text-transform:uppercase;margin:0;color:#fff}
+.ewp-liveWhen{margin:9px 0 0;font-size:14px;color:rgba(255,255,255,.88);font-weight:500}
+.ewp-liveCta{display:inline-flex;align-items:center;justify-content:center;min-height:50px;
+ padding:0 26px;border-radius:8px;background:#fff;color:#101010;text-decoration:none;
+ font-weight:700;font-size:16px;text-transform:uppercase;letter-spacing:.02em;align-self:flex-start}
+@media(max-width:700px){.ewp-liveInner{padding:28px 16px}.ewp-liveRight{width:100%}}
+
 /* The club sides, on white above everything else, the Forest shape. */
 .ewp-teamBar{background:#fff}
 .ewp-teamTabs{display:flex;flex-wrap:wrap;gap:26px;overflow-x:auto;scrollbar-width:none}
@@ -1904,6 +1960,24 @@ function ew_hb_js() {
   });
  });
 
+ /* The fixtures strip scrolls sideways on its own; the arrow is for a mouse.
+    It hides itself once there is nothing further to scroll to. */
+ [].forEach.call(document.querySelectorAll('[data-ew-strip-next]'), function(btn){
+  var list = btn.parentNode.querySelector('.ewp-stripList');
+  if (!list) { return; }
+  var sync = function(){
+   var more = list.scrollWidth - list.clientWidth - list.scrollLeft > 8;
+   btn.style.display = more ? '' : 'none';
+  };
+  btn.addEventListener('click', function(){
+   var cell = list.querySelector('.ewp-slide');
+   list.scrollLeft += cell ? cell.getBoundingClientRect().width : 280;
+  });
+  list.addEventListener('scroll', sync);
+  window.addEventListener('resize', sync);
+  sync();
+ });
+
  /* next-match countdown */
  [].forEach.call(document.querySelectorAll('.ewp-bannerClock'), function(el){
   var ko = parseInt(el.getAttribute('data-ko'), 10) * 1000;
@@ -1962,3 +2036,145 @@ function ew_home_preview_content() {
 		. "[/eastwood_home_discover]\n\n"
 		. "[eastwood_home_news title=\"Latest News\" count=\"4\"]";
 }
+
+
+/* ------------------------------------------------------------------
+ * [eastwood_home_strip count="6"]
+ *
+ * The next few fixtures as one thin full-width band directly under the
+ * nav, which is the first thing the reference puts on its homepage: 109px,
+ * one cell per game, scrolling sideways rather than wrapping.
+ *
+ * Same card as the rail inside the fixtures block, so a change to how a
+ * fixture reads happens once. The strip only flattens it.
+ * ------------------------------------------------------------------ */
+
+function ew_hb_strip_sc( $atts ) {
+	$atts = shortcode_atts( array( 'count' => '6' ), $atts, 'eastwood_home_strip' );
+
+	$fx  = ew_fwp_fetch( 'fixtures-results', array( 'team' => EW_TEAM ) );
+	$all = (array) ( $fx['fixtures-results']['matches'] ?? array() );
+
+	$today = current_time( 'Y-m-d' );
+	$next  = array();
+	foreach ( $all as $m ) {
+		if ( (string) ( $m['date'] ?? '' ) >= $today ) {
+			$next[] = $m;
+		}
+	}
+	usort( $next, function ( $a, $b ) {
+		return strcmp( (string) ( $a['date'] ?? '' ), (string) ( $b['date'] ?? '' ) );
+	} );
+	$next = array_slice( $next, 0, max( 1, (int) $atts['count'] ) );
+	if ( ! $next ) {
+		return '';
+	}
+
+	$out  = '<section class="ewp ewp-strip">';
+	$out .= '<ul class="ewp-stripList">';
+	foreach ( $next as $m ) {
+		$out .= ew_hb_card( $m, false );
+	}
+	$out .= '</ul>';
+	$out .= '<button type="button" class="ewp-stripNext" data-ew-strip-next aria-label="More fixtures">&#8250;</button>';
+	$out .= '</section>';
+	return $out;
+}
+add_shortcode( 'eastwood_home_strip', 'ew_hb_strip_sc' );
+
+
+/* ------------------------------------------------------------------
+ * [eastwood_home_live url="https://youtu.be/..." from="14:30"]
+ *
+ * The slot the reference gives to one big promotional graphic, straight
+ * under the strip. Ours is type rather than artwork, because artwork would
+ * have to be made for every game.
+ *
+ * Three states, decided by the stream link and the clock:
+ *
+ *   no url            nothing renders at all, no empty state
+ *   url, before       black, the game is coming
+ *   url, during       red, the game is on
+ *
+ * "During" runs from the hour before kick-off to three hours after, which
+ * covers build-up and full time without anybody having to take it down.
+ * ------------------------------------------------------------------ */
+
+function ew_hb_live_sc( $atts ) {
+	$atts = shortcode_atts( array(
+		'url'   => '',
+		'from'  => '',
+		'label' => 'Eastwood TV',
+	), $atts, 'eastwood_home_live' );
+
+	if ( '' === trim( (string) $atts['url'] ) ) {
+		return '';
+	}
+
+	$fx  = ew_fwp_fetch( 'fixtures-results', array( 'team' => EW_TEAM ) );
+	$all = (array) ( $fx['fixtures-results']['matches'] ?? array() );
+
+	$today = current_time( 'Y-m-d' );
+	$game  = null;
+	foreach ( $all as $m ) {
+		if ( (string) ( $m['date'] ?? '' ) < $today ) {
+			continue;
+		}
+		if ( (int) ( $m['home-team']['id'] ?? 0 ) !== (int) EW_TEAM ) {
+			continue;
+		}
+		if ( null === $game || (string) $m['date'] < (string) $game['date'] ) {
+			$game = $m;
+		}
+	}
+	if ( ! $game ) {
+		return '';
+	}
+
+	$kick = strtotime( $game['date'] . ' ' . substr( (string) ( $game['time'] ?? '15:00' ), 0, 5 ) );
+	$now  = (int) current_time( 'timestamp' );
+	$live = $kick && $now >= ( $kick - HOUR_IN_SECONDS ) && $now <= ( $kick + 3 * HOUR_IN_SECONDS );
+
+	$opp  = (string) ( $game['away-team']['name'] ?? '' );
+	$comp = (string) ( $game['competition']['name'] ?? '' );
+
+	ob_start();
+	?>
+<section class="ewp ewp-live<?php echo $live ? ' is-live' : ''; ?>">
+	<div class="ewp-liveInner">
+		<div class="ewp-liveLeft">
+			<p class="ewp-liveEyebrow"><span class="ewp-liveDot"></span><?php
+				echo esc_html( $live ? 'Live now on ' . $atts['label'] : 'Streaming on ' . $atts['label'] ); ?></p>
+			<?php if ( $live ) : ?>
+			<h2 class="ewp-liveHead">Follow<em>the action</em><strong>Live</strong></h2>
+			<?php else : ?>
+			<h2 class="ewp-liveHead">Watch it<em>from</em><strong>Anywhere</strong></h2>
+			<?php endif; ?>
+			<ul class="ewp-liveLines">
+				<?php if ( '' !== $atts['from'] ) : ?>
+				<li>Coverage from <?php echo esc_html( $atts['from'] ); ?></li>
+				<?php endif; ?>
+				<li>Full match, free to watch</li>
+				<li>Wherever you are</li>
+			</ul>
+		</div>
+		<div class="ewp-liveRight">
+			<div class="ewp-liveFix">
+				<?php if ( '' !== $comp ) : ?>
+				<p class="ewp-liveComp"><?php echo esc_html( $comp ); ?></p>
+				<?php endif; ?>
+				<p class="ewp-liveTie">Eastwood v<br><?php echo esc_html( $opp ); ?></p>
+				<p class="ewp-liveWhen"><?php echo esc_html(
+					date_i18n( 'D j M', $kick ) . ' · ' . date_i18n( 'H:i', $kick )
+					. ' · Coronation Park' ); ?></p>
+			</div>
+			<a class="ewp-liveCta" href="<?php echo esc_url( $atts['url'] ); ?>"
+				target="_blank" rel="noopener"><?php
+				echo esc_html( $live ? 'Watch now' : 'Set a reminder' ); ?></a>
+		</div>
+	</div>
+</section>
+	<?php
+	return trim( ob_get_clean() );
+}
+add_shortcode( 'eastwood_home_live', 'ew_hb_live_sc' );
