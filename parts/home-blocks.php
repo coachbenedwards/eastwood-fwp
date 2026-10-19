@@ -1972,11 +1972,18 @@ function ew_hb_css() {
 /* flex:1 so the body takes whatever height the row gives the card and the
    crest sits in the middle of it. Without it the body was only as tall as
    the crest, which left the whole lower half of a card pinned to the top
-   with white space under it -- the reference centres it. */
-.ewp-upcomingGrid .ewp-cardBody{display:flex;align-items:center;gap:16px;padding:12px 24px;
+   with white space under it -- the reference centres it.
+
+   The extra 8px at the foot is measured, not taste: on the reference the
+   crest sits 23px below the top of the body, not in the exact middle of
+   it, so the middle it is centred in has to be 8px shorter than the box.
+   With 12px top and 20px bottom the crest lands on 100 and the three
+   lines beside it on 111, 125 and 149, which is where the reference puts
+   them. */
+.ewp-upcomingGrid .ewp-cardBody{display:flex;align-items:center;gap:16px;padding:12px 24px 20px;
  flex:1 1 auto}
 .ewp-upcomingGrid .ewp-cardBody img{width:72px;height:72px;object-fit:contain;flex:none}
-.ewp-upcomingGrid .ewp-cardText{display:flex;flex-direction:column;gap:4px;min-width:0}
+.ewp-upcomingGrid .ewp-cardText{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1 1 auto}
 .ewp-upcomingGrid .ewp-cardText > *{display:block;margin:0}
 .ewp-upcomingGrid .ewp-kicker{font-size:10px;font-weight:700;letter-spacing:1px;line-height:10px;
  color:#212121;text-transform:uppercase}
