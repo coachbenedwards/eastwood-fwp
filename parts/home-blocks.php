@@ -1342,11 +1342,32 @@ add_shortcode( 'eastwood_home_sponsors', 'ew_hb_sponsors_sc' );
  * [eastwood_home_news title="..." count="4" link="/news/"]
  * ------------------------------------------------------------------ */
 
+/**
+ * The news section, built to the reference.
+ *
+ * Measured off it rather than eyeballed: the heading is Anton 56 in the
+ * club red with its own icon, the tab bar is a white 40px rail with 4px
+ * of padding and 4px between tabs, the active tab is white on red at a
+ * 2px radius, and a card is 405x228 with the photograph filling the
+ * whole of it and the headline laid over the bottom.
+ *
+ * The reference fetches each tab from its own news service on click. We
+ * have ten articles, so every tab is written into the page at once and
+ * the click only swaps which one shows -- same thing to look at, no
+ * round trip. The address bar still carries ?tab= the way theirs does,
+ * so a tab can be linked to and the back button works.
+ *
+ * Every word is a field, the tab row included: a team added or renamed
+ * is one line in the builder, not a release.
+ */
 function ew_hb_news_sc( $atts ) {
 	$atts = shortcode_atts(
 		array(
-			'title'     => 'Latest News',
-			'count'     => '4',
+			'title'     => 'Eastwood News',
+			'icon'      => '',
+			'tabs'      => 'Latest | Men’s First Team | Women’s First Team | Club | Academy',
+			'empty'     => 'Nothing here yet.',
+			'count'     => '6',
 			'link'      => '/news/',
 			'link_text' => 'View all news',
 		),
@@ -1354,12 +1375,44 @@ function ew_hb_news_sc( $atts ) {
 		'eastwood_home_news'
 	);
 
+	$tabs = array_values( array_filter( array_map( 'trim', explode( '|', (string) $atts['tabs'] ) ) ) );
+	if ( ! $tabs ) {
+		$tabs = array( 'Latest' );
+	}
+
 	$skip  = ew_hb_hero_id();
-	$posts = get_posts( array(
-		'numberposts' => max( 1, (int) $atts['count'] ),
-		'exclude'     => $skip ? array( $skip ) : array(),
-	) );
-	if ( ! $posts ) {
+	$count = max( 1, (int) $atts['count'] );
+
+	/*
+	 * The first tab is everything. The rest are categories, matched on the
+	 * words in the tab itself, so naming a tab after a category is all it
+	 * takes to fill it -- no second list to keep in step.
+	 */
+	$panels = array();
+	foreach ( $tabs as $i => $label ) {
+		$args = array(
+			'numberposts' => $count,
+			'exclude'     => $skip ? array( $skip ) : array(),
+		);
+		if ( 0 !== $i ) {
+			$term = get_term_by( 'name', $label, 'category' );
+			if ( ! $term ) {
+				$term = get_term_by( 'slug', sanitize_title( $label ), 'category' );
+			}
+			if ( ! $term ) {
+				$panels[] = array( 'label' => $label, 'slug' => sanitize_title( $label ), 'posts' => array() );
+				continue;
+			}
+			$args['category'] = (int) $term->term_id;
+		}
+		$panels[] = array(
+			'label' => $label,
+			'slug'  => sanitize_title( $label ),
+			'posts' => get_posts( $args ),
+		);
+	}
+
+	if ( empty( $panels[0]['posts'] ) ) {
 		return '';
 	}
 
@@ -1367,26 +1420,53 @@ function ew_hb_news_sc( $atts ) {
 	?>
 <section class="ewp ewp-news">
 	<div class="ewp-wrap">
-		<h2 class="ewp-h2"><?php echo esc_html( $atts['title'] ); ?></h2>
-		<div class="ewp-newsGrid">
-			<?php foreach ( $posts as $p ) : ?>
-			<a class="ewp-newsCard" href="<?php echo esc_url( get_permalink( $p ) ); ?>">
-				<span class="ewp-newsImg">
-					<?php if ( has_post_thumbnail( $p ) ) : ?>
-					<img src="<?php echo esc_url( get_the_post_thumbnail_url( $p, 'large' ) ); ?>" alt=""
-						loading="lazy" decoding="async">
-					<?php endif; ?>
-				</span>
-				<span class="ewp-newsText">
-					<b><?php echo esc_html( get_the_title( $p ) ); ?></b>
-					<i><?php
-						$c = get_the_category( $p->ID );
-						echo esc_html( $c ? $c[0]->name : '' ); ?> ·
-						<?php echo esc_html( human_time_diff( get_the_time( 'U', $p ), current_time( 'timestamp' ) ) ); ?> ago</i>
-				</span>
-			</a>
+		<h2 class="ewp-newsH"><?php
+			if ( '' !== $atts['icon'] ) {
+				echo '<span class="ewp-newsIcon" aria-hidden="true">' . esc_html( $atts['icon'] ) . '</span> ';
+			}
+			echo esc_html( $atts['title'] ); ?></h2>
+
+		<?php if ( count( $panels ) > 1 ) : ?>
+		<div class="ewp-newsTabs" role="tablist" aria-label="<?php echo esc_attr( $atts['title'] ); ?>">
+			<?php foreach ( $panels as $i => $panel ) : ?>
+			<button type="button" role="tab" class="ewp-newsTab<?php echo 0 === $i ? ' is-on' : ''; ?>"
+				data-tab="<?php echo esc_attr( $panel['slug'] ); ?>"
+				aria-selected="<?php echo 0 === $i ? 'true' : 'false'; ?>"><?php
+				echo esc_html( $panel['label'] ); ?></button>
 			<?php endforeach; ?>
 		</div>
+		<?php endif; ?>
+
+		<?php foreach ( $panels as $i => $panel ) : ?>
+		<div class="ewp-newsPanel" role="tabpanel" data-panel="<?php echo esc_attr( $panel['slug'] ); ?>"<?php
+			echo 0 === $i ? '' : ' hidden'; ?>>
+			<?php if ( empty( $panel['posts'] ) ) : ?>
+			<p class="ewp-newsEmpty"><?php echo esc_html( $atts['empty'] ); ?></p>
+			<?php else : ?>
+			<div class="ewp-newsGrid">
+				<?php foreach ( $panel['posts'] as $post_item ) : ?>
+				<a class="ewp-newsCard" href="<?php echo esc_url( get_permalink( $post_item ) ); ?>">
+					<?php if ( has_post_thumbnail( $post_item ) ) : ?>
+					<img class="ewp-newsShot" src="<?php
+						echo esc_url( get_the_post_thumbnail_url( $post_item, 'large' ) ); ?>" alt=""
+						loading="lazy" decoding="async">
+					<?php endif; ?>
+					<span class="ewp-newsOver">
+						<b><?php echo esc_html( get_the_title( $post_item ) ); ?></b>
+						<i><?php
+							$cats = get_the_category( $post_item->ID );
+							echo esc_html( $cats ? $cats[0]->name : '' ); ?>
+							<span aria-hidden="true">&middot;</span>
+							<?php echo esc_html( human_time_diff( get_the_time( 'U', $post_item ),
+								current_time( 'timestamp' ) ) ); ?> ago</i>
+					</span>
+				</a>
+				<?php endforeach; ?>
+			</div>
+			<?php endif; ?>
+		</div>
+		<?php endforeach; ?>
+
 		<?php if ( '' !== $atts['link'] ) : ?>
 		<p class="ewp-allRow"><a class="ewp-all" href="<?php
 			echo esc_url( home_url( '/' . ltrim( $atts['link'], '/' ) ) ); ?>"><?php
@@ -2049,16 +2129,43 @@ function ew_hb_css() {
 .ewp-discoverGrid i{font-style:normal;font-size:13px;color:#9a9aa3}
 .ewp-discoverGrid span{position:absolute;right:20px;top:24px;color:#CC0000;font-size:19px}
 
-.ewp-news{background:#f3f3f3;padding:44px 0 56px}
-.ewp-newsGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
-.ewp-newsCard{display:block;background:#fff;border-radius:4px;overflow:hidden;text-decoration:none;color:#111;
- transition:box-shadow .2s,transform .2s}
-.ewp-newsCard:hover{box-shadow:0 3px 14px rgba(0,0,0,.1);transform:translateY(-2px)}
-.ewp-newsImg{display:block;aspect-ratio:16/10;background:#ddd;overflow:hidden}
-.ewp-newsImg img{width:100%;height:100%;object-fit:cover;display:block}
-.ewp-newsText{display:block;padding:14px 15px 17px}
-.ewp-newsText b{display:block;font-size:16px;line-height:1.3;margin:0 0 6px}
-.ewp-newsText i{font-style:normal;font-size:12px;color:#8a8a8a}
+/* Measured off the reference, not eyeballed. Section on the page grey,
+   a 1248 column, the heading Anton 56 in the club red with its own icon
+   above a white 40px tab rail. */
+.ewp-news{background:#f3f3f3;padding:32px 0 32px}
+.ewp-newsH{font-family:Anton,"Instrument Sans",sans-serif;font-size:56px;line-height:56px;
+ font-weight:400;color:#CC0000;text-align:center;margin:0 0 32px}
+.ewp-newsIcon{font-family:"Instrument Sans",system-ui,sans-serif;font-size:48px;line-height:56px}
+/* 4px of padding, 4px between tabs, 2px corners: the rail on the
+   reference, to the pixel. */
+.ewp-newsTabs{display:flex;flex-wrap:wrap;gap:4px;padding:4px;background:#fff;border-radius:2px;
+ width:fit-content;max-width:100%;margin:0 0 24px}
+.ewp-newsTab{appearance:none;border:0;cursor:pointer;background:none;border-radius:2px;
+ padding:8px 16px;font-family:Anton,"Instrument Sans",sans-serif;font-size:16px;line-height:16px;
+ font-weight:400;color:#101010;text-transform:uppercase;
+ transition:color .2s cubic-bezier(.4,0,.2,1),background-color .2s cubic-bezier(.4,0,.2,1)}
+.ewp-newsTab:hover{color:#CC0000}
+.ewp-newsTab.is-on{background:#CC0000;color:#fff}
+.ewp-newsEmpty{font-size:15px;color:#5c5c5c;margin:0 0 8px}
+/* Three across the 1248 column with 16px between: 405 each, the card the
+   reference draws. The photograph is the card; the words sit on it. */
+.ewp-newsGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.ewp-newsCard{position:relative;display:block;overflow:hidden;border-radius:8px;
+ text-decoration:none;color:#fff;aspect-ratio:405/228;background:#101010}
+.ewp-newsShot{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;
+ transition:transform .5s cubic-bezier(.4,0,.2,1)}
+.ewp-newsCard:hover .ewp-newsShot{transform:scale(1.04)}
+/* Dark at the foot so a white headline holds on any photograph. */
+.ewp-newsOver{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;
+ gap:8px;padding:12px;background:linear-gradient(to top,rgba(0,0,0,.78) 0%,rgba(0,0,0,.45) 34%,rgba(0,0,0,0) 68%)}
+.ewp-newsOver b{display:block;font-family:Anton,"Instrument Sans",sans-serif;font-size:18px;
+ line-height:1.1;font-weight:400;text-transform:uppercase;color:#fff;
+ display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ewp-newsOver i{font-style:normal;font-size:12px;line-height:12px;color:rgba(255,255,255,.82)}
+@media(max-width:900px){.ewp-newsGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.ewp-newsGrid{grid-template-columns:1fr}
+ .ewp-newsH{font-size:34px;line-height:36px;margin-bottom:20px}
+ .ewp-newsIcon{font-size:28px}}
 
 /* The editor wraps loose text in paragraphs. Blocks sit flush; stray empty
    paragraphs between them would otherwise open white gaps in the stack. */
@@ -2103,6 +2210,55 @@ function ew_hb_css() {
 
 function ew_hb_js() {
 	return <<<'JS'
+/* The news tabs. The reference goes back to its news service on every
+   click; with ten articles every tab is already in the page, so a click
+   only swaps which one shows. The address bar still carries ?tab= the
+   way theirs does, so a tab can be linked to and the back button works,
+   and a tab arrived at by link opens on load. */
+(function(){
+ var wrap = document.querySelector('.ewp-news');
+ if (!wrap) { return; }
+ var tabs = wrap.querySelectorAll('.ewp-newsTab');
+ var panels = wrap.querySelectorAll('.ewp-newsPanel');
+ if (!tabs.length) { return; }
+
+ function show(slug, push){
+  var found = false;
+  for (var i = 0; i < panels.length; i++) {
+   var on = panels[i].getAttribute('data-panel') === slug;
+   panels[i].hidden = !on;
+   if (on) { found = true; }
+  }
+  if (!found) { return false; }
+  for (var j = 0; j < tabs.length; j++) {
+   var isOn = tabs[j].getAttribute('data-tab') === slug;
+   tabs[j].classList.toggle('is-on', isOn);
+   tabs[j].setAttribute('aria-selected', isOn ? 'true' : 'false');
+  }
+  if (push && window.history && history.pushState) {
+   var u = new URL(window.location.href);
+   if (slug === tabs[0].getAttribute('data-tab')) { u.searchParams.delete('tab'); }
+   else { u.searchParams.set('tab', slug); }
+   history.pushState({ ewTab: slug }, '', u);
+  }
+  return true;
+ }
+
+ for (var k = 0; k < tabs.length; k++) {
+  tabs[k].addEventListener('click', function(){
+   show(this.getAttribute('data-tab'), true);
+  });
+ }
+
+ window.addEventListener('popstate', function(){
+  var want = new URL(window.location.href).searchParams.get('tab');
+  show(want || tabs[0].getAttribute('data-tab'), false);
+ });
+
+ var start = new URL(window.location.href).searchParams.get('tab');
+ if (start) { show(start, false); }
+})();
+
 /* A crest that came back 429 is not a missing crest, it is a throttled one.
    Give each failed badge a single retry a moment later before giving up,
    so a burst of requests does not leave a card permanently blank. */
