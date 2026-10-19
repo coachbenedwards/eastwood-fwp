@@ -2173,6 +2173,13 @@ a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/"]) img{width:auto;height:100%;
    inside the grey band, so ours comes from the block. */
 .elementor-widget-heading:has(> .elementor-widget-container > .elementor-heading-title:empty){display:none}
 .ewp-news .ewp-wrap{max-width:1280px;margin:0 auto;padding:0 16px;box-sizing:border-box}
+/* The band paints its own top edge, so the padding the builder puts
+   above it is white space between the picture and the grey. Keyed on
+   our own section rather than the ids of one page, so it holds
+   wherever the block is put. */
+.elementor-element:has(> .elementor-shortcode > .ewp-news),
+.e-con:has(> .elementor-element > .elementor-shortcode > .ewp-news),
+.e-con:has(> .e-con > .elementor-element > .elementor-shortcode > .ewp-news){padding-top:0}
 /* Capitals: on the reference the heading is capitals in the words
    themselves, so a title typed in sentence case is lifted here rather
    than shouted into the field. */
