@@ -100,13 +100,13 @@ function ew_yt_get( $url ) {
 /**
  * The clips. Each one: id, title, url, img, secs, time, stamp, when.
  */
-function ew_yt_videos( $chan = '', $count = 8, $min_secs = 61 ) {
+function ew_yt_videos( $chan = '', $count = 24, $min_secs = 0 ) {
 	$cid = ew_yt_channel_id( $chan );
 	if ( ! $cid ) {
 		return array();
 	}
 
-	$count    = max( 1, min( 30, (int) $count ) );
+	$count    = max( 1, min( 40, (int) $count ) );
 	$min_secs = max( 0, (int) $min_secs );
 
 	$slot = 'ew_yt_v_' . md5( $cid . '|' . $count . '|' . $min_secs . '|' . ew_yt_api_key() );
@@ -131,6 +131,7 @@ function ew_yt_videos( $chan = '', $count = 8, $min_secs = 61 ) {
 		$route = $clips ? 'feed' : $route;
 	}
 
+	ew_yt_mark_shorts( $clips );
 	update_option( 'ew_yt_route', $route, false );
 
 	/* A miss is held briefly too, so a YouTube wobble is not a hundred
@@ -138,6 +139,43 @@ function ew_yt_videos( $chan = '', $count = 8, $min_secs = 61 ) {
 	set_transient( $slot, $clips, $clips ? ew_yt_ttl() : 5 * MINUTE_IN_SECONDS );
 
 	return $clips;
+}
+
+/**
+ * Which of these are shorts.
+ *
+ * Length alone does not answer it. A highlights package runs 2:49 and
+ * a short can now run to three minutes, so the two overlap. What does
+ * answer it is the vertical still: YouTube publishes oardefault.jpg at
+ * 1080x1920 for a short, and for an ordinary video serves a 120x90
+ * placeholder instead. One is a hundred kilobytes and the other is
+ * one or two, so asking for the size of the file is enough and the
+ * file itself never has to be fetched.
+ *
+ * Only clips short enough to be in question are asked about, and the
+ * answer is kept with the rest of the list.
+ */
+function ew_yt_mark_shorts( &$clips ) {
+	foreach ( $clips as $i => $clip ) {
+		$secs = (int) $clip['secs'];
+		if ( $secs > 200 ) {
+			continue;
+		}
+
+		$vert = 'https://i.ytimg.com/vi/' . $clip['id'] . '/oardefault.jpg';
+		$res  = wp_remote_head( $vert, array( 'timeout' => 6, 'redirection' => 2 ) );
+		if ( is_wp_error( $res ) || 200 !== (int) wp_remote_retrieve_response_code( $res ) ) {
+			continue;
+		}
+
+		if ( (int) wp_remote_retrieve_header( $res, 'content-length' ) < 10000 ) {
+			continue;
+		}
+
+		$clips[ $i ]['short'] = true;
+		$clips[ $i ]['vert']  = $vert;
+		$clips[ $i ]['url']   = 'https://www.youtube.com/shorts/' . $clip['id'];
+	}
 }
 
 /** Drop the held list, so the next page view goes and looks again. */
@@ -470,6 +508,8 @@ function ew_yt_clip( $id, $title, $secs, $when, $stamp, $img ) {
 		'time'  => $secs ? ew_yt_clock( $secs ) : '',
 		'stamp' => (int) $stamp,
 		'when'  => $when,
+		'short' => false,
+		'vert'  => '',
 	);
 }
 

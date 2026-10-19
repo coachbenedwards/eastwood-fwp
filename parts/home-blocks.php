@@ -1148,6 +1148,12 @@ add_shortcode( 'eastwood_home_discover', 'ew_hb_discover_sc' );
  * and takes that phrase back out of the title so a card does not say
  * Match Highlights twice. Set trim_cat="no" to leave titles whole.
  *
+ * format="wide" is the landscape row -- highlights and the series.
+ * format="shorts" is the same block drawn 9:16, carrying only the
+ * upright clips. The two are told apart by the upright still YouTube
+ * publishes for a short and not for anything else, so a three minute
+ * highlights package and a three minute short do not get confused.
+ *
  * The reference runs its video band as its own thing and nothing else
  * on their page looks like it: a red band the width of the window, the
  * channel name across the middle, a section heading hard against the
@@ -1172,7 +1178,7 @@ function ew_hb_tv_sc( $atts, $content = '' ) {
 			'count'    => '8',
 			'cats'     => 'Match Highlights=Highlights|This Is Eastwood=The Series',
 			'trim_cat' => 'yes',
-			'shorts'   => 'no',
+			'format'   => 'wide',
 		),
 		$atts,
 		'eastwood_home_tv'
@@ -1198,21 +1204,31 @@ function ew_hb_tv_sc( $atts, $content = '' ) {
 		);
 	}
 
+	$shorts = 'shorts' === $atts['format'];
+
 	/* Nothing typed in, so go and get the channel. */
 	if ( ! $clips && '' !== trim( $atts['channel'] ) && function_exists( 'ew_yt_videos' ) ) {
 		$map  = ew_yt_cat_map( $atts['cats'] );
 		$trim = 'no' !== $atts['trim_cat'];
-		$live = ew_yt_videos(
-			$atts['channel'],
-			$atts['count'],
-			'yes' === $atts['shorts'] ? 0 : 61
-		);
+		$want = max( 1, (int) $atts['count'] );
 
-		foreach ( $live as $clip ) {
+		foreach ( ew_yt_videos( $atts['channel'], 24 ) as $clip ) {
+			if ( ! empty( $clip['short'] ) !== $shorts ) {
+				continue;
+			}
+
 			$read          = ew_yt_label( $clip['title'], $map, $trim );
 			$clip['title'] = $read['title'];
-			$clip['cat']   = $read['cat'];
-			$clips[]       = $clip;
+			$clip['cat']   = $shorts ? '' : $read['cat'];
+
+			if ( $shorts && ! empty( $clip['vert'] ) ) {
+				$clip['img'] = $clip['vert'];
+			}
+
+			$clips[] = $clip;
+			if ( count( $clips ) >= $want ) {
+				break;
+			}
 		}
 	}
 
@@ -1222,7 +1238,7 @@ function ew_hb_tv_sc( $atts, $content = '' ) {
 
 	ob_start();
 	?>
-<section class="ewp ewp-tv">
+<section class="ewp ewp-tv<?php echo $shorts ? ' is-shorts' : ''; ?>">
 	<?php if ( '' !== $atts['mark'] ) : ?>
 	<p class="ewp-tvMark"><?php echo esc_html( $atts['mark'] ); ?></p>
 	<?php endif; ?>
@@ -1570,6 +1586,11 @@ function ew_hb_tiles_sc( $atts, $content = '' ) {
 	$red  = 'red' === $atts['tone'];
 	$dark = $red || 'dark' === $atts['tone'];
 	$cols = max( 2, min( 6, (int) $atts['cols'] ) );
+	/* Fewer tiles than the row was designed for: draw only as many
+	   columns as there are tiles, each still the width it would have
+	   had in a full row, and let the grid centre them. Three tiles in
+	   a four-wide grid sat left with a hole where the fourth was. */
+	$show = max( 1, min( $cols, count( $tiles ) ) );
 	$ext  = false !== strpos( $atts['all_url'], 'http' );
 
 	ob_start();
@@ -1581,7 +1602,8 @@ function ew_hb_tiles_sc( $atts, $content = '' ) {
 			echo esc_html( $atts['title'] ); ?></h2>
 		<?php endif; ?>
 
-		<ul class="ewp-tileGrid" style="--ewp-cols:<?php echo (int) $cols; ?>">
+		<ul class="ewp-tileGrid" style="--ewp-cols:<?php echo (int) $show; ?>;--ewp-tile:calc((100% - <?php
+			echo (int) ( ( $cols - 1 ) * 14 ); ?>px) / <?php echo (int) $cols; ?>)">
 			<?php foreach ( $tiles as $t ) : ?>
 			<li>
 				<a href="<?php echo esc_url( $t[1] ); ?>"<?php
@@ -1997,7 +2019,9 @@ function ew_hb_css() {
    band rather than in black. Everything else about the dark tone is
    right for it, so the red tone borrows all of it. */
 .ewp-tiles.is-red{background:#990000}
-.ewp-tileGrid{display:grid;grid-template-columns:repeat(var(--ewp-cols,4),1fr);gap:14px;
+.ewp-tileGrid{display:grid;
+ grid-template-columns:repeat(var(--ewp-cols,4),var(--ewp-tile,1fr));
+ justify-content:center;gap:14px;
  list-style:none;margin:0;padding:0}
 .ewp-tileGrid a{display:block;text-decoration:none;color:inherit}
 .ewp-tileImg{display:block;position:relative;aspect-ratio:3/4;border-radius:5px;overflow:hidden;
@@ -2738,6 +2762,21 @@ function ew_hb_css() {
  display:flex;align-items:center;justify-content:center;cursor:pointer;
  box-shadow:0 20px 25px -5px rgba(0,0,0,.18),0 8px 10px -6px rgba(0,0,0,.15)}
 .ewp-tv .ewp-stripNav[hidden]{display:none}
+/* The shorts row. There is nothing on the reference to measure this
+   against -- they do not run one -- so it is built off our own TV row
+   and the reference Discover cards, which are the two things beside
+   it. 220 wide gives five across the 1248 column with the same 16px
+   between them; 391 tall is that width at 9:16 to the pixel, which is
+   the shape the clip was shot in. YouTube publishes the upright still
+   at oardefault.jpg, so nothing is letterboxed or cropped. No category
+   label, because a short does not carry one. */
+.ewp-tv.is-shorts{padding-top:0}
+.ewp-tv.is-shorts .ewp-tvSlide{flex:0 0 220px;max-width:220px}
+.ewp-tv.is-shorts .ewp-tvCard{width:220px;height:464px}
+.ewp-tv.is-shorts .ewp-tvShot{height:391px;flex:0 0 391px}
+.ewp-tv.is-shorts .ewp-tvCat{display:none}
+.ewp-tv.is-shorts .ewp-tvTitle{margin-top:8px}
+.ewp-tv.is-shorts .ewp-stripNav{top:179px}
 .ewp-tv .ewp-stripNav.is-prev{left:max(16px,calc(50vw - 640px))}
 .ewp-tv .ewp-stripNav.is-next{right:max(16px,calc(50vw - 640px))}
 .ewp-tvAll{margin:36px 0 0;text-align:center}
@@ -2748,6 +2787,9 @@ function ew_hb_css() {
  .ewp-tvMark{font-size:32px;line-height:32px;margin-bottom:20px}
  .ewp-tvHead{font-size:28px;line-height:28px;margin-bottom:24px}
  .ewp-tv .ewp-stripNav{display:none}
+ .ewp-tv.is-shorts .ewp-tvSlide{flex:0 0 160px;max-width:160px}
+ .ewp-tv.is-shorts .ewp-tvCard{width:160px;height:350px}
+ .ewp-tv.is-shorts .ewp-tvShot{height:284px;flex:0 0 284px}
 }
 
 .ewp-news{background:#f3f3f3;padding:32px 0 32px;
