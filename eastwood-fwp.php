@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.73.0
+ * Version: 2.74.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -2162,47 +2162,86 @@ function ew_teams_link( $team ) {
 	return array( home_url( '/teams/' . ew_team_slug( $team['name'] ) . '/' ), false );
 }
 
-function ew_teams_shortcode() {
+/**
+ * The sides this page lists, as "Name | kind" lines.
+ *
+ * The kind decides what the tab shows: "squad" draws the squad block,
+ * "grassroots" draws the welcome line, anything else says the squad is
+ * being added. Left empty, it gives back exactly the six sides this page
+ * has always carried, so a page that names none of them is unchanged.
+ */
+function ew_teams_sides( $content ) {
+	$sides = array();
+	$lines = function_exists( 'ew_hb_lines' )
+		? ew_hb_lines( $content )
+		: array_filter( array_map( 'trim', preg_split( '/\r\n|\r|\n/', (string) $content ) ) );
+
+	foreach ( $lines as $line ) {
+		$parts = array_map( 'trim', explode( '|', $line ) );
+		if ( '' === $parts[0] ) {
+			continue;
+		}
+		$sides[] = array(
+			'label' => $parts[0],
+			'kind'  => isset( $parts[1] ) ? strtolower( $parts[1] ) : '',
+		);
+	}
+
+	if ( ! $sides ) {
+		$sides = array(
+			array( 'label' => "Men's First Team", 'kind' => 'squad' ),
+			array( 'label' => "Women's First Team", 'kind' => '' ),
+			array( 'label' => 'Development', 'kind' => '' ),
+			array( 'label' => 'Under 21s', 'kind' => '' ),
+			array( 'label' => 'Academy', 'kind' => '' ),
+			array( 'label' => 'Grassroots', 'kind' => 'grassroots' ),
+		);
+	}
+	return $sides;
+}
+
+function ew_teams_shortcode( $atts = array(), $content = '' ) {
+	$atts = shortcode_atts(
+		array(
+			// {team} is replaced with whichever side the reader is looking at.
+			'pending'    => '{team} squad details are being added.',
+			'grassroots' => 'New players are welcome across every section —',
+			'email'      => 'info@eastwoodfc.com',
+		),
+		$atts,
+		'eastwood_teams'
+	);
+
+	// The senior sides across the top, the way the reference site opens its
+	// Teams page. Only the first team has a squad in the league feed; the
+	// others say so rather than showing an empty grid.
+	$sides = ew_teams_sides( $content );
+
 	ob_start();
 	?>
 <div class="ew-teams-index" data-pv-group>
-	<?php
-	/*
-	 * The senior sides across the top, the way the reference site opens its
-	 * Teams page. Only the first team has a squad in the league feed; the
-	 * others say so rather than showing an empty grid.
-	 */
-	$sides = array(
-		"Men's First Team"   => 'squad',
-		"Women's First Team" => '',
-		'Development'        => '',
-		'Under 21s'          => '',
-		'Academy'            => '',
-		'Grassroots'         => 'grassroots',
-	);
-	?>
 	<div class="ewp ewp-teamBar ew-tm-bar">
 		<div class="ewp-teamTabs" role="tablist">
-			<?php $si = -1; ?>
-			<?php foreach ( $sides as $side => $kind ) : $si++; ?>
+			<?php foreach ( $sides as $si => $side ) : ?>
 			<button type="button" data-pv="s<?php echo (int) $si; ?>"
 				aria-selected="<?php echo 0 === $si ? 'true' : 'false'; ?>"><?php
-				echo esc_html( $side ); ?></button>
+				echo esc_html( $side['label'] ); ?></button>
 			<?php endforeach; ?>
 		</div>
 	</div>
 
-	<?php $si = -1; ?>
-	<?php foreach ( $sides as $side => $kind ) : $si++; ?>
+	<?php foreach ( $sides as $si => $side ) : ?>
 	<div class="ew-tm-side" data-pv-panel="s<?php echo (int) $si; ?>"<?php
 		echo 0 === $si ? '' : ' hidden'; ?>>
-		<?php if ( 'squad' === $kind ) : ?>
+		<?php if ( 'squad' === $side['kind'] ) : ?>
 		<?php echo ew_squad_shortcode(); // phpcs:ignore ?>
-		<?php elseif ( 'grassroots' === $kind ) : ?>
-		<p class="ew-credit">New players are welcome across every section &mdash;
-			<a href="mailto:info@eastwoodfc.com">info@eastwoodfc.com</a>.</p>
+		<?php elseif ( 'grassroots' === $side['kind'] ) : ?>
+		<p class="ew-credit"><?php echo esc_html( $atts['grassroots'] ); ?>
+			<a href="mailto:<?php echo esc_attr( $atts['email'] ); ?>"><?php
+				echo esc_html( $atts['email'] ); ?></a>.</p>
 		<?php else : ?>
-		<p class="ew-credit"><?php echo esc_html( $side ); ?> squad details are being added.</p>
+		<p class="ew-credit"><?php
+			echo esc_html( str_replace( '{team}', $side['label'], $atts['pending'] ) ); ?></p>
 		<?php endif; ?>
 	</div>
 	<?php endforeach; ?>
@@ -2293,14 +2332,61 @@ function ew_player_numbers() {
 	return $out;
 }
 
-function ew_squad_shortcode() {
+/**
+ * The headings the squad is listed under, as "code | heading | one player"
+ * lines -- gk, df, mf, fw, and a last line with no code for anyone the
+ * position list does not name. Left empty it gives back the four the
+ * reference site uses, so a page that names none of them is unchanged.
+ */
+function ew_squad_groups( $content ) {
+	$groups = array();
+	$lines  = function_exists( 'ew_hb_lines' )
+		? ew_hb_lines( $content )
+		: array_filter( array_map( 'trim', preg_split( '/\r\n|\r|\n/', (string) $content ) ) );
+
+	foreach ( $lines as $line ) {
+		$parts = array_map( 'trim', explode( '|', $line ) );
+		if ( ! isset( $parts[1] ) || '' === $parts[1] ) {
+			continue;
+		}
+		$groups[] = array(
+			strtolower( $parts[0] ),
+			$parts[1],
+			isset( $parts[2] ) && '' !== $parts[2] ? $parts[2] : $parts[1],
+		);
+	}
+
+	if ( ! $groups ) {
+		$groups = array(
+			array( 'gk', 'Goalkeepers', 'Goalkeeper' ),
+			array( 'df', 'Defenders', 'Defender' ),
+			array( 'mf', 'Midfielders', 'Midfielder' ),
+			array( 'fw', 'Forwards', 'Forward' ),
+			array( '', 'Squad', 'Squad' ),
+		);
+	}
+	return $groups;
+}
+
+function ew_squad_shortcode( $atts = array(), $content = '' ) {
+	$atts = shortcode_atts(
+		array(
+			'loading' => 'Loading the squad…',
+			'empty'   => 'No squad to show just now.',
+		),
+		$atts,
+		'eastwood_squad'
+	);
+
 	ob_start();
 	?>
 <div class="ew-squad" data-team="<?php echo esc_attr( EW_TEAM ); ?>"
 	data-positions="<?php echo esc_attr( (string) wp_json_encode( ew_player_positions() ) ); ?>"
 	data-departed="<?php echo esc_attr( (string) wp_json_encode( ew_squad_departed() ) ); ?>"
-	data-numbers="<?php echo esc_attr( (string) wp_json_encode( ew_player_numbers() ) ); ?>">
-	<div class="ew-sq-top"><p class="ew-loading">Loading the squad…</p></div>
+	data-numbers="<?php echo esc_attr( (string) wp_json_encode( ew_player_numbers() ) ); ?>"
+	data-groups="<?php echo esc_attr( (string) wp_json_encode( ew_squad_groups( $content ) ) ); ?>"
+	data-empty="<?php echo esc_attr( $atts['empty'] ); ?>">
+	<div class="ew-sq-top"><p class="ew-loading"><?php echo esc_html( $atts['loading'] ); ?></p></div>
 	<div class="ew-sq-body"></div>
 </div>
 	<?php
@@ -2484,11 +2570,17 @@ function build(apps,gls){
  try{(JSON.parse(root.getAttribute('data-departed')||'[]')||[])
    .forEach(function(n){GONE[nkey(n)]=1;});}catch(e){}
  rows=rows.filter(function(r){return !GONE[nkey(r.name)];});
- if(!rows.length){return fail('No squad to show just now.');}
+ if(!rows.length){return fail(root.getAttribute('data-empty')||'No squad to show just now.');}
 
+ // The headings come off the element, so they are a field on the block
+ // rather than a line in here. The four below are only the fallback for a
+ // page drawn before this attribute existed.
  var groups=[['gk','Goalkeepers'],['df','Defenders'],['mf','Midfielders'],
              ['fw','Forwards'],['','Squad']];
  var POSNAME={gk:'Goalkeeper',df:'Defender',mf:'Midfielder',fw:'Forward'};
+ try{var G=JSON.parse(root.getAttribute('data-groups')||'[]');
+  if(G&&G.length){groups=G.map(function(g){return [g[0],g[1]];});
+   POSNAME={};G.forEach(function(g){if(g[0]){POSNAME[g[0]]=g[2]||g[1];}});}}catch(e){}
  var bucket={};
  groups.forEach(function(g){bucket[g[0]]=[];});
  rows.forEach(function(r){
@@ -2586,7 +2678,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.73.0';
+const EW_FWP_VERSION = '2.74.0';
 
 /*
  * Parts loader.
