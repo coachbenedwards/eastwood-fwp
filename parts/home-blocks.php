@@ -1713,8 +1713,7 @@ function ew_hb_css() {
    nothing: no padding, no gap, no width of its own. Written as a class
    rather than :has() so it does not depend on the browser supporting it. */
 .e-con.ew-blockrow,.e-con.ew-blockrow>.e-con-inner{
- padding:0;gap:0;max-width:none;--padding-top:0;--padding-right:0;
- --padding-bottom:0;--padding-left:0}
+ gap:0;--gap:0px;row-gap:0;column-gap:0;max-width:none}
 
 @media(max-width:1100px){
  .ewp-strip .ewp-slide{flex:0 0 calc((100% - 72px)/3);max-width:calc((100% - 72px)/3)}

@@ -204,6 +204,19 @@ function ew_blocks_widget( $spec ) {
  */
 function ew_blocks_row( $widgets, $class = 'ew-blockrow', $pad = array() ) {
 	$pad = array_merge( array( 'top' => '0', 'right' => '0', 'bottom' => '0', 'left' => '0' ), $pad );
+
+	/*
+	 * ew-blockrow is on every row, whatever else it carries. It is what
+	 * takes off the twenty pixels of gap Elementor puts between widgets --
+	 * which, on a page split into one widget per section, added twenty
+	 * pixels seven times over and made every written page taller than it
+	 * was. The row's own class is added alongside it, not instead of it.
+	 */
+	$class = trim( $class );
+	if ( 'ew-blockrow' !== $class && '' !== $class ) {
+		$class = 'ew-blockrow ' . $class;
+	}
+
 	return array(
 		'id'       => substr( md5( 'row' . wp_rand() ), 0, 7 ),
 		'elType'   => 'container',
