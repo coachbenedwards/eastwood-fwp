@@ -82,3 +82,15 @@ It catches syntax, not a call to a function that no longer exists.
 Deleting `ew_squad_departed()` passed the lint and took two pages down
 with 500s. Run the undefined-function sweep, and run the logic against a
 real payload before shipping it.
+
+## 9. An apostrophe in a single-quoted PHP string
+
+The blocks print their CSS from inside single-quoted PHP strings. Writing a
+possessive or a contraction into one of those — a comment included — closes
+the string, and PHP fails to parse the whole file.
+
+Cost: six times now. It is always caught by `php -l`, and always after the
+edit has been written, staged and queued for a release.
+
+Before writing any string into a `.php` file, check it for `'`. Reword, or
+use double quotes. A CSS comment is not exempt: it is inside the string too.

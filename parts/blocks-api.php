@@ -1,0 +1,331 @@
+<?php
+/**
+ * The command channel: reading and changing the blocks on a page.
+ *
+ * Ben wants a person to be able to say "change this" and have the block
+ * change, and an agent to be able to do the same thing without opening a
+ * builder. Both need one addressable place where a page's words live.
+ *
+ * That place is the Elementor document. Every block this plugin provides
+ * already takes all of its visible copy as shortcode attributes -- the
+ * fixtures block alone has fifteen -- so the words are already fields
+ * rather than prose buried in markup. This exposes them:
+ *
+ *   GET  /wp-json/eastwood/v1/blocks?page=matches
+ *        every block on that page, with its element id and its fields
+ *
+ *   POST /wp-json/eastwood/v1/blocks
+ *        { "page": "matches", "id": "a1b2c3", "fields": { "title": "..." } }
+ *        changes those fields on that block and nothing else
+ *
+ *   POST /wp-json/eastwood/v1/page-blocks
+ *        { "page": "matches", "blocks": [ { "block": "...", "fields": {...} } ] }
+ *        lays a page out from scratch -- used when converting a page, and
+ *        refused unless `replace` is true, because it discards what is there
+ *
+ * One source of truth, two ways in. The rule that cost a fortnight stands:
+ * a page's words live in exactly one place, and this is it.
+ *
+ * @package eastwood-fwp
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+/** Shortcodes this channel is willing to write. Nothing else is accepted. */
+function ew_blocks_allowed() {
+	return array(
+		'eastwood_home_strip', 'eastwood_promo_bar', 'eastwood_home_hero',
+		'eastwood_home_banner', 'eastwood_home_fixtures', 'eastwood_home_upcoming',
+		'eastwood_home_news', 'eastwood_home_discover', 'eastwood_home_shop',
+		'eastwood_home_tiles', 'eastwood_home_sponsors', 'eastwood_home_live',
+		'eastwood_teams', 'eastwood_squad', 'eastwood_matches', 'eastwood_tv',
+		'eastwood_gate', 'eastwood_sponsors',
+	);
+}
+
+/** The page being addressed, by slug or by id. */
+function ew_blocks_page( $ref ) {
+	$ref = trim( (string) $ref );
+	if ( '' === $ref ) {
+		return null;
+	}
+	if ( ctype_digit( $ref ) ) {
+		$p = get_post( (int) $ref );
+		return ( $p && 'page' === $p->post_type ) ? $p : null;
+	}
+	return get_page_by_path( sanitize_title( $ref ) );
+}
+
+/** A shortcode string, pulled apart into its name and its fields. */
+function ew_blocks_parse( $shortcode ) {
+	$s = trim( (string) $shortcode );
+	if ( ! preg_match( '/^\[([a-z0-9_]+)([^\]]*)\]/i', $s, $m ) ) {
+		return null;
+	}
+	$atts = shortcode_parse_atts( trim( $m[2] ) );
+	return array(
+		'block'  => $m[1],
+		'fields' => is_array( $atts ) ? $atts : array(),
+		// Content between the tags, where a block takes a list.
+		'lines'  => preg_match( '/\](.*)\[\/' . preg_quote( $m[1], '/' ) . '\]/s', $s, $c )
+			? trim( $c[1] ) : '',
+	);
+}
+
+/**
+ * One attribute, quoted so the value survives.
+ *
+ * A value holding a double quote is written in single quotes, and only a
+ * value holding both falls back to an entity -- which is what a reader
+ * would see, so it is the last resort rather than the default.
+ */
+function ew_blocks_attr( $v ) {
+	$v = (string) $v;
+	if ( false === strpos( $v, '"' ) ) {
+		return '"' . $v . '"';
+	}
+	if ( false === strpos( $v, "'" ) ) {
+		return "'" . $v . "'";
+	}
+	return '"' . str_replace( '"', '&quot;', $v ) . '"';
+}
+
+/**
+ * A square bracket ends a shortcode, so no field may hold one. There is no
+ * escape for it: encoding it shows the reader the encoding. Refuse instead,
+ * and say which field, rather than writing something that renders as junk.
+ */
+function ew_blocks_bad( $fields ) {
+	foreach ( (array) $fields as $k => $v ) {
+		if ( is_string( $v ) && ( false !== strpos( $v, '[' ) || false !== strpos( $v, ']' ) ) ) {
+			return 'Square brackets cannot go in a block field (' . $k . ').';
+		}
+	}
+	return '';
+}
+
+/** The same thing, written back out. */
+function ew_blocks_build( $block, $fields, $lines = '' ) {
+	$out = '[' . $block;
+	foreach ( (array) $fields as $k => $v ) {
+		if ( ! preg_match( '/^[a-z0-9_]+$/i', (string) $k ) ) {
+			continue;
+		}
+		$out .= ' ' . $k . '=' . ew_blocks_attr( $v );
+	}
+	$out .= ']';
+	if ( '' !== trim( (string) $lines ) ) {
+		$out .= "\n" . trim( (string) $lines ) . "\n[/" . $block . ']';
+	}
+	return $out;
+}
+
+/** Walk the Elementor tree and hand every widget to a callback. */
+function ew_blocks_walk( &$nodes, $fn ) {
+	foreach ( $nodes as &$node ) {
+		if ( ! is_array( $node ) ) {
+			continue;
+		}
+		if ( isset( $node['elType'] ) && 'widget' === $node['elType'] ) {
+			$fn( $node );
+		}
+		if ( ! empty( $node['elements'] ) && is_array( $node['elements'] ) ) {
+			ew_blocks_walk( $node['elements'], $fn );
+		}
+	}
+	unset( $node );
+}
+
+function ew_blocks_read( $post ) {
+	$raw = get_post_meta( $post->ID, '_elementor_data', true );
+	$doc = is_string( $raw ) ? json_decode( $raw, true ) : $raw;
+	return is_array( $doc ) ? $doc : array();
+}
+
+function ew_blocks_write( $post, $doc ) {
+	update_post_meta( $post->ID, '_elementor_data', wp_slash( wp_json_encode( $doc ) ) );
+	update_post_meta( $post->ID, '_elementor_edit_mode', 'builder' );
+	// Elementor caches the CSS it generated for a page. Without this the
+	// markup changes and the old stylesheet keeps being served.
+	if ( class_exists( '\Elementor\Plugin' ) ) {
+		\Elementor\Plugin::$instance->files_manager->clear_cache();
+	}
+	clean_post_cache( $post->ID );
+}
+
+add_action( 'rest_api_init', function () {
+
+	register_rest_route( 'eastwood/v1', '/blocks', array(
+		array(
+			'methods'             => 'GET',
+			'permission_callback' => function () { return current_user_can( 'edit_pages' ); },
+			'callback'            => function ( $req ) {
+				$post = ew_blocks_page( $req->get_param( 'page' ) );
+				if ( ! $post ) {
+					return new WP_Error( 'ew_no_page', 'No page by that name.', array( 'status' => 404 ) );
+				}
+
+				$out = array();
+				$doc = ew_blocks_read( $post );
+				ew_blocks_walk( $doc, function ( $node ) use ( &$out ) {
+					$type = isset( $node['widgetType'] ) ? $node['widgetType'] : '';
+					$row  = array(
+						'id'     => isset( $node['id'] ) ? $node['id'] : '',
+						'widget' => $type,
+					);
+					if ( 'shortcode' === $type && ! empty( $node['settings']['shortcode'] ) ) {
+						$parsed = ew_blocks_parse( $node['settings']['shortcode'] );
+						if ( $parsed ) {
+							$row['block']  = $parsed['block'];
+							$row['fields'] = $parsed['fields'];
+							$row['lines']  = $parsed['lines'];
+						}
+					} elseif ( 'heading' === $type ) {
+						$row['fields'] = array( 'title' => $node['settings']['title'] ?? '' );
+					} elseif ( 'text-editor' === $type || 'html' === $type ) {
+						$key = 'html' === $type ? 'html' : 'editor';
+						$row['fields'] = array( $key => $node['settings'][ $key ] ?? '' );
+					}
+					$out[] = $row;
+				} );
+
+				return array(
+					'page'     => $post->post_name,
+					'id'       => $post->ID,
+					'builder'  => 'builder' === get_post_meta( $post->ID, '_elementor_edit_mode', true ),
+					'content'  => trim( (string) $post->post_content ),
+					'blocks'   => $out,
+				);
+			},
+		),
+		array(
+			'methods'             => 'POST',
+			'permission_callback' => function () { return current_user_can( 'edit_pages' ); },
+			'callback'            => function ( $req ) {
+				$post = ew_blocks_page( $req->get_param( 'page' ) );
+				$id   = (string) $req->get_param( 'id' );
+				$set  = (array) $req->get_param( 'fields' );
+				if ( ! $post ) {
+					return new WP_Error( 'ew_no_page', 'No page by that name.', array( 'status' => 404 ) );
+				}
+				if ( '' === $id || ! $set ) {
+					return new WP_Error( 'ew_args', 'Give it an id and some fields.', array( 'status' => 400 ) );
+				}
+				$bad = ew_blocks_bad( $set );
+				if ( $bad ) {
+					return new WP_Error( 'ew_field', $bad, array( 'status' => 400 ) );
+				}
+
+				$doc   = ew_blocks_read( $post );
+				$hit   = false;
+				$after = array();
+
+				ew_blocks_walk( $doc, function ( &$node ) use ( $id, $set, &$hit, &$after ) {
+					if ( ( $node['id'] ?? '' ) !== $id ) {
+						return;
+					}
+					$type = $node['widgetType'] ?? '';
+
+					if ( 'shortcode' === $type ) {
+						$parsed = ew_blocks_parse( $node['settings']['shortcode'] ?? '' );
+						if ( ! $parsed ) { return; }
+						$fields = array_merge( $parsed['fields'], $set );
+						$lines  = array_key_exists( 'lines', $set ) ? $set['lines'] : $parsed['lines'];
+						unset( $fields['lines'] );
+						$node['settings']['shortcode'] = ew_blocks_build( $parsed['block'], $fields, $lines );
+						$after = $fields;
+					} else {
+						foreach ( $set as $k => $v ) {
+							if ( in_array( $k, array( 'title', 'editor', 'html' ), true ) ) {
+								$node['settings'][ $k ] = $v;
+								$after[ $k ] = $v;
+							}
+						}
+					}
+					$hit = true;
+				} );
+
+				if ( ! $hit ) {
+					return new WP_Error( 'ew_no_block', 'No block with that id on that page.', array( 'status' => 404 ) );
+				}
+
+				ew_blocks_write( $post, $doc );
+				return array( 'ok' => true, 'page' => $post->post_name, 'id' => $id, 'fields' => $after );
+			},
+		),
+	) );
+
+	register_rest_route( 'eastwood/v1', '/page-blocks', array(
+		'methods'             => 'POST',
+		// Laying a page out again throws away whatever was there, so this one
+		// asks for more than the others.
+		'permission_callback' => function () { return current_user_can( 'edit_pages' ); },
+		'callback'            => function ( $req ) {
+			$post = ew_blocks_page( $req->get_param( 'page' ) );
+			if ( ! $post ) {
+				return new WP_Error( 'ew_no_page', 'No page by that name.', array( 'status' => 404 ) );
+			}
+			if ( ! $req->get_param( 'replace' ) ) {
+				return new WP_Error( 'ew_replace', 'This discards the page. Pass replace: true.', array( 'status' => 400 ) );
+			}
+
+			$blocks = (array) $req->get_param( 'blocks' );
+			if ( ! $blocks ) {
+				return new WP_Error( 'ew_args', 'Give it some blocks.', array( 'status' => 400 ) );
+			}
+
+			$allowed = ew_blocks_allowed();
+			$doc     = array();
+			foreach ( $blocks as $b ) {
+				$name = (string) ( $b['block'] ?? '' );
+				if ( ! in_array( $name, $allowed, true ) ) {
+					return new WP_Error( 'ew_block', 'Not a block this channel writes: ' . $name, array( 'status' => 400 ) );
+				}
+				$bad = ew_blocks_bad( (array) ( $b['fields'] ?? array() ) );
+				if ( $bad ) {
+					return new WP_Error( 'ew_field', $bad, array( 'status' => 400 ) );
+				}
+				$doc[] = array(
+					'id'       => substr( md5( $name . wp_rand() ), 0, 7 ),
+					'elType'   => 'container',
+					'settings' => array(
+						'content_width' => 'full',
+						// The block draws its own gutter. Elementor's container
+						// adds ten pixels of its own, which would move every
+						// one of these pages sideways by ten pixels against the
+						// capture it has to match. ew-blockrow takes it off in
+						// CSS rather than relying on these settings alone.
+						'css_classes'   => 'ew-blockrow',
+						'padding'       => array( 'unit' => 'px', 'top' => '0', 'right' => '0',
+							'bottom' => '0', 'left' => '0', 'isLinked' => true ),
+					),
+					'elements' => array( array(
+						'id'         => substr( md5( $name . 'w' . wp_rand() ), 0, 7 ),
+						'elType'     => 'widget',
+						'widgetType' => 'shortcode',
+						'settings'   => array(
+							'shortcode' => ew_blocks_build( $name, (array) ( $b['fields'] ?? array() ),
+								(string) ( $b['lines'] ?? '' ) ),
+						),
+					) ),
+					'isInner'  => false,
+				);
+			}
+
+			// The page stops carrying its own copy of the words. One source.
+			wp_update_post( array( 'ID' => $post->ID, 'post_content' => '' ) );
+			ew_blocks_write( $post, $doc );
+
+			// The page template is left exactly as it was. Elementor renders
+			// through the_content, which the current template already calls,
+			// so switching it would change the header, the footer or the page
+			// gutter for no gain -- and this has to match a capture.
+			if ( $req->get_param( 'template' ) ) {
+				update_post_meta( $post->ID, '_wp_page_template',
+					sanitize_text_field( (string) $req->get_param( 'template' ) ) );
+			}
+
+			return array( 'ok' => true, 'page' => $post->post_name, 'blocks' => count( $doc ) );
+		},
+	) );
+} );

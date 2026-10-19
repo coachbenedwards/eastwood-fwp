@@ -1708,6 +1708,13 @@ function ew_hb_css() {
 .e-con-inner:has(> .elementor-widget .ewp-promo){padding-top:0;padding-bottom:0;gap:0}
 .e-con:has(> .e-con-inner > .elementor-widget .ewp-strip),
 .e-con:has(> .e-con-inner > .elementor-widget .ewp-promo){padding-top:0;padding-bottom:0}
+/* A row holding one of the blocks in here. The block already draws its
+   own gutter and its own spacing, so the container around it contributes
+   nothing: no padding, no gap, no width of its own. Written as a class
+   rather than :has() so it does not depend on the browser supporting it. */
+.e-con.ew-blockrow,.e-con.ew-blockrow>.e-con-inner{
+ padding:0;gap:0;max-width:none;--padding-top:0;--padding-right:0;
+ --padding-bottom:0;--padding-left:0}
 
 @media(max-width:1100px){
  .ewp-strip .ewp-slide{flex:0 0 calc((100% - 72px)/3);max-width:calc((100% - 72px)/3)}
