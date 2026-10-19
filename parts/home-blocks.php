@@ -1130,9 +1130,22 @@ add_shortcode( 'eastwood_home_discover', 'ew_hb_discover_sc' );
 
 /* ------------------------------------------------------------------
  * [eastwood_home_tv mark="Eastwood TV" heading="Latest"
+ *                   channel="@eastwoodfootballclub" count="8"
+ *                   cats="Match Highlights=Highlights|This Is Eastwood=The Series"
  *                   all="Visit Eastwood TV" all_url="https://..."]
  * Title | https://watch/here | Category | 24:10 | https://thumb.jpg | 3 months ago
  * [/eastwood_home_tv]
+ *
+ * Left empty, the clips come straight off the club YouTube channel
+ * named in the channel field: the newest uploads, with their own
+ * stills, running times and ages, held for half an hour at a time.
+ * Shorts are left out, since the cards are landscape. Type lines in
+ * and the typed lines win, which is the way to pin a particular set
+ * of clips for a week.
+ *
+ * cats turns a phrase in a title into the small grey label above it,
+ * and takes that phrase back out of the title so a card does not say
+ * Match Highlights twice. Set trim_cat="no" to leave titles whole.
  *
  * The reference runs its video band as its own thing and nothing else
  * on their page looks like it: a red band the width of the window, the
@@ -1150,10 +1163,15 @@ add_shortcode( 'eastwood_home_discover', 'ew_hb_discover_sc' );
 function ew_hb_tv_sc( $atts, $content = '' ) {
 	$atts = shortcode_atts(
 		array(
-			'mark'    => 'Eastwood TV',
-			'heading' => 'Latest',
-			'all'     => 'Visit Eastwood TV',
-			'all_url' => '/eastwood-tv/',
+			'mark'     => 'Eastwood TV',
+			'heading'  => 'Latest',
+			'all'      => 'Visit Eastwood TV',
+			'all_url'  => '/eastwood-tv/',
+			'channel'  => '@eastwoodfootballclub',
+			'count'    => '8',
+			'cats'     => 'Match Highlights=Highlights|This Is Eastwood=The Series',
+			'trim_cat' => 'yes',
+			'shorts'   => 'no',
 		),
 		$atts,
 		'eastwood_home_tv'
@@ -1177,6 +1195,24 @@ function ew_hb_tv_sc( $atts, $content = '' ) {
 			'img'   => isset( $parts[4] ) ? $parts[4] : '',
 			'when'  => isset( $parts[5] ) ? $parts[5] : '',
 		);
+	}
+
+	/* Nothing typed in, so go and get the channel. */
+	if ( ! $clips && '' !== trim( $atts['channel'] ) && function_exists( 'ew_yt_videos' ) ) {
+		$map  = ew_yt_cat_map( $atts['cats'] );
+		$trim = 'no' !== $atts['trim_cat'];
+		$live = ew_yt_videos(
+			$atts['channel'],
+			$atts['count'],
+			'yes' === $atts['shorts'] ? 0 : 61
+		);
+
+		foreach ( $live as $clip ) {
+			$read          = ew_yt_label( $clip['title'], $map, $trim );
+			$clip['title'] = $read['title'];
+			$clip['cat']   = $read['cat'];
+			$clips[]       = $clip;
+		}
 	}
 
 	if ( ! $clips ) {
@@ -1208,9 +1244,7 @@ function ew_hb_tv_sc( $atts, $content = '' ) {
 						<i class="ewp-tvTime"><?php echo esc_html( $clip['time'] ); ?></i>
 						<?php endif; ?>
 					</span>
-					<?php if ( '' !== $clip['cat'] ) : ?>
 					<span class="ewp-tvCat"><?php echo esc_html( $clip['cat'] ); ?></span>
-					<?php endif; ?>
 					<b class="ewp-tvTitle"><?php echo esc_html( $clip['title'] ); ?></b>
 					<?php if ( '' !== $clip['when'] ) : ?>
 					<i class="ewp-tvWhen"><?php echo esc_html( $clip['when'] ); ?></i>
@@ -2679,7 +2713,7 @@ function ew_hb_css() {
  font-family:"Instrument Sans",sans-serif;font-size:11px;line-height:11px;color:#fff;
  background:rgba(16,16,16,.75);border-radius:3px;padding:4px 6px}
 .ewp-tvCat{display:block;margin:8px 8px 0;font-family:"Instrument Sans",sans-serif;
- font-size:12px;line-height:12px;color:#6b6b6b}
+ font-size:12px;line-height:12px;min-height:12px;color:#6b6b6b}
 .ewp-tvTitle{display:block;margin:1px 8px 0;font-family:Anton,"Instrument Sans",sans-serif;
  font-size:16px;line-height:19px;font-weight:400;color:#101010;text-transform:uppercase;
  overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
