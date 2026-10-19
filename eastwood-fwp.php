@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.77.0
+ * Version: 2.77.1
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -2796,7 +2796,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.77.0';
+const EW_FWP_VERSION = '2.77.1';
 
 /*
  * Parts loader.
@@ -4025,9 +4025,9 @@ function ew_prose_css_inline() {
    stopped reaching them -- which read as every line running the full
    width of the screen. The gutter stays on the widget itself, from the
    .ew-prose > * rule, so the sum is the same 1248 either way. */
-.ew-prose .elementor-widget-container > p,
-.ew-prose .elementor-widget-container > ul,
-.ew-prose .elementor-widget-container > ol{
+.ew-prose .elementor-widget > p,
+.ew-prose .elementor-widget > ul,
+.ew-prose .elementor-widget > ol{
  box-sizing:content-box;max-width:72ch}
 .ew-prose *{box-sizing:border-box}
 .ew-prose .ew-lede{font-size:19px;line-height:1.55;color:#333;margin:0 0 28px}
@@ -4047,13 +4047,20 @@ function ew_prose_css_inline() {
    page should not start with 40px of air above it. */
 .ew-prose > .elementor-element:first-child .elementor-widget-heading h2.elementor-heading-title{
  margin-top:0}
-.ew-prose p,.ew-prose .elementor-widget-text-editor p{font-size:16px;line-height:1.65;margin:0 0 16px}
-.ew-prose ul,.ew-prose .elementor-widget-text-editor ul{margin:0 0 20px;padding-left:20px}
+/* Descendant selectors, deliberately: these already reach a paragraph
+   inside a text widget, and adding .elementor-widget-text-editor p made
+   them MORE specific than .ew-prose .ew-lede, which quietly cost the
+   opening paragraph of every page its 19px. */
+.ew-prose p{font-size:16px;line-height:1.65;margin:0 0 16px}
+.ew-prose ul{margin:0 0 20px;padding-left:20px}
 .ew-prose li{font-size:16px;line-height:1.6;margin:0 0 8px}
 /* Elementor gives a text widget its own colour and leading; the ones set
    here are the ones that matter. */
 .ew-prose .elementor-widget-text-editor{color:#111;font-family:"Instrument Sans",system-ui,sans-serif}
-.ew-prose .elementor-widget-container > *:last-child{margin-bottom:0}
+/* Elementor lays a container out with flex, and flex does not collapse
+   margins. Without this the gap before a heading is 16px from the
+   paragraph PLUS 40px from the heading, where it used to collapse to 40. */
+.ew-prose .elementor-widget > *:last-child{margin-bottom:0}
 .ew-prose .ew-people{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin:0 0 20px}
 .ew-prose .ew-person{background:#fff;border:1px solid #e6e6e6;border-left:3px solid #CC0000;
  border-radius:4px;padding:14px 16px}

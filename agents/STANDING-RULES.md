@@ -126,8 +126,13 @@ Cost: seven times now — including once in the release immediately after
 this rule was written, in a CSS comment. It is always caught by `php -l`,
 and always after the edit has been written, staged and queued.
 
-Before writing any string into a `.php` file, check it for `'`. Reword, or
-use double quotes. A CSS comment is not exempt: it is inside the string too.
+It is not a thing to spot by eye, and eight attempts prove that. **Run
+`node qa/quotecheck.mjs` before every commit.** It parses every PHP file
+and, when one fails, prints the line and points at the apostrophe. Needs
+the php binary, so run it in the sandbox rather than on the laptop.
+
+Rewording is still the fix: say "the sides of the club", not "the club's
+sides". A CSS comment is not exempt — it is inside the string too.
 
 ## 10. Never amend a commit that has already been pushed
 

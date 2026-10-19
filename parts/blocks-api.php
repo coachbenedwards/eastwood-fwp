@@ -193,16 +193,25 @@ function ew_blocks_widget( $spec ) {
 	return null;
 }
 
-/** A row to hold widgets, drawing nothing of its own. */
-function ew_blocks_row( $widgets, $class = 'ew-blockrow' ) {
+/**
+ * A row to hold widgets, drawing nothing of its own unless asked.
+ *
+ * Elementor writes a container's padding as its own per-element rule, which
+ * beats a rule written against a class -- so a wrapper that needs padding
+ * has to ask for it here rather than rely on the stylesheet. The written
+ * pages need 64px under the last section, which is what .ew-prose used to
+ * give them before an Elementor container was in the way.
+ */
+function ew_blocks_row( $widgets, $class = 'ew-blockrow', $pad = array() ) {
+	$pad = array_merge( array( 'top' => '0', 'right' => '0', 'bottom' => '0', 'left' => '0' ), $pad );
 	return array(
 		'id'       => substr( md5( 'row' . wp_rand() ), 0, 7 ),
 		'elType'   => 'container',
 		'settings' => array(
 			'content_width' => 'full',
 			'css_classes'   => $class,
-			'padding'       => array( 'unit' => 'px', 'top' => '0', 'right' => '0',
-				'bottom' => '0', 'left' => '0', 'isLinked' => true ),
+			'padding'       => array( 'unit' => 'px', 'top' => $pad['top'], 'right' => $pad['right'],
+				'bottom' => $pad['bottom'], 'left' => $pad['left'], 'isLinked' => false ),
 		),
 		'elements' => array_values( array_filter( $widgets ) ),
 		'isInner'  => false,
@@ -452,8 +461,14 @@ add_action( 'rest_api_init', function () {
 				if ( ! $built ) {
 					continue;
 				}
+				$pad = array();
+				foreach ( array( 'top', 'right', 'bottom', 'left' ) as $side ) {
+					if ( isset( $row['padding'][ $side ] ) ) {
+						$pad[ $side ] = (string) (int) $row['padding'][ $side ];
+					}
+				}
 				$doc[] = ew_blocks_row( $built,
-					(string) ( $row['class'] ?? 'ew-blockrow' ) );
+					(string) ( $row['class'] ?? 'ew-blockrow' ), $pad );
 			}
 
 			if ( ! $doc ) {
