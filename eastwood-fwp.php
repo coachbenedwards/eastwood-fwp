@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.83.6
+ * Version: 2.83.7
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -469,7 +469,11 @@ function ew_fixture_adds() {
 			'time'        => '15:00',
 			'status'      => array( 'short' => '' ),
 			'venue'       => 'The Sports Ground (Lye)',
-			'competition' => array( 'id' => 0, 'name' => 'FA Vase Second Round' ),
+			// 30 is the FA Vase. The id is what puts the competition badge
+			// on a fixture -- assets/comps/30.png -- so a cup tie added by
+			// hand needs it as much as a game the feed carries, or it is
+			// the one fixture on the site with a blank corner.
+			'competition' => array( 'id' => 30, 'name' => 'FA Vase Second Round' ),
 			'home-team'   => array( 'id' => 0, 'name' => 'Lye Town' ),
 			'away-team'   => array( 'id' => (int) EW_TEAM, 'name' => 'Eastwood FC' ),
 		),
@@ -3065,7 +3069,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.83.6';
+const EW_FWP_VERSION = '2.83.7';
 
 /*
  * Parts loader.
