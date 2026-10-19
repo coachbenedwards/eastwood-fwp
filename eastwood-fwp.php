@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.77.3
+ * Version: 2.77.4
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -2796,7 +2796,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.77.3';
+const EW_FWP_VERSION = '2.77.4';
 
 /*
  * Parts loader.
@@ -4092,9 +4092,20 @@ function ew_prose_css_inline() {
    here are the ones that matter. */
 .ew-prose .elementor-widget-text-editor{color:#111;font-family:"Instrument Sans",system-ui,sans-serif}
 /* Elementor lays a container out with flex, and flex does not collapse
-   margins. Without this the gap before a heading is 16px from the
-   paragraph PLUS 40px from the heading, where it used to collapse to 40. */
-.ew-prose .elementor-widget > *:last-child{margin-bottom:0}
+   margins, so every gap on a converted page was the sum of two margins
+   instead of the larger of them. The first attempt zeroed the bottom
+   margin of whatever ended a widget, which fixed the gap before a
+   heading and silently removed the gap everywhere else: eleven pages
+   came out between 28 and 390 pixels shorter than the pages they
+   replaced.
+
+   A page of prose is not a flex layout. Put the container back into
+   normal flow and the browser collapses the margins itself, exactly as
+   it did before the page was converted -- a widget wrapper has no
+   padding or border, so a margin collapses straight through it. With
+   this one line all eleven pages measure identical to the originals,
+   element for element. */
+.e-con.ew-prose{display:block}
 .ew-prose .ew-people{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin:0 0 20px}
 .ew-prose .ew-person{background:#fff;border:1px solid #e6e6e6;border-left:3px solid #CC0000;
  border-radius:4px;padding:14px 16px}
@@ -4112,7 +4123,12 @@ function ew_prose_css_inline() {
 .ew-prose .ew-cta p a{text-decoration:underline}
 @media(max-width:720px){
  .ew-prose .ew-lede{font-size:17px}
- .ew-prose h2{font-size:19px}
+ /* The three-class selector again. Without it the desktop rule above,
+    which needs three classes to beat Elementor, also beat this one, so
+    on a phone every heading on a converted page stayed at 30px and
+    wrapped onto two lines. */
+ .ew-prose h2,
+ .ew-prose .elementor-widget-heading h2.elementor-heading-title{font-size:19px}
 }';
 }
 
