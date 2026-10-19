@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.88.5
+ * Version: 2.88.6
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1869,10 +1869,79 @@ h1.elementor-heading-title,
    positioned, so without it the anchor has nothing to stand on. The grid
    cards below use min-h-[320px], which did survive. */
 .min-h-\[420px\]{min-height:420px}
+
+/* The sponsor rail across the top of every page, and the wall in the
+   footer. Both of these sat in the home-blocks stylesheet, which only
+   prints on a page carrying one of those blocks -- so everywhere else
+   the marks fell back to the captured 60px width and came out at
+   different heights again. They are chrome, and they belong here.
+
+   The rail: the captured header pins each mark to 60px wide, and a
+   width is the wrong thing to pin. Two marks of different proportions
+   set to the same width come out different heights, which is why the
+   squarer KAM badge towered over PodCut. A rail is balanced on height,
+   and the height is the one PodCut already had -- 26, a pixel up from
+   25 since PodCut became the real sponsorship lockup, because that
+   artwork carries .com under the tail and leaves the wordmark 62 per
+   cent of the file where the bare mark was 65. KAM comes down to match
+   rather than everything going up. */
+a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/"]){width:auto;height:26px}
+a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/"]) img{width:auto;height:100%;
+ object-fit:contain}
+
+/* The footer wall. The captured markup gives the two upper rows a 128px
+   slot each, which is fine for a boxy logo with air around it and far
+   too much for a wide wordmark: PodCut came out 427 across and KAM 277,
+   towering over the rows beneath. Eighty-four tall with a ceiling on the
+   width settles every mark on one line without picking on two of them,
+   and leaves the hierarchy intact -- these rows still sit above the 40px
+   partners row below. */
+[class*="lg:h-32"]:has(img[src*="/ew-sponsors/"]){height:84px}
+[class*="lg:h-32"]:has(img[src*="/ew-sponsors/"]) img{max-width:240px;margin:0 auto}
+
+/* The web address under KAM.
+
+   The PodCut sponsorship artwork carries .com set under the tail of
+   the wordmark. The KAM artwork does not: theirs is a line inside the
+   badge, 16px of a 200px file, which comes out two pixels tall in the
+   rail. So it is typeset -- the heavy condensed italic their own
+   lettering is cut in, right aligned under the badge the way the
+   PodCut one sits under the wordmark. The proportions are taken off
+   the PodCut file: its .com is 24 per cent of the artwork height with
+   a 7 per cent gap above it, so the KAM badge gives up exactly that
+   much and neither the rail nor the wall row ends up any taller than
+   it is now. Four characters are fetched, not a whole family. */
+a:has(img[src*="/ew-sponsors/kam"]){text-decoration:none}
+a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/kam"]){display:flex;flex-direction:column;
+ justify-content:flex-start;height:26px}
+a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/kam"]) img{height:17px;flex:0 0 auto}
+a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/kam"])::after{content:".com";display:block;
+ font:italic 700 12px/6px "Barlow Condensed","Instrument Sans",sans-serif;
+ color:#fff;text-align:right;margin-top:3px}
+
+/* Seventy-one, not the slot height of 84: the 240px ceiling catches a
+   wordmark that wide, so PodCut lands at 71 tall and a KAM badge filling
+   all 84 would tower over it again. Against 71 the numbers above fall
+   out exactly -- badge 49, gap 5, line 17. */
+[class*="lg:h-32"]:has(img[src*="/ew-sponsors/kam"]){height:71px;display:flex;
+ flex-direction:column;justify-content:flex-start;width:fit-content;margin:0 auto}
+[class*="lg:h-32"]:has(img[src*="/ew-sponsors/kam"]) picture{display:block;line-height:0}
+[class*="lg:h-32"]:has(img[src*="/ew-sponsors/kam"]) img{height:49px;width:auto;max-width:240px}
+[class*="lg:h-32"]:has(img[src*="/ew-sponsors/kam"])::after{content:".com";display:block;
+ font:italic 700 32px/17px "Barlow Condensed","Instrument Sans",sans-serif;
+ color:#fff;text-align:right;margin-top:5px}
 ';
 }
 
 add_action( 'wp_head', function () {
+	/*
+	 * Four characters of Barlow Condensed, the heavy condensed italic
+	 * KAM's own lettering is cut in, for the .com typeset under their
+	 * badge. The text= parameter means Google serves a subset holding
+	 * only . c o m -- about two kilobytes -- rather than a family.
+	 */
+	echo '<link rel="stylesheet" href="https://fonts.googleapis.com/css2'
+		. '?family=Barlow+Condensed:ital,wght@1,700&amp;text=.com&amp;display=swap">' . "\n";
 	echo '<style id="ew-chrome">' . ew_chrome_css() . '</style>'; // phpcs:ignore
 }, 21 );
 
@@ -3121,7 +3190,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.88.5';
+const EW_FWP_VERSION = '2.88.6';
 
 /*
  * Parts loader.

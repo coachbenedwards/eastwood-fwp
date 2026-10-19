@@ -1680,6 +1680,21 @@ function ew_hb_css() {
 .ewp-sponsors.is-red{background:#CC0000}
 .ewp-sponsors.is-red .ewp-sponsorLabel{color:rgba(255,255,255,.75)}
 .ewp-sponsors.is-red .ewp-sponsorRow img{filter:brightness(0) invert(1)}
+/* The .com under KAM, same reasoning as the rail and the wall in the
+   chrome stylesheet: their artwork has no web address that survives
+   being shrunk, so it is typeset in the heavy condensed italic their
+   own lettering is cut in, right aligned under the badge. The badge
+   gives up the height, so the row does not grow. */
+.ewp-sponsorRow li:has(img[src*="/ew-sponsors/kam"]){display:flex;flex-direction:column;
+ justify-content:flex-start}
+.ewp-sponsorRow li:has(img[src*="/ew-sponsors/kam"]) img{height:32px}
+.ewp-sponsorRow.is-lead li:has(img[src*="/ew-sponsors/kam"]) img{height:46px}
+.ewp-sponsorRow li:has(img[src*="/ew-sponsors/kam"])::after{content:".com";display:block;
+ font:italic 700 20px/11px "Barlow Condensed","Instrument Sans",sans-serif;
+ color:#101010;text-align:right;margin-top:3px}
+.ewp-sponsorRow.is-lead li:has(img[src*="/ew-sponsors/kam"])::after{
+ font-size:30px;line-height:15px;margin-top:5px}
+.ewp-sponsors.is-red .ewp-sponsorRow li:has(img[src*="/ew-sponsors/kam"])::after{color:#fff}
 
 /* The matches page: a month, then one full-width panel per fixture.
    Same tie layout as the banner, white instead of a photograph. */
@@ -2145,31 +2160,6 @@ function ew_hb_css() {
    stopped short either side and the cards came out 372 instead of 405.
    The row cannot be widened from here without moving every other
    section in it, so this section steps outside its own column. */
-/* The sponsor rail across the top of every page. The captured header
-   pins each mark to 60px wide, which left them smaller than anything
-   else up there -- and a width is the wrong thing to pin anyway. Two
-   marks of different proportions set to the same width come out
-   different heights, which is why the squarer KAM badge towered over
-   PodCut. A rail is balanced on height instead, and the height is the
-   one PodCut already had at 90 wide -- 25 -- because that one was
-   right. KAM comes down to match it rather than everything going up.
-   Twenty-six, not twenty-five, since PodCut became the real sponsorship
-   lockup: that artwork carries .com under the tail of the wordmark, so
-   the wordmark is 62 per cent of the file where the bare mark was 65,
-   and one more pixel of height keeps podcut reading exactly as it did. */
-a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/"]){width:auto;height:26px}
-a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/"]) img{width:auto;height:100%;
- object-fit:contain}
-/* The footer wall. The captured markup gives the two upper rows a 128px
-   slot each, which is fine for a boxy logo with air around it and far
-   too much for a wide wordmark: PodCut came out 427 across and KAM 277,
-   towering over the rows beneath. Eighty-four tall with a ceiling on the
-   width settles every mark on one line without picking on two of them,
-   and leaves the hierarchy intact -- these rows still sit above the 40px
-   partners row below. */
-[class*="lg:h-32"]:has(img[src*="/ew-sponsors/"]){height:84px}
-[class*="lg:h-32"]:has(img[src*="/ew-sponsors/"]) img{max-width:240px;margin:0 auto}
-
 .ewp-news{background:#f3f3f3;padding:32px 0 32px;
  width:100vw;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw)}
 /* A heading widget emptied in the builder should draw nothing rather
