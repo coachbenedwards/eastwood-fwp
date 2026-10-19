@@ -1966,7 +1966,12 @@ function ew_hb_css() {
 .ewp-upcomingGrid .ewp-ha.is-home{background:#fff;color:#CC0000;border-color:#CC0000}
 .ewp-upcomingGrid .ewp-ha.is-away{background:#fff;color:#CC0000;border-color:#CC0000}
 
-.ewp-upcomingGrid .ewp-cardBody{display:flex;align-items:center;gap:16px;padding:12px 24px}
+/* flex:1 so the body takes whatever height the row gives the card and the
+   crest sits in the middle of it. Without it the body was only as tall as
+   the crest, which left the whole lower half of a card pinned to the top
+   with white space under it -- the reference centres it. */
+.ewp-upcomingGrid .ewp-cardBody{display:flex;align-items:center;gap:16px;padding:12px 24px;
+ flex:1 1 auto}
 .ewp-upcomingGrid .ewp-cardBody img{width:72px;height:72px;object-fit:contain;flex:none}
 .ewp-upcomingGrid .ewp-cardText{display:flex;flex-direction:column;gap:4px;min-width:0}
 .ewp-upcomingGrid .ewp-cardText > *{display:block;margin:0}
