@@ -89,8 +89,9 @@ The blocks print their CSS from inside single-quoted PHP strings. Writing a
 possessive or a contraction into one of those — a comment included — closes
 the string, and PHP fails to parse the whole file.
 
-Cost: six times now. It is always caught by `php -l`, and always after the
-edit has been written, staged and queued for a release.
+Cost: seven times now — including once in the release immediately after
+this rule was written, in a CSS comment. It is always caught by `php -l`,
+and always after the edit has been written, staged and queued.
 
 Before writing any string into a `.php` file, check it for `'`. Reword, or
 use double quotes. A CSS comment is not exempt: it is inside the string too.

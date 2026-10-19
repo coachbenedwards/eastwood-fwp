@@ -125,6 +125,90 @@ function ew_blocks_build( $block, $fields, $lines = '' ) {
 	return $out;
 }
 
+/**
+ * One widget, from a plain description of it.
+ *
+ * A page "in blocks" has to mean blocks a person can edit, which means
+ * Elementor's own heading and text widgets wherever the content is just a
+ * heading or a paragraph -- not one shortcode box holding a page of HTML.
+ * That was the first attempt and Ben was right to reject it: the words
+ * were reachable, but only as HTML in a single field.
+ *
+ *   { "widget": "heading",     "fields": { "title": "Trials", "tag": "h2" } }
+ *   { "widget": "text-editor", "fields": { "editor": "<p>...</p>" } }
+ *   { "block":  "eastwood_gate" }
+ */
+function ew_blocks_widget( $spec ) {
+	$id = substr( md5( wp_json_encode( $spec ) . wp_rand() ), 0, 7 );
+
+	if ( ! empty( $spec['block'] ) ) {
+		return array(
+			'id'         => $id,
+			'elType'     => 'widget',
+			'widgetType' => 'shortcode',
+			'settings'   => array(
+				'shortcode' => ew_blocks_build( (string) $spec['block'],
+					(array) ( $spec['fields'] ?? array() ), (string) ( $spec['lines'] ?? '' ) ),
+			),
+		);
+	}
+
+	$kind   = (string) ( $spec['widget'] ?? '' );
+	$fields = (array) ( $spec['fields'] ?? array() );
+
+	if ( 'heading' === $kind ) {
+		$tag = strtolower( (string) ( $fields['tag'] ?? 'h2' ) );
+		if ( ! in_array( $tag, array( 'h1', 'h2', 'h3', 'h4', 'h5', 'h6' ), true ) ) {
+			$tag = 'h2';
+		}
+		return array(
+			'id'         => $id,
+			'elType'     => 'widget',
+			'widgetType' => 'heading',
+			'settings'   => array(
+				'title'       => (string) ( $fields['title'] ?? '' ),
+				'header_size' => $tag,
+			),
+		);
+	}
+
+	if ( 'text-editor' === $kind ) {
+		return array(
+			'id'         => $id,
+			'elType'     => 'widget',
+			'widgetType' => 'text-editor',
+			'settings'   => array( 'editor' => (string) ( $fields['editor'] ?? '' ) ),
+		);
+	}
+
+	if ( 'html' === $kind ) {
+		return array(
+			'id'         => $id,
+			'elType'     => 'widget',
+			'widgetType' => 'html',
+			'settings'   => array( 'html' => (string) ( $fields['html'] ?? '' ) ),
+		);
+	}
+
+	return null;
+}
+
+/** A row to hold widgets, drawing nothing of its own. */
+function ew_blocks_row( $widgets, $class = 'ew-blockrow' ) {
+	return array(
+		'id'       => substr( md5( 'row' . wp_rand() ), 0, 7 ),
+		'elType'   => 'container',
+		'settings' => array(
+			'content_width' => 'full',
+			'css_classes'   => $class,
+			'padding'       => array( 'unit' => 'px', 'top' => '0', 'right' => '0',
+				'bottom' => '0', 'left' => '0', 'isLinked' => true ),
+		),
+		'elements' => array_values( array_filter( $widgets ) ),
+		'isInner'  => false,
+	);
+}
+
 /** Walk the Elementor tree and hand every widget to a callback. */
 function ew_blocks_walk( &$nodes, $fn ) {
 	foreach ( $nodes as &$node ) {
@@ -328,40 +412,52 @@ add_action( 'rest_api_init', function () {
 
 			$allowed = ew_blocks_allowed();
 			$doc     = array();
-			foreach ( $blocks as $b ) {
-				$name = (string) ( $b['block'] ?? '' );
-				if ( ! in_array( $name, $allowed, true ) ) {
-					return new WP_Error( 'ew_block', 'Not a block this channel writes: ' . $name, array( 'status' => 400 ) );
+
+			/*
+			 * Two shapes. A flat list of blocks gives one row each, which is
+			 * what the pages built so far use. A list of rows -- each with its
+			 * own class and its own widgets -- lets a page put a heading and
+			 * its paragraphs side by side inside one wrapper, which is what
+			 * the written pages need: the wrapper carries the column, the
+			 * widgets inside it are what a person edits.
+			 */
+			$rows = isset( $blocks[0]['widgets'] ) ? $blocks : array_map(
+				function ( $b ) { return array( 'widgets' => array( $b ) ); },
+				$blocks
+			);
+
+			foreach ( $rows as $row ) {
+				$built = array();
+				foreach ( (array) ( $row['widgets'] ?? array() ) as $spec ) {
+					if ( ! empty( $spec['block'] ) ) {
+						if ( ! in_array( (string) $spec['block'], $allowed, true ) ) {
+							return new WP_Error( 'ew_block',
+								'Not a block this channel writes: ' . $spec['block'],
+								array( 'status' => 400 ) );
+						}
+						$bad = ew_blocks_bad( (array) ( $spec['fields'] ?? array() ) );
+						if ( $bad ) {
+							return new WP_Error( 'ew_field', $bad, array( 'status' => 400 ) );
+						}
+					}
+					$w = ew_blocks_widget( $spec );
+					if ( null === $w ) {
+						return new WP_Error( 'ew_widget',
+							'Not a widget this channel writes: '
+							. (string) ( $spec['widget'] ?? '?' ),
+							array( 'status' => 400 ) );
+					}
+					$built[] = $w;
 				}
-				$bad = ew_blocks_bad( (array) ( $b['fields'] ?? array() ) );
-				if ( $bad ) {
-					return new WP_Error( 'ew_field', $bad, array( 'status' => 400 ) );
+				if ( ! $built ) {
+					continue;
 				}
-				$doc[] = array(
-					'id'       => substr( md5( $name . wp_rand() ), 0, 7 ),
-					'elType'   => 'container',
-					'settings' => array(
-						'content_width' => 'full',
-						// The block draws its own gutter. Elementor's container
-						// adds ten pixels of its own, which would move every
-						// one of these pages sideways by ten pixels against the
-						// capture it has to match. ew-blockrow takes it off in
-						// CSS rather than relying on these settings alone.
-						'css_classes'   => 'ew-blockrow',
-						'padding'       => array( 'unit' => 'px', 'top' => '0', 'right' => '0',
-							'bottom' => '0', 'left' => '0', 'isLinked' => true ),
-					),
-					'elements' => array( array(
-						'id'         => substr( md5( $name . 'w' . wp_rand() ), 0, 7 ),
-						'elType'     => 'widget',
-						'widgetType' => 'shortcode',
-						'settings'   => array(
-							'shortcode' => ew_blocks_build( $name, (array) ( $b['fields'] ?? array() ),
-								(string) ( $b['lines'] ?? '' ) ),
-						),
-					) ),
-					'isInner'  => false,
-				);
+				$doc[] = ew_blocks_row( $built,
+					(string) ( $row['class'] ?? 'ew-blockrow' ) );
+			}
+
+			if ( ! $doc ) {
+				return new WP_Error( 'ew_args', 'Nothing to lay out.', array( 'status' => 400 ) );
 			}
 
 			// The page stops carrying its own copy of the words. One source.

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.76.2
+ * Version: 2.77.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -2796,7 +2796,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.76.2';
+const EW_FWP_VERSION = '2.77.0';
 
 /*
  * Parts loader.
@@ -4018,7 +4018,16 @@ function ew_prose_css_inline() {
    PADDING on every child, and border-box was taking it out of the
    measure: 72ch minus two 132px gutters left a 503px line hugging the
    left of a 1512px page, which is what "poor layout" looked like. */
-.ew-prose > p,.ew-prose > ul,.ew-prose > ol,.ew-prose .ew-lede{
+.ew-prose > p,.ew-prose > ul,.ew-prose > ol,.ew-prose .ew-lede,
+/* And the same again for a paragraph inside an Elementor text widget.
+   Every section of these pages is its own editable widget now, so the
+   paragraphs are one level further in and the direct-child rule above
+   stopped reaching them -- which read as every line running the full
+   width of the screen. The gutter stays on the widget itself, from the
+   .ew-prose > * rule, so the sum is the same 1248 either way. */
+.ew-prose .elementor-widget-container > p,
+.ew-prose .elementor-widget-container > ul,
+.ew-prose .elementor-widget-container > ol{
  box-sizing:content-box;max-width:72ch}
 .ew-prose *{box-sizing:border-box}
 .ew-prose .ew-lede{font-size:19px;line-height:1.55;color:#333;margin:0 0 28px}
@@ -4027,12 +4036,24 @@ function ew_prose_css_inline() {
    page started at the window edge while its paragraphs started 132px
    in -- headings and text not even sharing a left edge. Same shape of
    fault as the away disc in the fixtures strip. */
-.ew-prose h2{font-family:Anton,"Instrument Sans",sans-serif;font-size:30px;letter-spacing:.03em;
+.ew-prose h2,
+/* Three classes, because Elementor styles its own heading widget with two
+   and would otherwise win. */
+.ew-prose .elementor-widget-heading h2.elementor-heading-title{
+ font-family:Anton,"Instrument Sans",sans-serif;font-size:30px;letter-spacing:.03em;
  text-transform:uppercase;margin:40px 0 14px;padding-bottom:10px;
- border-bottom:2px solid #e3e3e3}
-.ew-prose p{font-size:16px;line-height:1.65;margin:0 0 16px}
-.ew-prose ul{margin:0 0 20px;padding-left:20px}
+ border-bottom:2px solid #e3e3e3;color:#111}
+/* A heading widget sits in a wrapper of its own, and the first section of a
+   page should not start with 40px of air above it. */
+.ew-prose > .elementor-element:first-child .elementor-widget-heading h2.elementor-heading-title{
+ margin-top:0}
+.ew-prose p,.ew-prose .elementor-widget-text-editor p{font-size:16px;line-height:1.65;margin:0 0 16px}
+.ew-prose ul,.ew-prose .elementor-widget-text-editor ul{margin:0 0 20px;padding-left:20px}
 .ew-prose li{font-size:16px;line-height:1.6;margin:0 0 8px}
+/* Elementor gives a text widget its own colour and leading; the ones set
+   here are the ones that matter. */
+.ew-prose .elementor-widget-text-editor{color:#111;font-family:"Instrument Sans",system-ui,sans-serif}
+.ew-prose .elementor-widget-container > *:last-child{margin-bottom:0}
 .ew-prose .ew-people{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin:0 0 20px}
 .ew-prose .ew-person{background:#fff;border:1px solid #e6e6e6;border-left:3px solid #CC0000;
  border-radius:4px;padding:14px 16px}
