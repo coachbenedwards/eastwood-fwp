@@ -1985,8 +1985,9 @@ function ew_hb_css() {
 .ewp-upcomingGrid .ewp-cardBody{display:flex;align-items:center;gap:16px;
  padding:12px 24px 20px;flex:1 1 auto}
 /* The eight the foot of the body just took, given back, so a card with a
-   button is the same height as a card without one. */
-.ewp-upcomingGrid .ewp-cardCta{margin-bottom:7px}
+   button is the same height as a card without one. Six, not seven:
+   measured live the card came out at 216 against the reference 215. */
+.ewp-upcomingGrid .ewp-cardCta{margin-bottom:6px}
 /* No border here: the reference card has none, and this one was adding
    3px to the height of every card. The hover line is drawn with ::after. */
 .ewp-upcomingGrid .ewp-card{border-bottom:0}
