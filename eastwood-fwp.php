@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.88.6
+ * Version: 2.88.7
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -2112,6 +2112,31 @@ function ew_rewrite_markup( $html ) {
 		}
 	}
 
+	/*
+	 * A mark shipped in the plugin wins over the uploads copy, wherever
+	 * the markup came from.
+	 *
+	 * ew_sponsor_url() already prefers the shipped file, but the sponsor
+	 * rail plugin writes the header strip itself -- it runs in a buffer
+	 * nested inside this one, so its output arrives here already pointing
+	 * at uploads -- and it keeps its own copy of the white PodCut mark
+	 * there. The rail was still on the bare wordmark while the footer wall
+	 * carried the real sponsorship lockup. This sweep settles it: any
+	 * uploads path this plugin also ships is redirected to the shipped
+	 * file, so there is one answer to what a mark looks like.
+	 */
+	$up   = content_url( '/uploads/ew-sponsors/' );
+	$html = preg_replace_callback(
+		'#' . preg_quote( $up, '#' ) . '([a-z0-9\-]+)\.png#',
+		function ( $m ) {
+			$ship = plugin_dir_path( __FILE__ ) . 'assets/ew-sponsors/' . $m[1] . '.png';
+			return file_exists( $ship )
+				? esc_url( plugins_url( 'assets/ew-sponsors/' . $m[1] . '.png', __FILE__ ) )
+				: $m[0];
+		},
+		$html
+	);
+
 	// A sponsor taken off the roster has to leave the wall, not just stop
 	// being updated. The captured markup decides how many slots there are,
 	// and this pass only ever filled them in, so PodFirst and SB Outdoor
@@ -3190,7 +3215,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.88.6';
+const EW_FWP_VERSION = '2.88.7';
 
 /*
  * Parts loader.
