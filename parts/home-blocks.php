@@ -96,6 +96,7 @@ function ew_home_blocks_present() {
 	foreach ( array( 'eastwood_home_banner', 'eastwood_home_hero', 'eastwood_home_fixtures',
 		'eastwood_home_upcoming', 'eastwood_home_shop', 'eastwood_home_tiles',
 		'eastwood_home_sponsors', 'eastwood_home_discover', 'eastwood_home_news',
+		'eastwood_home_player',
 		'eastwood_home_strip', 'eastwood_home_live',
 		'eastwood_matches', 'eastwood_teams', 'eastwood_squad' ) as $tag ) {
 		foreach ( $hay as $text ) {
@@ -1035,15 +1036,27 @@ function ew_hb_upcoming_sc( $atts, $content = '' ) {
 add_shortcode( 'eastwood_home_upcoming', 'ew_hb_upcoming_sc' );
 
 /* ------------------------------------------------------------------
- * [eastwood_home_discover title="..."]
- * Label | /where-it-goes/ | One line underneath
+ * [eastwood_home_discover title="Discover Eastwood"]
+ * Label | /where-it-goes/ | https://.../photograph.jpg
  * [/eastwood_home_discover]
+ *
+ * The reference runs this as a rail of portrait photographs, not a row
+ * of text tiles, and every number here is measured off it: a 1512 wide
+ * page, cards 300 by 450 with an 8px corner and a 16px gap, the first
+ * one landing on the 1248 column at x=132, the label Anton 20 in white
+ * 16px in from the bottom left corner with an arrow after it, and a
+ * 32px round white chevron centred on the edge of that column. The
+ * heading is Anton 56 in red with 48px of air under it, and the band
+ * behind the whole thing is the same #f3f3f3 as the news band.
+ *
+ * The third field is the photograph. A line without one still renders
+ * -- the card falls back to flat black and the label still reads.
  * ------------------------------------------------------------------ */
 
 function ew_hb_discover_sc( $atts, $content = '' ) {
 	$atts = shortcode_atts( array( 'title' => 'Discover Eastwood' ), $atts, 'eastwood_home_discover' );
 
-	$tiles = array();
+	$cards = array();
 	foreach ( ew_hb_lines( $content ) as $line ) {
 		$parts = array_map( 'trim', explode( '|', $line ) );
 		if ( '' === $parts[0] || ! isset( $parts[1] ) || '' === $parts[1] ) {
@@ -1053,29 +1066,61 @@ function ew_hb_discover_sc( $atts, $content = '' ) {
 		if ( 0 !== strpos( $url, 'http' ) ) {
 			$url = home_url( '/' . ltrim( $url, '/' ) );
 		}
-		$tiles[] = array( $parts[0], $url, isset( $parts[2] ) ? $parts[2] : '' );
+		$img = isset( $parts[2] ) ? $parts[2] : '';
+		/*
+		 * stock:academy is a football photograph that travels with the
+		 * plugin, there to hold the shape of the rail until the club has
+		 * its own. Writing a real picture over it means putting its address
+		 * in this field in the builder -- nothing in the code changes, and
+		 * nothing here pretends a stock photograph is ours.
+		 */
+		if ( 0 === strpos( $img, 'stock:' ) ) {
+			$name = preg_replace( '/[^a-z0-9\-]/', '', strtolower( substr( $img, 6 ) ) );
+			$file = plugin_dir_path( dirname( __FILE__ ) ) . 'assets/discover/' . $name . '.jpg';
+			$img  = file_exists( $file )
+				? plugins_url( 'assets/discover/' . $name . '.jpg', dirname( __FILE__ ) . '/eastwood-fwp.php' )
+				: '';
+		}
+		// The field used to hold a line of prose. Anything that is not a
+		// path to a picture is ignored rather than printed somewhere it
+		// was never designed to go.
+		if ( '' !== $img && ! preg_match( '#^(https?:)?/.*\.(jpe?g|png|webp|avif|gif)$#i', $img ) ) {
+			$img = '';
+		}
+		$cards[] = array( $parts[0], $url, $img );
 	}
 
-	if ( ! $tiles ) {
+	if ( ! $cards ) {
 		return '';
 	}
 
 	ob_start();
 	?>
-<section class="ewp ewp-discover">
-	<div class="ewp-wrap">
-		<?php if ( '' !== $atts['title'] ) : ?>
-		<h2 class="ewp-h2 is-light"><?php echo esc_html( $atts['title'] ); ?></h2>
-		<?php endif; ?>
-		<div class="ewp-discoverGrid">
-			<?php foreach ( $tiles as $tile ) : ?>
-			<a href="<?php echo esc_url( $tile[1] ); ?>">
-				<b><?php echo esc_html( $tile[0] ); ?></b>
-				<?php if ( '' !== $tile[2] ) : ?><i><?php echo esc_html( $tile[2] ); ?></i><?php endif; ?>
-				<span aria-hidden="true">&rarr;</span>
-			</a>
+<section class="ewp ewp-disc">
+	<?php if ( '' !== $atts['title'] ) : ?>
+	<h2 class="ewp-discH"><?php echo esc_html( $atts['title'] ); ?></h2>
+	<?php endif; ?>
+	<div class="ewp-discRail">
+		<ul class="ewp-stripList ewp-discList">
+			<?php foreach ( $cards as $card ) : ?>
+			<li class="ewp-discSlide">
+				<a class="ewp-discCard" href="<?php echo esc_url( $card[1] ); ?>">
+					<?php if ( '' !== $card[2] ) : ?>
+					<img class="ewp-discShot" src="<?php echo esc_url( $card[2] ); ?>" alt="" loading="lazy">
+					<?php endif; ?>
+					<p class="ewp-discLabel"><?php echo esc_html( $card[0] ); ?><span aria-hidden="true">&rarr;</span></p>
+				</a>
+			</li>
 			<?php endforeach; ?>
-		</div>
+		</ul>
+		<button type="button" class="ewp-stripNav is-prev" aria-label="Back" hidden>
+			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+				stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+		</button>
+		<button type="button" class="ewp-stripNav is-next" aria-label="More">
+			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+				stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+		</button>
 	</div>
 </section>
 	<?php
@@ -1164,6 +1209,157 @@ function ew_hb_shop_sc( $atts, $content = '' ) {
 	return ob_get_clean();
 }
 add_shortcode( 'eastwood_home_shop', 'ew_hb_shop_sc' );
+
+/* ------------------------------------------------------------------
+ * [eastwood_home_player kicker="Shop by player" ask="..." cta="Shop %s"
+ *                       all="View all players" all_url="/teams/"
+ *                       shop_url="/shop/" shirt="https://.../back.png"]
+ * Gibbs-White | 10 | /shop/the-shirt/
+ * [/eastwood_home_player]
+ *
+ * The reference sits this inside Get Kitted Out: a panel with the
+ * player name in Anton black, the number huge in red under it, a
+ * button that names the player, and a stage on the right holding the
+ * shirt with two more either side of it, faded back. A row of tabs
+ * along the bottom carries every player, name over number, the one
+ * showing underlined in red.
+ *
+ * They have a photograph of every shirt with a name and number already
+ * printed on it. We have one shirt and a printer, which is also what
+ * the club actually sells, so the name and number are set over the
+ * shirt here rather than baked into seventeen photographs. One picture
+ * serves the whole squad and a change of squad changes nothing else.
+ *
+ * A player line carries its own number; leave it off and the number
+ * the squad page already uses is filled in. No line, no block -- this
+ * never invents a squad.
+ * ------------------------------------------------------------------ */
+
+function ew_hb_player_sc( $atts, $content = '' ) {
+	$atts = shortcode_atts(
+		array(
+			'title'    => '',
+			'kicker'   => 'Shop by player',
+			'ask'      => "Who's your pick?",
+			'cta'      => 'Shop %s',
+			'all'      => 'View all players',
+			'all_url'  => '/teams/',
+			'shop_url' => '/shop/',
+			'shirt'    => '',
+			'bg'       => '',
+			// Where the printing sits on whatever shirt is supplied.
+			// A field rather than a number in the stylesheet, because
+			// the right answer depends on the photograph.
+			'name_top' => '20%',
+			'num_top'  => '30%',
+		),
+		$atts,
+		'eastwood_home_player'
+	);
+
+	$numbers = function_exists( 'ew_player_numbers' ) ? (array) ew_player_numbers() : array();
+
+	$players = array();
+	foreach ( ew_hb_lines( $content ) as $line ) {
+		$parts = array_map( 'trim', explode( '|', $line ) );
+		if ( '' === $parts[0] ) {
+			continue;
+		}
+		$name = $parts[0];
+		$num  = isset( $parts[1] ) && '' !== $parts[1] ? $parts[1] : '';
+		if ( '' === $num ) {
+			foreach ( $numbers as $who => $n ) {
+				if ( 0 === strcasecmp( (string) $who, $name ) && $n ) {
+					$num = (string) $n;
+				}
+			}
+		}
+		$url = isset( $parts[2] ) && '' !== $parts[2] ? $parts[2] : $atts['shop_url'];
+		if ( 0 !== strpos( $url, 'http' ) ) {
+			$url = home_url( '/' . ltrim( $url, '/' ) );
+		}
+		$players[] = array( 'name' => $name, 'num' => $num, 'url' => $url );
+	}
+
+	if ( ! $players ) {
+		return '';
+	}
+
+	$surname = function ( $name ) {
+		$bits = preg_split( '/\s+/', trim( $name ) );
+		return strtoupper( (string) end( $bits ) );
+	};
+
+	ob_start();
+	?>
+<section class="ewp ewp-picker" data-shirt="<?php echo esc_attr( $atts['shirt'] ); ?>">
+	<div class="ewp-wrap">
+		<?php if ( '' !== $atts['title'] ) : ?>
+		<h2 class="ewp-h2 is-center is-red"><?php echo esc_html( $atts['title'] ); ?></h2>
+		<?php endif; ?>
+
+		<div class="ewp-pickPanel" style="<?php
+			if ( '' !== $atts['bg'] ) { echo 'background-image:url(' . esc_url( $atts['bg'] ) . ');'; }
+			echo '--ew-name-top:' . esc_attr( $atts['name_top'] ) . ';';
+			echo '--ew-num-top:' . esc_attr( $atts['num_top'] ) . ';'; ?>">
+
+			<div class="ewp-pickSide">
+				<p class="ewp-pickKicker"><?php echo esc_html( $atts['kicker'] ); ?></p>
+				<p class="ewp-pickName" data-name><?php echo esc_html( $surname( $players[0]['name'] ) ); ?></p>
+				<p class="ewp-pickNum" data-num><?php echo esc_html( $players[0]['num'] ); ?></p>
+				<p class="ewp-pickAsk"><?php echo esc_html( $atts['ask'] ); ?></p>
+				<p class="ewp-pickCta"><a data-cta href="<?php echo esc_url( $players[0]['url'] ); ?>"><?php
+					echo esc_html( sprintf( $atts['cta'], $surname( $players[0]['name'] ) ) ); ?></a></p>
+				<?php if ( '' !== $atts['all'] ) : ?>
+				<p class="ewp-pickAll"><a href="<?php echo esc_url( home_url( $atts['all_url'] ) ); ?>"><?php
+					echo esc_html( $atts['all'] ); ?> <span aria-hidden="true">&rarr;</span></a></p>
+				<?php endif; ?>
+			</div>
+
+			<div class="ewp-pickRight">
+			<div class="ewp-pickStage">
+				<button type="button" class="ewp-pickNav is-prev" aria-label="Previous player">
+					<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+						stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+				</button>
+				<?php foreach ( array( 'is-left', 'is-mid', 'is-right' ) as $slot ) : ?>
+				<span class="ewp-pickShirt <?php echo esc_attr( $slot ); ?>">
+					<?php if ( '' !== $atts['shirt'] ) : ?>
+					<img src="<?php echo esc_url( $atts['shirt'] ); ?>" alt="" loading="lazy">
+					<?php endif; ?>
+					<b data-slot-name></b>
+					<i data-slot-num></i>
+				</span>
+				<?php endforeach; ?>
+				<button type="button" class="ewp-pickNav is-next" aria-label="Next player">
+					<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+						stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+				</button>
+			</div>
+
+			<ul class="ewp-pickTabs">
+				<?php foreach ( $players as $i => $pl ) : ?>
+				<li>
+					<button type="button" class="ewp-pickTab<?php echo 0 === $i ? ' is-on' : ''; ?>"
+						data-i="<?php echo (int) $i; ?>"
+						data-player="<?php echo esc_attr( $surname( $pl['name'] ) ); ?>"
+						data-number="<?php echo esc_attr( $pl['num'] ); ?>"
+						data-url="<?php echo esc_url( $pl['url'] ); ?>"
+						data-cta="<?php echo esc_attr( sprintf( $atts['cta'], $surname( $pl['name'] ) ) ); ?>">
+						<b><?php echo esc_html( $surname( $pl['name'] ) ); ?></b>
+						<i><?php echo esc_html( $pl['num'] ); ?></i>
+					</button>
+				</li>
+				<?php endforeach; ?>
+			</ul>
+			</div>
+		</div>
+	</div>
+</section>
+	<?php
+	return ob_get_clean();
+}
+add_shortcode( 'eastwood_home_player', 'ew_hb_player_sc' );
 
 /* ------------------------------------------------------------------
  * [eastwood_home_tiles title="Hospitality" all="Book now" all_url="/..."
@@ -2160,6 +2356,139 @@ function ew_hb_css() {
    stopped short either side and the cards came out 372 instead of 405.
    The row cannot be widened from here without moving every other
    section in it, so this section steps outside its own column. */
+/* Discover: a rail of portrait photographs, measured off the reference
+   at 1512 wide -- cards 300 by 450 with an 8px corner and a 16px gap,
+   the first landing on the 1248 column, the label Anton 20 in white 16
+   in from the bottom left, a 32px round chevron centred on the edge of
+   that column, and the heading Anton 56 in red with 48 of air under it.
+   The band is the same #f3f3f3 as the news band and runs the full width
+   of the window, so it steps out of the Elementor column the same way. */
+.ewp-disc{position:relative;background:#f3f3f3;padding:32px 0;
+ width:100vw;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw)}
+.ewp-discH{font-family:Anton,"Instrument Sans",sans-serif;font-size:56px;line-height:56px;
+ font-weight:400;color:#CC0000;text-align:center;text-transform:uppercase;margin:0 0 48px}
+.ewp-discRail{position:relative}
+.ewp-discList{display:flex;gap:16px;list-style:none;margin:0;
+ padding:0 max(16px,calc(50vw - 624px));overflow-x:auto;cursor:grab;
+ scroll-behavior:smooth;scrollbar-width:none;-ms-overflow-style:none}
+.ewp-discList::-webkit-scrollbar{display:none}
+.ewp-discSlide{flex:0 0 300px;max-width:300px;list-style:none;margin:0;padding:0}
+.ewp-discSlide::marker{content:""}
+.ewp-discCard{position:relative;display:block;width:300px;height:450px;border-radius:8px;
+ overflow:hidden;background:#101010;text-decoration:none;color:#fff}
+.ewp-discCard img.ewp-discShot{position:absolute;inset:0;width:100%;height:100%;
+ object-fit:cover;max-width:none;display:block;
+ transition:transform .5s cubic-bezier(.4,0,.2,1)}
+/* The reference darkens the foot of every card so a white label reads
+   over grass as well as it does over a floodlit crowd: sampled down one
+   of their cards it falls from 50 to 17 in the last 90 pixels. */
+.ewp-discCard::after{content:"";position:absolute;inset:0;
+ background:linear-gradient(to top,rgba(0,0,0,.72) 0%,rgba(0,0,0,.35) 26%,rgba(0,0,0,0) 55%)}
+.ewp-discCard:hover img.ewp-discShot{transform:scale(1.04)}
+.ewp-discLabel{position:absolute;left:16px;right:16px;bottom:16px;z-index:2;margin:0;
+ font-family:Anton,"Instrument Sans",sans-serif;font-size:20px;line-height:20px;
+ font-weight:400;color:#fff;text-transform:uppercase}
+.ewp-discLabel span{margin-left:8px;font-family:"Instrument Sans",sans-serif;font-weight:400}
+.ewp-disc .ewp-stripNav{position:absolute;top:209px;z-index:20;
+ width:32px;height:32px;padding:0;border:0;border-radius:50%;background:#fff;color:#101010;
+ display:flex;align-items:center;justify-content:center;cursor:pointer;
+ box-shadow:0 20px 25px -5px rgba(0,0,0,.1),0 8px 10px -6px rgba(0,0,0,.1)}
+.ewp-disc .ewp-stripNav[hidden]{display:none}
+.ewp-disc .ewp-stripNav.is-prev{left:max(16px,calc(50vw - 640px))}
+.ewp-disc .ewp-stripNav.is-next{right:max(16px,calc(50vw - 640px))}
+@media(max-width:820px){
+ .ewp-discH{font-size:38px;line-height:38px;margin:0 0 26px}
+ .ewp-discSlide{flex:0 0 232px;max-width:232px}
+ .ewp-discCard{width:232px;height:348px}
+ .ewp-disc .ewp-stripNav{display:none}
+}
+
+/* Shop by player, measured off the reference panel rather than judged.
+   Every figure below was read off their page at 1512 wide: the panel
+   is the full 1248 column and 570 tall with 68 of padding down the
+   left and 62 across the top; the kicker is 14 with 26 under it, the
+   name Anton at a 39 cap with 30 under it, the number Anton at a 131
+   cap -- four times the kicker, which is what gives the panel its
+   weight -- with 73 under it, the question 19 with 29, the button 56
+   tall by 218, and the link under that with 21 above it. The right
+   half starts at 634: the shirt on a 371 stage, then 49 of air, then
+   the tabs. Line heights are set to the cap heights so those gaps are
+   the gaps that actually appear.
+
+   Ours was built at 120 for the number against 40 of padding, which is
+   why it read as a grey box with some type in it rather than as the
+   panel it is. */
+.ewp-picker{padding:0 0 8px}
+.ewp-pickPanel{position:relative;min-height:570px;background:#e9e9e9;
+ background-size:cover;background-position:center;border-radius:10px;overflow:hidden;
+ padding:62px 24px 22px 68px;
+ display:grid;grid-template-columns:434px minmax(0,1fr);gap:0;align-items:start}
+.ewp-pickPanel::before{content:"";position:absolute;inset:0;background:rgba(233,233,233,.8)}
+.ewp-pickSide,.ewp-pickRight{position:relative;z-index:2}
+.ewp-pickKicker{margin:0 0 26px;font-family:"Instrument Sans",sans-serif;font-size:14px;line-height:11px;
+ font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#CC0000}
+.ewp-pickName{margin:0 0 30px;font-family:Anton,"Instrument Sans",sans-serif;font-size:54px;
+ line-height:39px;font-weight:400;text-transform:uppercase;color:#101010}
+.ewp-pickNum{margin:0 0 73px;font-family:Anton,"Instrument Sans",sans-serif;font-size:180px;
+ line-height:132px;font-weight:400;color:#CC0000}
+.ewp-pickAsk{margin:0 0 29px;font-size:19px;line-height:16px;color:#4a4a4a}
+.ewp-pickCta{margin:0 0 21px}
+.ewp-pickCta a{display:inline-flex;align-items:center;justify-content:center;height:56px;
+ min-width:218px;padding:0 28px;background:#CC0000;color:#fff;border-radius:2px;text-decoration:none;
+ font-family:Anton,"Instrument Sans",sans-serif;font-size:16px;letter-spacing:.09em;
+ text-transform:uppercase;transition:background-color .2s}
+.ewp-pickCta a:hover{background:#a80000}
+.ewp-pickAll{margin:0}
+.ewp-pickAll a{display:inline-block;font-family:Anton,"Instrument Sans",sans-serif;font-size:14px;
+ line-height:11px;letter-spacing:.1em;text-transform:uppercase;color:#101010;text-decoration:none;
+ border-bottom:2px solid #101010;padding-bottom:7px}
+.ewp-pickStage{position:relative;display:flex;align-items:center;justify-content:center;height:371px}
+.ewp-pickShirt{position:relative;display:block;width:306px;flex:0 0 auto}
+.ewp-pickShirt img{display:block;width:100%;height:auto}
+/* Until there is a photograph of the shirt, the printing sits on a
+   plain panel of club red in the same proportions. The moment a
+   picture goes in the field it takes over and nothing else moves. */
+.ewp-pickShirt:not(:has(img)){background:#CC0000;border-radius:8px;aspect-ratio:306/371}
+.ewp-pickShirt.is-left,.ewp-pickShirt.is-right{transform:scale(.62);opacity:.3;z-index:1}
+.ewp-pickShirt.is-left{margin-right:-108px}
+.ewp-pickShirt.is-right{margin-left:-108px}
+.ewp-pickShirt.is-mid{z-index:3}
+.ewp-pickShirt b{position:absolute;left:0;right:0;top:var(--ew-name-top,20%);text-align:center;
+ font-family:Anton,"Instrument Sans",sans-serif;font-size:26px;letter-spacing:.02em;
+ color:#fff;text-transform:uppercase}
+.ewp-pickShirt i{position:absolute;left:0;right:0;top:var(--ew-num-top,30%);text-align:center;
+ font-family:Anton,"Instrument Sans",sans-serif;font-style:normal;font-size:104px;line-height:1;color:#fff}
+.ewp-pickNav{position:absolute;top:50%;transform:translateY(-50%);z-index:5;
+ width:44px;height:44px;border:0;border-radius:6px;background:#fff;color:#101010;cursor:pointer;
+ display:flex;align-items:center;justify-content:center;
+ box-shadow:0 20px 25px -5px rgba(0,0,0,.12),0 8px 10px -6px rgba(0,0,0,.1)}
+.ewp-pickNav.is-prev{left:8%}
+.ewp-pickNav.is-next{right:8%}
+.ewp-pickTabs{display:flex;list-style:none;margin:49px 0 0;padding:0}
+.ewp-pickTabs li{flex:1 1 0;min-width:0;list-style:none;margin:0;padding:0;
+ border-left:1px solid rgba(0,0,0,.12)}
+.ewp-pickTabs li::marker{content:""}
+.ewp-pickTabs li:first-child{border-left:0}
+.ewp-pickTab{width:100%;background:none;border:0;cursor:pointer;padding:0 6px 0;
+ display:flex;flex-direction:column;align-items:center;gap:12px;color:#9a9a9a;
+ border-bottom:3px solid transparent;transition:color .2s,border-color .2s}
+.ewp-pickTab b{font-family:"Instrument Sans",sans-serif;font-size:12px;line-height:9px;font-weight:600;
+ letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+ max-width:100%}
+.ewp-pickTab i{font-family:Anton,"Instrument Sans",sans-serif;font-style:normal;font-size:46px;
+ line-height:34px;padding-bottom:10px}
+.ewp-pickTab.is-on{color:#101010;border-bottom-color:#CC0000}
+@media(max-width:1100px){
+ .ewp-pickPanel{grid-template-columns:1fr;padding:32px 20px 24px;min-height:0}
+ .ewp-pickName{font-size:40px;line-height:30px;margin-bottom:20px}
+ .ewp-pickNum{font-size:120px;line-height:88px;margin-bottom:40px}
+ .ewp-pickStage{height:300px}
+ .ewp-pickShirt{width:240px}
+ .ewp-pickShirt i{font-size:80px}
+ .ewp-pickTabs{margin-top:28px;overflow-x:auto}
+ .ewp-pickTabs li{flex:0 0 128px}
+}
+
 .ewp-news{background:#f3f3f3;padding:32px 0 32px;
  width:100vw;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw)}
 /* A heading widget emptied in the builder should draw nothing rather
@@ -2382,6 +2711,49 @@ function ew_hb_js() {
   });
  });
 })();
+ /* Shop by player. The tabs along the bottom and the two chevrons both
+    move the same cursor: the panel reads the player off the live tab, so
+    the name, the number, the button and the three shirts on the stage
+    never get a chance to disagree with each other. */
+ [].forEach.call(document.querySelectorAll('.ewp-picker'), function(sec){
+  var tabs = [].slice.call(sec.querySelectorAll('.ewp-pickTab'));
+  if (!tabs.length) { return; }
+  var name  = sec.querySelector('[data-name]');
+  var num   = sec.querySelector('[data-num]');
+  var cta   = sec.querySelector('[data-cta]');
+  var slots = [].slice.call(sec.querySelectorAll('.ewp-pickShirt'));
+  var at    = 0;
+
+  var wrap = function(k){ return (k % tabs.length + tabs.length) % tabs.length; };
+
+  var show = function(k){
+   at = wrap(k);
+   var t = tabs[at];
+   if (name) { name.textContent = t.getAttribute('data-player'); }
+   if (num)  { num.textContent  = t.getAttribute('data-number'); }
+   if (cta)  { cta.textContent  = t.getAttribute('data-cta');
+               cta.setAttribute('href', t.getAttribute('data-url')); }
+   tabs.forEach(function(x){ x.classList.remove('is-on'); });
+   t.classList.add('is-on');
+   [-1, 0, 1].forEach(function(d, n){
+    var slot = slots[n];
+    if (!slot) { return; }
+    var q = tabs[wrap(at + d)];
+    var sn = slot.querySelector('[data-slot-name]');
+    var sv = slot.querySelector('[data-slot-num]');
+    if (sn) { sn.textContent = q.getAttribute('data-player'); }
+    if (sv) { sv.textContent = q.getAttribute('data-number'); }
+   });
+  };
+
+  tabs.forEach(function(t, k){ t.addEventListener('click', function(){ show(k); }); });
+  var prev = sec.querySelector('.ewp-pickNav.is-prev');
+  var next = sec.querySelector('.ewp-pickNav.is-next');
+  if (prev) { prev.addEventListener('click', function(){ show(at - 1); }); }
+  if (next) { next.addEventListener('click', function(){ show(at + 1); }); }
+  show(0);
+ });
+
  /* Open the rest of the season. The cards are already in the page but
     hidden, so their crests have not been requested yet; revealing them
     lets the browser fetch that handful rather than the whole season. */
@@ -2403,15 +2775,20 @@ function ew_hb_js() {
     a drag, so the fixture links keep working. */
  /* The chevrons. One press is one card; each hides when there is
     nothing that way, which is what the reference does. */
- [].forEach.call(document.querySelectorAll('.ewp-strip'), function(strip){
+ [].forEach.call(document.querySelectorAll('.ewp-strip, .ewp-disc'), function(strip){
   var list = strip.querySelector('.ewp-stripList');
   var prev = strip.querySelector('.ewp-stripNav.is-prev');
   var next = strip.querySelector('.ewp-stripNav.is-next');
   if (!list || !prev || !next) { return; }
 
+  /* One press is one card. The fixture strip butts its cards together
+     and the discover rail sets them 16 apart, so the gap is read off
+     the list rather than assumed either way. */
   var step = function(){
-   var card = list.querySelector('.ewp-slide');
-   return card ? Math.round(card.getBoundingClientRect().width) : 340;
+   var card = list.firstElementChild;
+   if (!card) { return 340; }
+   var gap = parseFloat(getComputedStyle(list).columnGap) || 0;
+   return Math.round(card.getBoundingClientRect().width + gap);
   };
 
   var sync = function(){
