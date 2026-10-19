@@ -1687,8 +1687,12 @@ function ew_hb_css() {
    further down this sheet, which the font-size here never overrode. */
 .ewp-strip .ewp-when b{font-family:"Instrument Sans",system-ui,sans-serif;
  font-size:18px;font-weight:100;letter-spacing:normal;line-height:25px;color:#101010}
+/* margin-left:0 because .ewp-when i further down this sheet, which the
+   match banner uses, adds 7px of its own -- so the kick-off was sitting
+   15px after the day where the reference puts it 8px after. */
 .ewp-strip .ewp-when i{font-family:"Instrument Sans",system-ui,sans-serif;
- font-size:18px;font-weight:700;font-style:normal;line-height:25px;color:#101010}
+ font-size:18px;font-weight:700;font-style:normal;line-height:25px;color:#101010;
+ margin-left:0}
 /* The disc carries a LETTER, not a picture.
  *
  * The reference draws an H or an A in it -- its two icon files, which look
@@ -1708,7 +1712,12 @@ function ew_hb_css() {
 .ewp-strip .ewp-ha.is-away{background-color:#e8e8e8;color:#101010;background-image:none}
 .ewp-strip .ewp-cardBody{display:flex;align-items:center;gap:16px;margin:0;padding:0 16px;flex:1}
 .ewp-strip .ewp-cardBody img{width:48px;height:48px;object-fit:contain;flex:none}
-.ewp-strip .ewp-cardText{min-width:0}
+/* The three lines of the card: kicker, opponent, ground. The reference
+   leaves 4px between them and the gaps here were falling out of the line
+   boxes at 3, which shifted the block a pixel and left it two short. A
+   column with a stated gap says it once. */
+.ewp-strip .ewp-cardText{min-width:0;display:flex;flex-direction:column;gap:4px}
+.ewp-strip .ewp-cardText > *{display:block}
 .ewp-strip .ewp-kicker{font-size:10px;font-weight:700;letter-spacing:1px;line-height:10px;
  color:#212121;text-transform:uppercase}
 .ewp-strip .ewp-cardText b{font-size:18px;line-height:1;display:block;
