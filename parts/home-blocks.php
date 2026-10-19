@@ -1974,22 +1974,25 @@ function ew_hb_css() {
    the crest, which left the whole lower half of a card pinned to the top
    with white space under it -- the reference centres it.
 
-   Then measured properly, which changed the answer. The reference card
-   is a fixed 215px -- its empty "No Upcoming Fixtures" cards are 215 too
-   -- and the crest is not centred in the lower half at all: it starts a
-   fixed 23px below it, with the three lines beside it starting 11px
-   lower again. Ours grow with what is in them, so centring could never
-   land on the same rows whatever the padding. So the offset is pinned
-   instead: 12 of padding plus 23 puts the crest on 100 and the lines on
-   111, 125 and 149, on every card, whatever height the row ends up. */
-.ewp-upcomingGrid .ewp-cardBody{display:flex;align-items:flex-start;gap:16px;
- padding:35px 24px 20px;flex:1 1 auto}
+   Then measured properly, twice. The reference card is 215px and ours,
+   once the stray border below was gone, is 216 -- so the height was
+   never the problem. What was: the reference centres the crest in a box
+   8px shorter than the lower half, so its crest sits 23px down where
+   ours sat 27. Twenty at the foot instead of twelve reproduces that,
+   and the eight it adds to the height of a card carrying a Tickets
+   button is taken back off that button below, so every card stays the
+   height of the reference. Crest 100, lines 111, 125 and 149. */
+.ewp-upcomingGrid .ewp-cardBody{display:flex;align-items:center;gap:16px;
+ padding:12px 24px 20px;flex:1 1 auto}
+/* The eight the foot of the body just took, given back, so a card with a
+   button is the same height as a card without one. */
+.ewp-upcomingGrid .ewp-cardCta{margin-bottom:7px}
 /* No border here: the reference card has none, and this one was adding
    3px to the height of every card. The hover line is drawn with ::after. */
 .ewp-upcomingGrid .ewp-card{border-bottom:0}
 .ewp-upcomingGrid .ewp-cardBody img{width:72px;height:72px;object-fit:contain;flex:none}
 .ewp-upcomingGrid .ewp-cardText{display:flex;flex-direction:column;gap:4px;min-width:0;
- flex:1 1 auto;margin-top:11px}
+ flex:1 1 auto}
 .ewp-upcomingGrid .ewp-cardText > *{display:block;margin:0}
 .ewp-upcomingGrid .ewp-kicker{font-size:10px;font-weight:700;letter-spacing:1px;line-height:10px;
  color:#212121;text-transform:uppercase}
