@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.89.2
+ * Version: 2.89.3
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1912,12 +1912,10 @@ a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/"]) img{width:auto;height:100%;
    much and neither the rail nor the wall row ends up any taller than
    it is now. Four characters are fetched, not a whole family. */
 a:has(img[src*="/ew-sponsors/kam"]){text-decoration:none}
-a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/kam"]){display:flex;flex-direction:column;
- justify-content:flex-start;height:26px}
-a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/kam"]) img{height:17px;flex:0 0 auto}
-a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/kam"])::after{content:".com";display:block;
- font:italic 700 12px/6px "Barlow Condensed","Instrument Sans",sans-serif;
- color:#fff;text-align:right;margin-top:3px}
+/* Not in the rail. At 26px the badge has to come down to 17 to make
+   room for a line of type six pixels tall, which is a smudge rather
+   than an address -- and it cost KAM a third of their mark to print
+   it. The wall below has the room for it; the rail does not. */
 
 /* Seventy-one, not the slot height of 84: the 240px ceiling catches a
    wordmark that wide, so PodCut lands at 71 tall and a KAM badge filling
@@ -3215,7 +3213,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.89.2';
+const EW_FWP_VERSION = '2.89.3';
 
 /*
  * Parts loader.
