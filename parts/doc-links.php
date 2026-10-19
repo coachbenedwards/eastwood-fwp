@@ -118,8 +118,20 @@ add_action( 'init', function () {
 		false
 	);
 
+	/*
+	 * The slug travels on the address as well as in the cookie.
+	 *
+	 * Set-Cookie does not survive the way out: the host rewrites the
+	 * caching headers on this response and the cookie goes with them,
+	 * which was tested live and came back empty every time. So the
+	 * landing page is told who sent them, and the first thing the page
+	 * does is move that into a cookie and wipe it off the address bar.
+	 * It is on screen for less time than the page takes to paint.
+	 */
+	$dest = add_query_arg( 'ewdoc', $slug, ew_doc_dest_url( $row['dest'] ) );
+
 	nocache_headers();
-	wp_redirect( ew_doc_dest_url( $row['dest'] ), 302 );
+	wp_redirect( $dest, 302 );
 
 	/*
 	 * The host puts s-maxage=2592000 on everything, including this.
@@ -180,7 +192,21 @@ add_action( 'wp_footer', function () {
   var m = document.cookie.match('(^|; )' + n + '=([^;]*)');
   return m ? decodeURIComponent(m[2]) : '';
  };
- var slug = get('ew_doc');
+ /* Arriving on a doc link: take the slug off the address, keep it in
+    a cookie, and tidy the address bar before anyone reads it. */
+ var here = new URL(window.location.href);
+ var sent = here.searchParams.get('ewdoc');
+ if (sent) {
+  sent = sent.replace(/[^a-z0-9_-]/gi, '').toLowerCase();
+  if (sent) {
+   document.cookie = 'ew_doc=' + encodeURIComponent(sent) +
+     ';path=/;max-age=' + (60 * 60 * 24 * <?php echo (int) ew_doc_days(); ?>);
+  }
+  here.searchParams.delete('ewdoc');
+  history.replaceState(null, '', here.pathname + (here.search || '') + here.hash);
+ }
+
+ var slug = sent || get('ew_doc');
  if (!slug || get('ew_doc_seen') === slug) { return; }
  /* Mark it first. A visitor who refreshes while the request is in
     flight should still only ever be one arrival. */
