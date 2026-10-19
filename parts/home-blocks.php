@@ -1243,17 +1243,28 @@ function ew_hb_player_sc( $atts, $content = '' ) {
 			'all'      => 'View all players',
 			'all_url'  => '/teams/',
 			'shop_url' => '/shop/',
+			// Empty means the club shirt that travels with the plugin --
+			// the back of the home shirt, cut out of the photograph Ben
+			// supplied. Putting an address in the field uses that
+			// instead, which is how a change of kit gets made.
 			'shirt'    => '',
 			'bg'       => '',
 			// Where the printing sits on whatever shirt is supplied.
-			// A field rather than a number in the stylesheet, because
-			// the right answer depends on the photograph.
-			'name_top' => '20%',
-			'num_top'  => '30%',
+			// Fields rather than numbers in the stylesheet, because the
+			// right answer depends on the photograph.
+			'name_top' => '19%',
+			'num_top'  => '27%',
 		),
 		$atts,
 		'eastwood_home_player'
 	);
+
+	if ( '' === $atts['shirt'] ) {
+		$ship = dirname( __DIR__ ) . '/assets/shop/home-shirt-back.png';
+		if ( file_exists( $ship ) ) {
+			$atts['shirt'] = ew_hb_asset( 'shop/home-shirt-back.png' );
+		}
+	}
 
 	$numbers = function_exists( 'ew_player_numbers' ) ? (array) ew_player_numbers() : array();
 
@@ -2459,11 +2470,11 @@ function ew_hb_css() {
 .ewp-pickShirt.is-left{margin-right:-108px}
 .ewp-pickShirt.is-right{margin-left:-108px}
 .ewp-pickShirt.is-mid{z-index:3}
-.ewp-pickShirt b{position:absolute;left:0;right:0;top:var(--ew-name-top,20%);text-align:center;
+.ewp-pickShirt b{position:absolute;left:0;right:0;top:var(--ew-name-top,19%);text-align:center;
  font-family:Anton,"Instrument Sans",sans-serif;font-size:26px;letter-spacing:.02em;
  color:#fff;text-transform:uppercase}
-.ewp-pickShirt i{position:absolute;left:0;right:0;top:var(--ew-num-top,30%);text-align:center;
- font-family:Anton,"Instrument Sans",sans-serif;font-style:normal;font-size:104px;line-height:1;color:#fff}
+.ewp-pickShirt i{position:absolute;left:0;right:0;top:var(--ew-num-top,27%);text-align:center;
+ font-family:Anton,"Instrument Sans",sans-serif;font-style:normal;font-size:118px;line-height:1;color:#fff}
 .ewp-pickNav{position:absolute;top:50%;transform:translateY(-50%);z-index:5;
  width:44px;height:44px;border:0;border-radius:6px;background:#fff;color:#101010;cursor:pointer;
  display:flex;align-items:center;justify-content:center;
