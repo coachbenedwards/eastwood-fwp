@@ -1707,7 +1707,10 @@ function ew_hb_css() {
  display:flex;align-items:center;justify-content:center;
  font-family:"Instrument Sans",system-ui,sans-serif;
  font-size:11px;font-weight:700;line-height:1;letter-spacing:normal;
- background-image:none}
+ background-image:none;
+ /* The disc is centred in a 41px band, which puts it on the half pixel;
+    the reference rounds that up the way this margin does. */
+ margin-bottom:1px}
 .ewp-strip .ewp-ha.is-home{background-color:#CC0000;color:#fff;background-image:none}
 .ewp-strip .ewp-ha.is-away{background-color:#e8e8e8;color:#101010;background-image:none}
 .ewp-strip .ewp-cardBody{display:flex;align-items:center;gap:16px;margin:0;padding:0 16px;flex:1}
@@ -1717,7 +1720,10 @@ function ew_hb_css() {
    boxes at 3, which shifted the block a pixel and left it two short. A
    column with a stated gap says it once. */
 .ewp-strip .ewp-cardText{min-width:0;display:flex;flex-direction:column;gap:4px}
-.ewp-strip .ewp-cardText > *{display:block}
+/* margin:0 as well as the gap. The kicker and the opponent each carry
+   3px of bottom margin from elsewhere, which was adding to the 4px gap
+   and making it 7. */
+.ewp-strip .ewp-cardText > *{display:block;margin:0}
 .ewp-strip .ewp-kicker{font-size:10px;font-weight:700;letter-spacing:1px;line-height:10px;
  color:#212121;text-transform:uppercase}
 .ewp-strip .ewp-cardText b{font-size:18px;line-height:1;display:block;
