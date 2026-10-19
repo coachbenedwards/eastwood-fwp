@@ -1494,12 +1494,21 @@ function ew_hb_css() {
    not the alignment, so the h2 headings typed onto the page
    are brought to the ones the blocks draw. Only h2: the h3s are card titles and belong ranged left.
    Colour is left alone -- a title over the dark section is white and
-   that is set on the widget. */
-.elementor-template-full-width h2.elementor-heading-title{
+   that is set on the widget.
+
+   The selector is long because it has to be. Elementor writes a size per
+   widget at three classes; the first attempt at this rule was two classes
+   and a tag, lost the tie, and the four stayed 40px while picking up the
+   centring, which nothing was competing for. Size now comes from here for
+   every section title, so the size box on these four headings in the
+   editor no longer does anything -- which is the point of having one. */
+.elementor-template-full-width .elementor-widget.elementor-widget-heading
+ h2.elementor-heading-title{
  font-family:Anton,"Instrument Sans",sans-serif;font-size:54px;letter-spacing:.02em;
  line-height:1.02;text-transform:uppercase;margin:0 0 26px;text-align:center}
 @media(max-width:820px){
- .elementor-template-full-width h2.elementor-heading-title{font-size:30px;margin-bottom:20px}
+ .elementor-template-full-width .elementor-widget.elementor-widget-heading
+  h2.elementor-heading-title{font-size:30px;margin-bottom:20px}
 }
 .ewp-allRow{margin:30px 0 0;text-align:center}
 .ewp-all{font-family:Anton,"Instrument Sans",sans-serif;font-size:14px;letter-spacing:.09em;
