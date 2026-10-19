@@ -94,3 +94,19 @@ edit has been written, staged and queued for a release.
 
 Before writing any string into a `.php` file, check it for `'`. Reword, or
 use double quotes. A CSS comment is not exempt: it is inside the string too.
+
+## 10. Never amend a commit that has already been pushed
+
+2.75.0 was committed, Ben pushed it, and then it was amended to add one
+more change. His copy and GitHub then disagreed about what 2.75.0 was,
+and his next push was rejected as "non-fast-forward" — which reads, to
+him, as something broken at his end.
+
+Cost: a failed push, a confusing error, and a conversation about git
+rather than about the club.
+
+Amending is only ever safe before the push. Once it is up, the next
+change is a new commit with the next version number, even when the
+change is small and the previous one was only minutes ago. The fix, if
+it happens again, is `git reset --soft origin/main` and one new commit —
+never a force push, which would destroy whatever else had arrived.

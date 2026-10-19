@@ -136,6 +136,40 @@ function ew_blocks_walk( &$nodes, $fn ) {
 	unset( $node );
 }
 
+/**
+ * Take one widget out of the tree, and any container it leaves empty.
+ *
+ * Setting a widget's text to nothing leaves the widget there. That is fine
+ * for a line of prose, which then renders as nothing at all, but not for a
+ * widget that is wrong rather than empty -- a shortcode nobody registered
+ * prints its own name on the page, and no field change makes that stop.
+ */
+function ew_blocks_remove( &$nodes, $id ) {
+	$hit = false;
+	foreach ( $nodes as $i => $node ) {
+		if ( ! is_array( $node ) ) {
+			continue;
+		}
+		if ( isset( $node['id'] ) && (string) $node['id'] === (string) $id ) {
+			unset( $nodes[ $i ] );
+			$hit = true;
+			continue;
+		}
+		if ( ! empty( $node['elements'] ) && is_array( $node['elements'] ) ) {
+			if ( ew_blocks_remove( $nodes[ $i ]['elements'], $id ) ) {
+				$hit = true;
+				// A container with nothing left in it still draws its own
+				// padding, so it goes too.
+				if ( ! $nodes[ $i ]['elements'] && 'widget' !== ( $node['elType'] ?? '' ) ) {
+					unset( $nodes[ $i ] );
+				}
+			}
+		}
+	}
+	$nodes = array_values( $nodes );
+	return $hit;
+}
+
 function ew_blocks_read( $post ) {
 	$raw = get_post_meta( $post->ID, '_elementor_data', true );
 	$doc = is_string( $raw ) ? json_decode( $raw, true ) : $raw;
@@ -208,8 +242,21 @@ add_action( 'rest_api_init', function () {
 				if ( ! $post ) {
 					return new WP_Error( 'ew_no_page', 'No page by that name.', array( 'status' => 404 ) );
 				}
-				if ( '' === $id || ! $set ) {
-					return new WP_Error( 'ew_args', 'Give it an id and some fields.', array( 'status' => 400 ) );
+				if ( '' === $id ) {
+					return new WP_Error( 'ew_args', 'Give it an id.', array( 'status' => 400 ) );
+				}
+
+				if ( $req->get_param( 'remove' ) ) {
+					$doc = ew_blocks_read( $post );
+					if ( ! ew_blocks_remove( $doc, $id ) ) {
+						return new WP_Error( 'ew_no_block', 'No block with that id on that page.', array( 'status' => 404 ) );
+					}
+					ew_blocks_write( $post, $doc );
+					return array( 'ok' => true, 'page' => $post->post_name, 'id' => $id, 'removed' => true );
+				}
+
+				if ( ! $set ) {
+					return new WP_Error( 'ew_args', 'Give it some fields, or remove: true.', array( 'status' => 400 ) );
 				}
 				$bad = ew_blocks_bad( $set );
 				if ( $bad ) {
