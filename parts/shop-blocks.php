@@ -208,9 +208,15 @@ function ew_shop_css() {
 		. '.ew-shoprow .elementor-widget-heading h1.elementor-heading-title'
 		. '{line-height:1.05;margin:0 calc(50% - 50vw) 34px !important}'
 		/* The line under the title is a text widget now, so it needs the
-		   column gutter the wrapper used to give it. */
-		. '.elementor-widget-text-editor > p.lede{font-size:17px;line-height:1.6;'
-		. 'color:#5c5c5c;margin:0 0 34px;'
+		   column gutter the wrapper used to give it.
+		
+		   15px, not the 17px the plugin's own sheet asks for: two rules set
+		   this paragraph and the page's own came last, so 15px is what it has
+		   always been. Its line-height was 1.6 inherited as a number from the
+		   wrapper, which on 15px text is 24, and its margin 30. Those three
+		   numbers are the seven pixels the page was out by. */
+		. '.elementor-widget-text-editor > p.lede{font-size:15px;line-height:1.6;'
+		. 'color:#5c5c5c;margin:0 0 30px;'
 		. 'padding-left:max(16px,calc(50vw - 624px));'
 		. 'padding-right:max(16px,calc(50vw - 624px))}'
 		. '.ewshop{max-width:1120px;margin:0 auto;padding:40px 20px 70px; font:400 16px/1.6 Inter,-apple-system,system-ui,sans-serif;color:#111} .ewshop h1{font-size:40px;line-height:1.05;margin:0 0 6px;letter-spacing:.3px} .ewshop .lede{color:#5c5c5c;margin:0 0 30px;font-size:15px} .ewshop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px} .ewshop-card{border:1px solid #e4e4e7;border-radius:6px;overflow:hidden;background:#fff; text-decoration:none;color:inherit;display:block;transition:border-color .15s} .ewshop-card:hover{border-color:#CC0000} .ewshop-pic{background:#CC0000;height:190px;display:flex;align-items:center;justify-content:center} .ewshop-pic svg{width:120px;height:auto} .ewshop-body{padding:16px 18px 20px} .ewshop-body h2{font-size:17px;margin:0 0 4px;line-height:1.3} .ewshop-body .p{font-weight:700;margin:0 0 6px} .ewshop-body .m{font-size:13px;color:#6a6a6a;margin:0}';
