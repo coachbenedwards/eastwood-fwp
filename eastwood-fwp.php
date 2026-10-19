@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.74.0
+ * Version: 2.75.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -428,6 +428,55 @@ function ew_stale_matches() {
 }
 
 /**
+ * Games hidden only while the feed still has them on the wrong day.
+ *
+ * A plain drop by id is a trap: when the league finally re-dates the game
+ * the feed carries it again on its real date, and the drop is still there
+ * hiding a fixture that is now correct -- and nobody is watching for that.
+ *
+ * So a drop here names the date it is for. The game disappears while the
+ * feed says that date and comes back by itself the moment the feed says
+ * anything else. Nothing to remember and nothing to undo.
+ *
+ * @return array id => the date (Y-m-d) the game is hidden on.
+ */
+function ew_moved_matches() {
+	return array(
+		// Eastwood v Newark Town. Eastwood are away at Lye Town in the FA
+		// Vase that afternoon instead; the league game will be given a new
+		// date, and will reappear on its own when it is.
+		585774 => '2026-10-31',
+	);
+}
+
+/**
+ * Games the feed does not carry at all.
+ *
+ * Football Web Pages covers the United Counties League. A cup run outside
+ * it -- the FA Vase -- is simply absent, so the club's own fixture list
+ * would show a free Saturday on the day of a cup tie. These are merged in
+ * and then sorted with the rest, so one entry here reaches the strip, the
+ * homepage, the matches page and the hospitality page together.
+ *
+ * Ids are ours and start well above anything the feed issues, so they can
+ * never collide with a real match. Take one out once the feed carries it.
+ */
+function ew_fixture_adds() {
+	return array(
+		array(
+			'id'          => 990001,
+			'date'        => '2026-10-31',
+			'time'        => '15:00',
+			'status'      => array( 'short' => '' ),
+			'venue'       => 'The Sports Ground (Lye)',
+			'competition' => array( 'id' => 0, 'name' => 'FA Vase Second Round' ),
+			'home-team'   => array( 'id' => 0, 'name' => 'Lye Town' ),
+			'away-team'   => array( 'id' => (int) EW_TEAM, 'name' => 'Eastwood FC' ),
+		),
+	);
+}
+
+/**
  * Apply every correction we keep over the feed, in one place, so server-side
  * reads and the browser-side proxy cannot drift apart.
  */
@@ -458,6 +507,11 @@ function ew_fixture_fixes() {
 		$fixes[ (int) $id ] = array( 'drop' => true );
 	}
 
+	// Hidden only while the feed still has them on the wrong day.
+	foreach ( ew_moved_matches() as $id => $on ) {
+		$fixes[ (int) $id ] = array( 'drop' => true, 'on' => (string) $on );
+	}
+
 	foreach ( (array) get_option( 'ew_fixture_fixes', array() ) as $id => $row ) {
 		$id = (int) $id;
 		if ( ! $id ) {
@@ -478,6 +532,13 @@ function ew_fixture_apply( $m ) {
 	}
 
 	$fix = $fixes[ $id ];
+
+	// A fix can name the date it is for. If the feed has since moved the
+	// game, the fix no longer applies and the real fixture comes back.
+	if ( ! empty( $fix['on'] ) && (string) $fix['on'] !== (string) ( $m['date'] ?? '' ) ) {
+		return $m;
+	}
+
 	if ( ! empty( $fix['drop'] ) ) {
 		return null;
 	}
@@ -510,11 +571,28 @@ function ew_fixture_apply_all( $node ) {
 	// so a game moved to a new date sits where it now belongs.
 	$is_list = isset( $node[0] ) && is_array( $node[0] ) && isset( $node[0]['id'] );
 	if ( $is_list ) {
-		$out = array();
+		$out  = array();
+		$have = array();
+		$ours = false;
 		foreach ( $node as $m ) {
 			$m = ew_fixture_apply( (array) $m );
 			if ( null !== $m ) {
 				$out[] = $m;
+				$have[ (int) ( $m['id'] ?? 0 ) ] = true;
+				if ( (int) ( $m['home-team']['id'] ?? 0 ) === (int) EW_TEAM
+					|| (int) ( $m['away-team']['id'] ?? 0 ) === (int) EW_TEAM ) {
+					$ours = true;
+				}
+			}
+		}
+
+		// Only a list that is already Eastwood's own fixtures, so a league
+		// table or another club's list is never handed a game of ours.
+		if ( $ours && isset( $node[0]['home-team'] ) ) {
+			foreach ( ew_fixture_adds() as $add ) {
+				if ( empty( $have[ (int) $add['id'] ] ) ) {
+					$out[] = $add;
+				}
 			}
 		}
 		usort( $out, function ( $a, $b ) {
@@ -2283,6 +2361,26 @@ add_shortcode( 'eastwood_teams', 'ew_teams_shortcode' );
  */
 function ew_squad_details() {
 	return array(
+		// Positions as Ben gave them, 19 October 2026. Numbers are still to
+		// come, so each row leaves the number null and the page keeps falling
+		// back to the shirt the player has worn most often.
+		'Scott Loach'        => array( null, 'gk' ),
+		'Louis Nicholson'    => array( null, 'df' ),
+		'Jake Wright'        => array( null, 'df' ),
+		'Toby Moore'         => array( null, 'df' ),
+		'Charlie Marzano'    => array( null, 'df' ),
+		'Theo Sackey-Mensah' => array( null, 'df' ),
+		'Connor Dimaio'      => array( null, 'mf' ),
+		'Jamie Walker'       => array( null, 'mf' ),
+		'Jacob Pearce'       => array( null, 'mf' ),
+		'Ryan Wilson'        => array( null, 'mf' ),
+		'Curtis Thompson'    => array( null, 'mf' ),
+		'Jordan Hallam'      => array( null, 'mf' ),
+		'Callum Chettle'     => array( null, 'mf' ),
+		'Tyree Wilson'       => array( null, 'mf' ),
+		'Luke Rawson'        => array( null, 'fw' ),
+		'Patrick Webb'       => array( null, 'fw' ),
+		'Tyler Blake'        => array( null, 'fw' ),
 	);
 }
 
@@ -2307,6 +2405,7 @@ function ew_squad_departed() {
 		'Rashaan Frances',
 		'Harry Wood',
 		'Bradley Gascoigne',
+		'Tony Gbopo',
 	);
 }
 
@@ -2678,7 +2777,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.74.0';
+const EW_FWP_VERSION = '2.75.0';
 
 /*
  * Parts loader.
