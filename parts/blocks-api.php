@@ -40,7 +40,7 @@ function ew_blocks_allowed() {
 		'eastwood_home_tiles', 'eastwood_home_sponsors', 'eastwood_home_live',
 		'eastwood_teams', 'eastwood_squad', 'eastwood_matches', 'eastwood_tv',
 		'eastwood_gate', 'eastwood_sponsors', 'eastwood_prose',
-		'eastwood_sponsor_cards',
+		'eastwood_sponsor_cards', 'eastwood_shop', 'eastwood_shirt',
 	);
 }
 

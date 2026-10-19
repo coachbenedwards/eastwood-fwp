@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.79.1
+ * Version: 2.80.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -3065,7 +3065,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.79.1';
+const EW_FWP_VERSION = '2.80.0';
 
 /*
  * Parts loader.
@@ -3897,7 +3897,74 @@ function ew_tv_series( $title ) {
 	return 'clips';
 }
 
-function ew_tv_shortcode() {
+/**
+ * Every word Eastwood TV puts on the screen, as a field.
+ *
+ * The videos are live -- they come from the channel -- but the words
+ * around them were written into this file, which meant nobody but me
+ * could change "Latest episode" or the line under the documentary row.
+ * They are attributes and body lines now:
+ *
+ *   [eastwood_tv kicker="Latest episode"]
+ *   documentary | This Is Eastwood | The club's own documentary series...
+ *   highlights | Match highlights | Every goal from every game...
+ *   clips | More from the club |
+ *   [/eastwood_tv]
+ *
+ * @param array       $atts    Attributes.
+ * @param string|null $content Body: one row per line.
+ * @return string
+ */
+/**
+ * The rows of Eastwood TV, read from the block's body.
+ *
+ * "key | heading | the line under it", one per line, in the order they
+ * appear on the page. The key is the series the video carries, which is
+ * data; the other two are words, which is why they are here.
+ *
+ * @param string|null $body The shortcode body.
+ * @return array
+ */
+function ew_tv_groups( $body ) {
+	$out = array();
+	foreach ( preg_split( '/\r\n|\r|\n/', (string) $body ) as $line ) {
+		$line = trim( $line );
+		if ( '' === $line ) {
+			continue;
+		}
+		$bits = array_map( 'trim', explode( '|', $line ) );
+		$key  = (string) ( $bits[0] ?? '' );
+		if ( '' === $key ) {
+			continue;
+		}
+		$out[ $key ] = array( (string) ( $bits[1] ?? '' ), (string) ( $bits[2] ?? '' ) );
+	}
+
+	// Nothing in the body: the rows this page has always shown, so an
+	// older page that has not been given its lines yet is unchanged.
+	if ( ! $out ) {
+		$out = array(
+			'documentary' => array( 'This Is Eastwood', 'The club\'s own documentary series, a new episode every Thursday.' ),
+			'highlights'  => array( 'Match highlights', 'Every goal from every game, usually up within a day or two.' ),
+			'clips'       => array( 'More from the club', '' ),
+		);
+	}
+
+	return $out;
+}
+
+function ew_tv_shortcode( $atts = array(), $content = null ) {
+	$a = shortcode_atts(
+		array(
+			'kicker'  => 'Latest episode',
+			'trouble' => 'Eastwood TV is having trouble reaching the channel just now. You can watch everything at',
+			'credit'  => 'Eastwood TV shows the most recent uploads from the club\'s YouTube channel. The full archive is',
+			'archive' => 'on YouTube',
+		),
+		(array) $atts,
+		'eastwood_tv'
+	);
+
 	$videos = ew_tv_feed();
 
 	ob_start();
@@ -3905,8 +3972,8 @@ function ew_tv_shortcode() {
 	if ( empty( $videos ) ) {
 		?>
 <div class="ew-tv">
-	<p class="ew-loading">Eastwood TV is having trouble reaching the channel just now.
-		You can watch everything at <a href="https://www.youtube.com/@<?php echo esc_attr( EW_TV_HANDLE ); ?>"
+	<p class="ew-loading"><?php echo esc_html( $a['trouble'] ); ?>
+		<a href="https://www.youtube.com/@<?php echo esc_attr( EW_TV_HANDLE ); ?>"
 		target="_blank" rel="noopener">youtube.com/@<?php echo esc_html( EW_TV_HANDLE ); ?></a>.</p>
 </div>
 		<?php
@@ -3918,11 +3985,7 @@ function ew_tv_shortcode() {
 		if ( 'documentary' === $v['series'] ) { $hero = $v; break; }
 	}
 
-	$groups = array(
-		'documentary' => array( 'This Is Eastwood', 'The club\'s own documentary series, a new episode every Thursday.' ),
-		'highlights'  => array( 'Match highlights', 'Every goal from every game, usually up within a day or two.' ),
-		'clips'       => array( 'More from the club', '' ),
-	);
+	$groups = ew_tv_groups( $content );
 	?>
 <div class="ew-tv">
 	<section class="ew-tv-hero">
@@ -3933,7 +3996,7 @@ function ew_tv_shortcode() {
 				referrerpolicy="strict-origin-when-cross-origin"></iframe>
 		</div>
 		<div class="ew-tv-heroText">
-			<span class="ew-tv-kicker">Latest episode</span>
+			<span class="ew-tv-kicker"><?php echo esc_html( $a['kicker'] ); ?></span>
 			<h2><?php echo esc_html( $hero['title'] ); ?></h2>
 			<p><?php echo esc_html( date_i18n( 'j F Y', $hero['published'] ) ); ?></p>
 		</div>
@@ -3966,9 +4029,9 @@ function ew_tv_shortcode() {
 	</section>
 	<?php endforeach; ?>
 
-	<p class="ew-credit">Eastwood TV shows the most recent uploads from the club's YouTube channel.
-		The full archive is <a href="https://www.youtube.com/@<?php echo esc_attr( EW_TV_HANDLE ); ?>/videos"
-		target="_blank" rel="noopener">on YouTube</a>.</p>
+	<p class="ew-credit"><?php echo esc_html( $a['credit'] ); ?>
+		<a href="https://www.youtube.com/@<?php echo esc_attr( EW_TV_HANDLE ); ?>/videos"
+		target="_blank" rel="noopener"><?php echo esc_html( $a['archive'] ); ?></a>.</p>
 </div>
 	<?php
 	return trim( ob_get_clean() );
