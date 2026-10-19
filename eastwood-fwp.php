@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.84.2
+ * Version: 2.85.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1757,6 +1757,7 @@ function ew_icon_sprite() {
 		. '<symbol id="ew-ball" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><path d="M12 8.1l3.3 2.4-1.26 3.9h-4.08L8.7 10.5z"/><path d="M12 8.1V3.5M15.3 10.5l4.35-1.45M14.04 14.4l2.7 3.7M9.96 14.4l-2.7 3.7M8.7 10.5 4.35 9.05"/></symbol>'
 		. '<symbol id="ew-account" viewBox="0 0 24 24"><circle cx="12" cy="8.2" r="3.7"/><path d="M4.8 20.4a7.2 7.2 0 0 1 14.4 0"/></symbol>'
 		. '<symbol id="ew-search" viewBox="0 0 24 24"><circle cx="10.6" cy="10.6" r="6.4"/><path d="m15.3 15.3 5.5 5.5"/></symbol>'
+		. '<symbol id="ew-events" viewBox="0 0 24 24"><rect x="3.4" y="5.2" width="17.2" height="15.4" rx="1.6"/><path d="M3.4 9.8h17.2M8.4 3.4v3.6M15.6 3.4v3.6"/></symbol>'
 		. '<symbol id="ew-menu" viewBox="0 0 24 24"><path d="M4 7.2h16M4 12h16M4 16.8h16"/></symbol>'
 		. '</defs></svg>';
 }
@@ -3082,7 +3083,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.84.2';
+const EW_FWP_VERSION = '2.85.0';
 
 /*
  * Parts loader.
@@ -4161,9 +4162,7 @@ function ew_topbar_changes() {
 	return array(
 		// It was called Matchday and went to the ticket page, which is not
 		// what anyone clicking it is after.
-		'Matchday'  => array( 'Hospitality', '/hospitality/' ),
-		// "The Venue" reads as a place. The thing being sold is the hire.
-		'The Venue' => array( 'Venue Hire', '' ),
+		'Matchday' => array( 'Hospitality', '/hospitality/' ),
 	);
 }
 
@@ -4174,7 +4173,25 @@ function ew_topbar_changes() {
  */
 function ew_topbar_order() {
 	return array(
-		array( 'Shop', 'Venue Hire' ),
+		array( 'Shop', 'TheVenue' ),
+	);
+}
+
+/**
+ * Nav items the captured header does not have at all.
+ *
+ * Keyed on the item the new one goes after, and cloned from it: an anchor
+ * in this bar carries about a thousand characters of utility classes, and
+ * a hand-written one would drift from its neighbours the first time the
+ * theme is rebuilt. Only the three things that differ are changed -- the
+ * words, where it goes, and which symbol it draws.
+ *
+ * @return array after-label => array( label, path, sprite id ).
+ */
+function ew_topbar_additions() {
+	return array(
+		// Beside the room the events happen in.
+		'TheVenue' => array( 'Events', '/events/', 'ew-events' ),
 	);
 }
 
@@ -4249,6 +4266,38 @@ function ew_rewrite_topbar( $html ) {
 		$html = str_replace( $a, '<!--ew-swap-->', $html );
 		$html = str_replace( $b, $a, $html );
 		$html = str_replace( '<!--ew-swap-->', $b, $html );
+	}
+
+	/*
+	 * A new item, cloned from the one it sits beside. Done after the
+	 * order pass, so it follows the item it belongs to wherever that has
+	 * ended up, and skipped when the page already carries the label, so a
+	 * second pass cannot leave two of them.
+	 */
+	foreach ( ew_topbar_additions() as $after => $spec ) {
+		list( $label, $path, $icon ) = $spec;
+		if ( false !== strpos( $html, '<p class="z-10">' . $label . '</p>' ) ) {
+			continue;
+		}
+		$source = ew_topbar_anchor( $html, $after );
+		if ( '' === $source ) {
+			continue;
+		}
+		$new = str_replace(
+			'<p class="z-10">' . $after . '</p>',
+			'<p class="z-10">' . esc_html( $label ) . '</p>',
+			$source
+		);
+		// The anchor's own href comes before the symbol's, so one is one.
+		$new = preg_replace( '#\shref="[^"]*"#',
+			' href="' . esc_url( home_url( $path ) ) . '"', $new, 1 );
+		$new = preg_replace( '#\shref="\#[a-z-]+"#',
+			' href="#' . $icon . '"', $new, 1 );
+		if ( preg_match( '#\stitle="[^"]*"#', $new ) ) {
+			$new = preg_replace( '#\stitle="[^"]*"#',
+				' title="' . esc_attr( $label ) . '"', $new, 1 );
+		}
+		$html = str_replace( $source, $source . $new, $html );
 	}
 
 	return $html;

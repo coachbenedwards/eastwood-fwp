@@ -1939,8 +1939,11 @@ function ew_hb_css() {
 .ewp-upcomingGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(272px,1fr));
  gap:16px;list-style:none;margin:0;padding:0}
 .ewp-upcoming .ewp-card:hover{box-shadow:0 3px 18px rgba(0,0,0,.28)}
+/* Square, like the reference. The 8px rounding was clipping the top
+   corners of the grey band, so the red behind the section showed
+   through where the band should reach the edge. */
 .ewp-upcomingGrid .ewp-slide{display:flex;flex-direction:column;flex:1 1 auto;max-width:none;
- background:#fff;border-radius:8px;overflow:hidden}
+ background:#fff;border-radius:0;overflow:hidden}
 /* A flex column, so the body below can take the height the row gives the
    card. As a plain block it could not: the card stretched to fill the row
    and left the extra as empty space under the venue. */
