@@ -1941,7 +1941,10 @@ function ew_hb_css() {
 .ewp-upcoming .ewp-card:hover{box-shadow:0 3px 18px rgba(0,0,0,.28)}
 .ewp-upcomingGrid .ewp-slide{display:flex;flex-direction:column;flex:1 1 auto;max-width:none;
  background:#fff;border-radius:8px;overflow:hidden}
-.ewp-upcomingGrid .ewp-card{flex:1 1 auto;border-radius:0}
+/* A flex column, so the body below can take the height the row gives the
+   card. As a plain block it could not: the card stretched to fill the row
+   and left the extra as empty space under the venue. */
+.ewp-upcomingGrid .ewp-card{flex:1 1 auto;border-radius:0;display:flex;flex-direction:column}
 
 .ewp-upcomingGrid .ewp-cardTop{display:flex;align-items:center;gap:8px;
  padding:12px 24px;min-height:65px;background:#fff;border-bottom:1px solid #f3f3f3}
