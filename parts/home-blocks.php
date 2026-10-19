@@ -2049,7 +2049,9 @@ function ew_hb_css() {
  display:flex;align-items:center;justify-content:center;align-self:flex-start;margin-top:8px;
  font-family:"Instrument Sans",system-ui,sans-serif;font-size:12px;font-weight:400;line-height:1;
  background:#fff;border:1px solid #CC0000;color:#CC0000;background-image:none}
-.ewp-upcomingGrid .ewp-ha.is-home{background:#fff;color:#CC0000;border-color:#CC0000}
+/* Home is filled, away is the outline. The reference leaves only the
+   away mark hollow; both were hollow here, so the two read the same. */
+.ewp-upcomingGrid .ewp-ha.is-home{background:#CC0000;color:#fff;border-color:#CC0000}
 .ewp-upcomingGrid .ewp-ha.is-away{background:#fff;color:#CC0000;border-color:#CC0000}
 
 /* flex:1 so the body takes whatever height the row gives the card and the
@@ -2132,16 +2134,23 @@ function ew_hb_css() {
 /* Measured off the reference, not eyeballed. Section on the page grey,
    a 1248 column, the heading Anton 56 in the club red with its own icon
    above a white 40px tab rail. */
-/* The reference runs a 1248 column here, like the fixture cards. The
-   shared wrap is 1180, which made the cards 372 instead of 405. */
-.ewp-news{background:#f3f3f3;padding:32px 0 32px}
+/* The reference runs the grey the full width of the window with a 1248
+   column inside it. Ours sat in an Elementor row 1180 wide, so the grey
+   stopped short either side and the cards came out 372 instead of 405.
+   The row cannot be widened from here without moving every other
+   section in it, so this section steps outside its own column. */
+.ewp-news{background:#f3f3f3;padding:32px 0 32px;
+ width:100vw;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw)}
 /* A heading widget emptied in the builder should draw nothing rather
    than leave its margins behind. The reference carries its heading
    inside the grey band, so ours comes from the block. */
 .elementor-widget-heading:has(> .elementor-widget-container > .elementor-heading-title:empty){display:none}
-.ewp-news .ewp-wrap{max-width:1280px}
+.ewp-news .ewp-wrap{max-width:1280px;margin:0 auto;padding:0 16px;box-sizing:border-box}
+/* Capitals: on the reference the heading is capitals in the words
+   themselves, so a title typed in sentence case is lifted here rather
+   than shouted into the field. */
 .ewp-newsH{font-family:Anton,"Instrument Sans",sans-serif;font-size:56px;line-height:56px;
- font-weight:400;color:#CC0000;text-align:center;margin:0 0 32px}
+ font-weight:400;color:#CC0000;text-align:center;text-transform:uppercase;margin:0 0 32px}
 .ewp-newsIcon{font-family:"Instrument Sans",system-ui,sans-serif;font-size:48px;line-height:56px}
 /* 4px of padding, 4px between tabs, 2px corners: the rail on the
    reference, to the pixel. */
