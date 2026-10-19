@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.69.0
+ * Version: 2.70.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1397,6 +1397,7 @@ function ew_chrome_css() {
  padding-right:max(16px,calc(50vw - 624px))}
 
 h1.elementor-heading-title,
+.ew-title,
 .ewshop h1{
  background:#CC0000;color:#fff !important;
  font-family:Anton,"Instrument Sans",sans-serif !important;
@@ -1410,6 +1411,7 @@ h1.elementor-heading-title,
 }
 @media(max-width:820px){
  h1.elementor-heading-title,
+ .ew-title,
  .ewshop h1{font-size:38px !important;padding:32px 16px 34px !important}
 }
 
@@ -1745,6 +1747,31 @@ add_action( 'template_redirect', function () {
 	if ( is_admin() || is_feed() || is_embed() ) { return; }
 	ob_start( 'ew_rewrite_markup' );
 }, 1 );
+
+/* ------------------------------------------------------------------
+ * Letting the chosen homepage actually be the homepage.
+ *
+ * The theme was captured from a reference build and carries its own
+ * front-page template. That template wins over everything else in the
+ * WordPress hierarchy, so setting a static page as the homepage in
+ * Settings changed the setting and nothing else: the address bar said
+ * eastwoodfc.com and the captured front page kept rendering, which looks
+ * exactly like the setting not having saved.
+ *
+ * With a page chosen, that template steps aside and the page renders
+ * through its own, which is how the builder pages reach the screen.
+ * Choose "Your latest posts" again and the captured front page comes
+ * back, so this takes nothing away.
+ * ------------------------------------------------------------------ */
+
+add_filter( 'front_page_template', function ( $template ) {
+	if ( 'page' === get_option( 'show_on_front' ) && (int) get_option( 'page_on_front' ) ) {
+		return '';
+	}
+	return $template;
+} );
+
+
 
 /* ------------------------------------------------------------------
  * The Matches page: fixtures, results and the league table.
@@ -2503,7 +2530,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.69.0';
+const EW_FWP_VERSION = '2.70.0';
 
 /*
  * Parts loader.
@@ -3536,11 +3563,29 @@ function ew_topbar_order() {
 	);
 }
 
-/** The whole anchor carrying one label, or '' if it is not on the page. */
+/**
+ * The whole anchor carrying one label, or '' if it is not on the page.
+ *
+ * Found by hand rather than by pattern. The first version matched the
+ * anchor with a lazy "anything that is not a closing tag" and it worked
+ * for the first item and silently failed for the second: each nav anchor
+ * carries about a thousand characters of utility classes, and scanning a
+ * seventy-kilobyte page that way runs into the backtracking limit, which
+ * PCRE reports by returning no match rather than an error. Hospitality
+ * changed, Venue Hire did not, and nothing said why. Walking back from
+ * the label to the anchor that opens it is exact and costs nothing.
+ */
 function ew_topbar_anchor( $html, $label ) {
-	$re = '#<a\b[^>]*>(?:(?!</a>).)*?<p class="z-10">'
-		. preg_quote( $label, '#' ) . '</p></a>#s';
-	return preg_match( $re, $html, $m ) ? $m[0] : '';
+	$needle = '<p class="z-10">' . $label . '</p></a>';
+	$at     = strpos( $html, $needle );
+	if ( false === $at ) {
+		return '';
+	}
+	$open = strrpos( substr( $html, 0, $at ), '<a ' );
+	if ( false === $open ) {
+		return '';
+	}
+	return substr( $html, $open, ( $at + strlen( $needle ) ) - $open );
 }
 
 function ew_rewrite_topbar( $html ) {
@@ -3672,18 +3717,53 @@ function ew_rewrite_nav( $html ) {
  * loads whenever that wrapper appears.
  * ------------------------------------------------------------------ */
 
+/**
+ * The red band with the page name in it.
+ *
+ * It used to come from a heading widget, because these pages were in the
+ * builder. Taking them back off it left them with no title at all -- a
+ * page that opens straight into a paragraph. The title is the page title
+ * either way, so it is printed here rather than typed into the content,
+ * and a page that already carries its own h1 is left alone.
+ */
+add_filter( 'the_content', function ( $html ) {
+	if ( is_admin() || ! is_singular() || is_front_page() ) {
+		return $html;
+	}
+	if ( false === strpos( $html, 'ew-prose' ) || false !== stripos( $html, '<h1' ) ) {
+		return $html;
+	}
+	$title = get_the_title();
+	if ( '' === trim( (string) $title ) ) {
+		return $html;
+	}
+	return '<h1 class="ew-title">' . esc_html( $title ) . '</h1>' . $html;
+}, 9 );
+
 function ew_prose_css_inline() {
 	return '
 .ew-prose{margin:0 calc(50% - 50vw);padding:0 0 64px;
  font-family:"Instrument Sans",system-ui,sans-serif;color:#111}
 /* The reference holds a 1248px column on every page, so these do too.
    A 1248px line of body copy is too long to read comfortably, so the
-   column is wide and the paragraphs inside it are not. */
-.ew-prose > p,.ew-prose > ul,.ew-prose > ol,.ew-prose .ew-lede{max-width:72ch}
+   column is wide and the paragraphs inside it are not.
+
+   On a content box, because the gutter that centres the column is
+   PADDING on every child, and border-box was taking it out of the
+   measure: 72ch minus two 132px gutters left a 503px line hugging the
+   left of a 1512px page, which is what "poor layout" looked like. */
+.ew-prose > p,.ew-prose > ul,.ew-prose > ol,.ew-prose .ew-lede{
+ box-sizing:content-box;max-width:72ch}
 .ew-prose *{box-sizing:border-box}
 .ew-prose .ew-lede{font-size:19px;line-height:1.55;color:#333;margin:0 0 28px}
+/* padding-bottom, not a padding shorthand. The shorthand zeroed the
+   left and right the column rule sets, so every heading on every prose
+   page started at the window edge while its paragraphs started 132px
+   in -- headings and text not even sharing a left edge. Same shape of
+   fault as the away disc in the fixtures strip. */
 .ew-prose h2{font-family:Anton,"Instrument Sans",sans-serif;font-size:30px;letter-spacing:.03em;
- text-transform:uppercase;margin:40px 0 14px;padding:0 0 10px;border-bottom:2px solid #e3e3e3}
+ text-transform:uppercase;margin:40px 0 14px;padding-bottom:10px;
+ border-bottom:2px solid #e3e3e3}
 .ew-prose p{font-size:16px;line-height:1.65;margin:0 0 16px}
 .ew-prose ul{margin:0 0 20px;padding-left:20px}
 .ew-prose li{font-size:16px;line-height:1.6;margin:0 0 8px}
@@ -3692,11 +3772,16 @@ function ew_prose_css_inline() {
  border-radius:4px;padding:14px 16px}
 .ew-prose .ew-person b{display:block;font-size:15px}
 .ew-prose .ew-person span{font-size:12px;color:#8a8a8a}
-.ew-prose .ew-cta{background:#111;color:#fff;border-radius:4px;padding:26px 28px;margin:36px 0 0}
+/* The same shorthand, and here it made a black band across the whole
+   window instead of a box in the column. The gutter is a margin on this
+   one, so the dark starts and stops with the text. */
+.ew-prose .ew-cta{background:#111;color:#fff;border-radius:4px;box-sizing:content-box;
+ padding:26px 28px;margin:36px max(16px,calc(50vw - 624px)) 0;max-width:72ch}
 .ew-prose .ew-cta h2,.ew-prose .ew-cta h3{font-family:Anton,"Instrument Sans",sans-serif;font-size:20px;letter-spacing:.05em;
  text-transform:uppercase;margin:0 0 8px;color:#fff}
 .ew-prose .ew-cta p{color:#d6d6d6;margin:0 0 4px;font-size:15px}
 .ew-prose .ew-cta a{color:#fff;font-weight:600}
+.ew-prose .ew-cta p a{text-decoration:underline}
 @media(max-width:720px){
  .ew-prose .ew-lede{font-size:17px}
  .ew-prose h2{font-size:19px}
