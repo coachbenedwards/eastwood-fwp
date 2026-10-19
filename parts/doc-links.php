@@ -120,6 +120,20 @@ add_action( 'init', function () {
 
 	nocache_headers();
 	wp_redirect( ew_doc_dest_url( $row['dest'] ), 302 );
+
+	/*
+	 * The host puts s-maxage=2592000 on everything, including this.
+	 * Left alone, the edge would answer the redirect for a month
+	 * without ever reaching here -- the click counted once and then
+	 * never again -- and Cloudflare strips Set-Cookie off anything it
+	 * might cache, which takes the marker with it. These say no, in
+	 * the three spellings Cloudflare reads, and they go after
+	 * wp_redirect so that nothing else gets the last word.
+	 */
+	header_remove( 'Pragma' );
+	header( 'Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0', true );
+	header( 'CDN-Cache-Control: no-store', true );
+	header( 'Cloudflare-CDN-Cache-Control: no-store', true );
 	exit;
 }, 1 );
 
