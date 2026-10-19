@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.83.9
+ * Version: 2.84.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -119,6 +119,15 @@ function ew_badge_candidates( $key ) {
 
 	$fx = ew_fwp_fetch( 'fixtures-results' );
 	foreach ( (array) ( $fx['fixtures-results']['matches'] ?? array() ) as $m ) {
+		foreach ( array( 'home-team', 'away-team' ) as $side ) {
+			$add( $out, (array) ( $m[ $side ] ?? array() ), 'cup' );
+		}
+	}
+
+	// And the clubs in ties we add by hand. The feed has never heard of them,
+	// so without this they never reach this screen and never get a crest --
+	// which is exactly what happened to Lye Town in the Vase.
+	foreach ( ew_fixture_adds() as $m ) {
 		foreach ( array( 'home-team', 'away-team' ) as $side ) {
 			$add( $out, (array) ( $m[ $side ] ?? array() ), 'cup' );
 		}
@@ -474,7 +483,11 @@ function ew_fixture_adds() {
 			// hand needs it as much as a game the feed carries, or it is
 			// the one fixture on the site with a blank corner.
 			'competition' => array( 'id' => 30, 'name' => 'FA Vase Second Round' ),
-			'home-team'   => array( 'id' => 0, 'name' => 'Lye Town' ),
+			// Team ids for a club the feed does not carry start at 990101, so
+			// they sit clear of both the feed and the 9900xx fixture ids. The
+			// id is the crest file name, so a club with id 0 can never have
+			// one: it falls back to the initials disc for good.
+			'home-team'   => array( 'id' => 990101, 'name' => 'Lye Town' ),
 			'away-team'   => array( 'id' => (int) EW_TEAM, 'name' => 'Eastwood FC' ),
 		),
 	);
@@ -3069,7 +3082,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.83.9';
+const EW_FWP_VERSION = '2.84.0';
 
 /*
  * Parts loader.
