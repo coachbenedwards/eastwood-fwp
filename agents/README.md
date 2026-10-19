@@ -2,7 +2,10 @@
 
 Five jobs, run in order, once per page. A page does not reach the next
 agent until the one before it has passed. Every agent reads
-[STANDING-RULES.md](STANDING-RULES.md) first.
+[STANDING-RULES.md](STANDING-RULES.md) first, and rule 0 of it governs
+everything here: every page is laid out as Elementor blocks a person at
+the club can edit and carry on from, and that is not negotiable without
+Ben saying so.
 
 The order is the point. The baseline has to exist before anything is
 touched, because after the page has changed there is no way to know what

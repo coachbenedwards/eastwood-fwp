@@ -11,6 +11,28 @@ first.
 
 ## Build
 
+Rule 0 decides the shape of every page you build: Elementor blocks a
+person at the club can edit and carry on from. Concretely, for each piece
+of a page, in this order of preference:
+
+1. **A heading widget** where the content is a heading. **A text widget**
+   where it is prose. A person clicks it and types.
+2. **A block of this plugin** where the content is live data or
+   interactive — fixtures, the squad, the sponsor wall, the TV strip —
+   and every word it shows is a field on that block.
+3. **Nothing else.** A page of HTML in one code box is not a block page.
+   If you are about to write one, you have the wrong answer: go back and
+   either split it into widgets or add the fields to a block.
+
+Sections are separate widgets inside one wrapper container, so they can
+be reordered and added to. The wrapper carries the class the styling
+needs; it never carries the words.
+
+If a CSS rule stands in the way of splitting a page into editable
+widgets — a direct-child rule is the usual one — fix the rule. That has
+happened and the fix is in the plugin: a measure rule reaches both a bare
+paragraph and one inside a text widget. Do not ship one box instead.
+
 Containers holding the plugin's blocks, the way the homepage is built.
 Set the container's own padding to zero where a block is full-bleed:
 Elementor adds 10px top and bottom to every widget, which read as a

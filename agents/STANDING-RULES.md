@@ -1,7 +1,40 @@
 # Standing rules
 
-Every agent on this team reads this first. Each line is here because it
-already went wrong on this site, and the cost is written next to it.
+Every agent on this team reads this first. Rule 0 governs every other
+rule. The rest are here because they already went wrong on this site, and
+the cost is written next to each one.
+
+## 0. Every page is editable in Elementor, by a person, always
+
+THIS RULE IS SET BY BEN AND MAY NOT BE RELAXED, REINTERPRETED OR TRADED
+AWAY WITHOUT HIS EXPLICIT APPROVAL. Not for speed, not for a technical
+constraint, not "for now".
+
+Every page on this site — every page ever built on it, not only the ones
+converted so far — is laid out as Elementor blocks that somebody at the
+club can edit and carry on from without asking anyone. In practice:
+
+- A heading is a heading widget. A paragraph is a text widget. A person
+  clicks it in the builder and types.
+- Sections are separate blocks, so they can be reordered, duplicated and
+  added to.
+- A block of this plugin is used where the content is live data or an
+  interactive piece — fixtures, the squad, the sponsor wall — and every
+  word it shows is a field on that block, not a string in the code.
+- One page of HTML in a single code box is NOT a block page. That was
+  tried on the eleven written pages and rejected: "every single page
+  needs to be in the elementor editable blocks... as ive said from the
+  very beginning."
+- Words live on the page, in one place. Never in a heredoc in this
+  plugin, and never in two places at once (see rule 1).
+
+When a technical constraint appears to stand in the way, the constraint
+is what gets fixed. The direct-child CSS rule that made each paragraph
+need to sit inside one wrapper was such a constraint, and the answer was
+to rewrite the rule, not to ship one HTML box and call it a block page.
+
+If a page genuinely cannot be built this way, stop and ask Ben. Do not
+decide it on his behalf.
 
 ## 1. Two systems must never hold the same words
 
