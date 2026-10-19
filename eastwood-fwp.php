@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.70.1
+ * Version: 2.71.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1232,6 +1232,40 @@ function ew_sponsor_url( $slug ) {
 }
 
 /**
+ * A second file for a sponsor, where one reads better than the other.
+ *
+ * The wall in the footer sits on the red band, and a logo supplied as a
+ * white-backgrounded jpeg lands on it as a white tile. The nav already
+ * uses a white version of PodCut for the same reason, so the wall uses
+ * the same file. Anything with no second version keeps its own.
+ */
+function ew_sponsor_alt() {
+	return array( 'podcut' => 'podcut-white' );
+}
+
+function ew_sponsor_wall_url( $slug ) {
+	$alt = ew_sponsor_alt();
+	if ( isset( $alt[ $slug ] ) && file_exists( ew_sponsor_dir() . $alt[ $slug ] . '.png' ) ) {
+		return ew_sponsor_url( $alt[ $slug ] );
+	}
+	return ew_sponsor_url( $slug );
+}
+
+/**
+ * The sponsor a file belongs to, whichever of its files it is.
+ *
+ * Both the link lookup and the pass that removes a retired sponsor read
+ * the slug straight out of the filename. Pointing the wall at
+ * podcut-white.png without this would have made PodCut look like a
+ * sponsor nobody has heard of: no link, and then the anchor deleted
+ * outright as a slot belonging to nobody on the roster.
+ */
+function ew_sponsor_slug_of( $file ) {
+	$alt = array_flip( ew_sponsor_alt() );
+	return isset( $alt[ $file ] ) ? $alt[ $file ] : $file;
+}
+
+/**
  * Download one sponsor logo and keep it locally. Same shape as
  * ew_badge_install(): unchanged bytes at source are a no-op, and a
  * failure leaves whatever is already on disk alone.
@@ -1589,12 +1623,12 @@ function ew_rewrite_markup( $html ) {
 		if ( ! file_exists( ew_sponsor_dir() . $slug . '.png' ) ) { continue; }
 		$html = str_replace(
 			'https://images.gc.nffcservices.co.uk/fit-in/120x120/' . $file,
-			esc_url( ew_sponsor_url( $slug ) ),
+			esc_url( ew_sponsor_wall_url( $slug ) ),
 			$html
 		);
 		$html = preg_replace(
 			'#https://images\.gc\.nffcservices\.co\.uk/[^"\']*' . preg_quote( $file, '#' ) . '#',
-			esc_url( ew_sponsor_url( $slug ) ),
+			esc_url( ew_sponsor_wall_url( $slug ) ),
 			$html
 		);
 		if ( isset( $roster[ $slug ] ) ) {
@@ -1616,7 +1650,7 @@ function ew_rewrite_markup( $html ) {
 	$html = preg_replace_callback(
 		'#<a\b[^>]*>(?:(?!</a>).)*?/ew-sponsors/([a-z0-9\-]+)\.png(?:(?!</a>).)*?</a>#s',
 		function ( $m ) use ( $roster ) {
-			return isset( $roster[ $m[1] ] ) ? $m[0] : '';
+			return isset( $roster[ ew_sponsor_slug_of( $m[1] ) ] ) ? $m[0] : '';
 		},
 		$html
 	);
@@ -2552,7 +2586,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.70.1';
+const EW_FWP_VERSION = '2.71.0';
 
 /*
  * Parts loader.
@@ -5130,8 +5164,9 @@ function ew_sponsor_link_for_markup( $html ) {
 	if ( ! preg_match( '#/ew-sponsors/([a-z0-9\-]+)\.png#', $html, $m ) ) {
 		return '';
 	}
+	$slug   = ew_sponsor_slug_of( $m[1] );
 	$roster = ew_sponsor_roster();
-	return isset( $roster[ $m[1] ][2] ) ? (string) $roster[ $m[1] ][2] : '';
+	return isset( $roster[ $slug ][2] ) ? (string) $roster[ $slug ][2] : '';
 }
 
 /**
@@ -5278,6 +5313,8 @@ function ew_academy_content() {
 
 <div class="ew-people">
 	<div class="ew-person"><b>Lewis McGugan</b><span>Head Coach</span></div>
+	<div class="ew-person"><b>Owen Betts</b><span>Coach</span></div>
+	<div class="ew-person"><b>Dave Plant</b><span>Coach</span></div>
 </div>
 
 <h2>Trials</h2>
