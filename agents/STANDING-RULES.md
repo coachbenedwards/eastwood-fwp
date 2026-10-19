@@ -127,6 +127,16 @@ whether to print CSS or script for it, and check the new markup still
 satisfies each one. A gate that matches on a class name will not match a
 block name.
 
+Then this was fixed, and it broke again on the next run: there were TWO
+gates with the same test, and only one was changed. The second governed
+the price grid on the tickets page and the gate figures on the
+sponsorship page, so those two pages shipped unstyled a second time.
+
+So the rule is not "fix the gate". It is: grep for every call site,
+count them, and replace the test with one named function they all call.
+A condition written out in more than one place is a condition that will
+be fixed in one place.
+
 ## 12. A shortcode's body is not run through WordPress's typography
 
 These pages printed through the_content, which curls quotes and turns a

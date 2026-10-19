@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.76.1
+ * Version: 2.76.2
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1962,6 +1962,25 @@ function ew_uses_shortcode( $post, $tag ) {
  * a page body lands in _elementor_data on an Elementor page, so a gate that
  * only reads post_content never fires and the stylesheet is never printed.
  */
+/**
+ * Is this one of the written pages, however it renders?
+ *
+ * A page that still prints its own content carries the class ew-prose. A
+ * page converted to a block carries the block's name instead, and
+ * eastwood_prose does not contain ew-prose -- an underscore against a
+ * hyphen. Every gate that decides whether to send a page its styling has
+ * to accept both, and there is more than one such gate: the first time
+ * this was fixed, only one of them was, which left the price grid on the
+ * tickets page and the gate figures on the sponsorship page unstyled.
+ *
+ * So the test lives here, once, rather than being written out at each
+ * gate. A new gate calls this.
+ */
+function ew_is_prose_page( $post ) {
+	return ew_post_contains( $post, 'ew-prose' )
+		|| ew_post_contains( $post, 'eastwood_prose' );
+}
+
 function ew_post_contains( $post, $needle ) {
 	if ( ! $post ) {
 		return false;
@@ -2777,7 +2796,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.76.1';
+const EW_FWP_VERSION = '2.76.2';
 
 /*
  * Parts loader.
@@ -4038,16 +4057,7 @@ function ew_prose_css_inline() {
 function ew_prose_assets() {
 	if ( ! is_singular() ) { return; }
 	$post = get_post();
-	/*
-	 * Either spelling. A page that still renders its own content carries
-	 * the class ew-prose; a page converted to a block carries the block's
-	 * name instead, and eastwood_prose does not contain the string
-	 * ew-prose -- an underscore against a hyphen. That one character left
-	 * eleven converted pages with no styling at all, live, until the
-	 * before-and-after said every paragraph had gone full width.
-	 */
-	if ( ! ew_post_contains( $post, 'ew-prose' )
-		&& ! ew_post_contains( $post, 'eastwood_prose' ) ) { return; }
+	if ( ! ew_is_prose_page( $post ) ) { return; }
 
 	$css = ew_prose_css_inline();
 
@@ -4300,7 +4310,7 @@ HTML;
 function ew_commercial_assets() {
 	if ( ! is_singular() ) { return; }
 	$post = get_post();
-	if ( ! ew_post_contains( $post, 'ew-prose' ) ) { return; }
+	if ( ! ew_is_prose_page( $post ) ) { return; }
 
 	$css = '
 .ew-prose .ew-prices{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin:0 0 20px}
