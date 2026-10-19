@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.67.0
+ * Version: 2.68.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1990,23 +1990,38 @@ a.ew-tm-card.is-external:hover{border-color:#b5b5b5;box-shadow:0 2px 10px rgba(0
 
 /* A player is a face first. Until there are photographs the frame holds
    its shape and shows the shirt number, rather than collapsing. */
-.ew-sq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(176px,1fr));gap:14px;
+.ew-sq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(256px,1fr));gap:16px;
  list-style:none;margin:0;padding:0}
-.ew-sq-card{background:#fff;border:1px solid #e6e6e6;border-radius:5px;overflow:hidden}
-.ew-sq-shot{display:flex;align-items:flex-end;justify-content:center;position:relative;
- aspect-ratio:4/5;background:#e9e9ec;overflow:hidden}
-.ew-sq-shot img{width:100%;height:100%;object-fit:cover;display:block}
+/* No border, no corner, no white box: the reference lets the photograph be
+   the card and sets the name under it. Theirs is 300 wide with a 16px gap
+   and four across a 1280 column; the minimum above lands on the same. */
+.ew-sq-card{background:transparent;border:0;border-radius:0;overflow:hidden}
+.ew-sq-shot{display:block;position:relative;aspect-ratio:300/379;background:#e9e9ec;overflow:hidden}
+.ew-sq-shot img{width:100%;height:100%;object-fit:cover;display:block;position:relative;z-index:2}
 .ew-sq-shot::before{content:"";position:absolute;left:50%;top:26%;transform:translateX(-50%);
  width:34%;aspect-ratio:1;border-radius:50%;background:#d6d6da}
 .ew-sq-shot::after{content:"";position:absolute;left:50%;bottom:-14%;transform:translateX(-50%);
  width:64%;aspect-ratio:1;border-radius:50%;background:#d6d6da}
-.ew-sq-shot img{position:relative;z-index:2}
-.ew-sq-no{position:absolute;z-index:3;left:10px;bottom:9px;font-family:Anton,sans-serif;
- font-size:30px;line-height:1;color:#CC0000}
-.ew-sq-name{display:block;padding:12px 13px 2px;font-family:Anton,"Instrument Sans",sans-serif;
- font-size:17px;letter-spacing:.02em;text-transform:uppercase;color:#111}
-.ew-sq-stats{display:block;padding:0 13px 14px;font-size:12.5px;color:#8a8a8a}
+/* The number is white on the reference because it always sits on a
+   photograph. Ours has to read on an empty frame too, until the shoot
+   happens, so the foot of the frame darkens under it either way. */
+.ew-sq-scrim{position:absolute;z-index:3;left:0;right:0;bottom:0;height:46%;
+ background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.62))}
+.ew-sq-no{position:absolute;z-index:4;left:24px;bottom:14px;
+ font-family:"Instrument Sans",system-ui,sans-serif;font-size:48px;font-weight:700;
+ line-height:1;color:#fafafa;font-variant-numeric:tabular-nums}
+.ew-sq-name{display:block;padding:14px 24px 0;font-family:Anton,"Instrument Sans",sans-serif;
+ font-size:24px;font-weight:700;letter-spacing:.01em;color:#101010}
+.ew-sq-pos{display:block;padding:6px 24px 0;font-size:12px;letter-spacing:.04em;
+ text-transform:uppercase;color:#aaa}
+.ew-sq-stats{display:block;padding:4px 24px 16px;font-size:12px;color:#8a8a8a}
 .ew-sq-stats em{font-style:normal;font-weight:700;color:#111}
+@media(max-width:620px){
+ .ew-sq-grid{grid-template-columns:repeat(auto-fill,minmax(146px,1fr));gap:12px}
+ .ew-sq-no{font-size:30px;left:14px;bottom:10px}
+ .ew-sq-name{font-size:18px;padding:11px 14px 0}
+ .ew-sq-pos,.ew-sq-stats{padding-left:14px;padding-right:14px}
+}
 
 .ew-sq-table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e6e6e6;
  border-radius:4px;overflow:hidden}
@@ -2106,6 +2121,7 @@ function build(apps,gls){
 
  var groups=[['gk','Goalkeepers'],['df','Defenders'],['mf','Midfielders'],
              ['fw','Forwards'],['','Squad']];
+ var POSNAME={gk:'Goalkeeper',df:'Defender',mf:'Midfielder',fw:'Forward'};
  var bucket={};
  groups.forEach(function(g){bucket[g[0]]=[];});
  rows.forEach(function(r){
@@ -2115,14 +2131,17 @@ function build(apps,gls){
  });
 
  function card(r){
+    var pos=POSNAME[key[nkey(r.name)]]||'';
     return '<li class="ew-sq-card">'
      +'<span class="ew-sq-shot">'
        +'<img src="/wp-content/uploads/ew-players/'+slug(r.name)+'.jpg" alt="" loading="lazy"'
        +' onerror="this.remove()">'
+       +'<i class="ew-sq-scrim"></i>'
        +(r.shirt?'<b class="ew-sq-no">'+r.shirt+'</b>':'')
      +'</span>'
      +'<span class="ew-sq-name">'+esc(r.name)
      +(r.capt?'<i class="ew-sq-armband" title="Has captained the side">C</i>':'')+'</span>'
+     +(pos?'<span class="ew-sq-pos">'+pos+'</span>':'')
      +'<span class="ew-sq-stats"><em>'+r.apps+'</em> apps'
      +(r.goals?' &middot; <em>'+r.goals+'</em> '+(r.goals===1?'goal':'goals'):'')+'</span>'
      +'</li>';
@@ -2200,7 +2219,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.67.0';
+const EW_FWP_VERSION = '2.68.0';
 
 /*
  * Parts loader.
