@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.90.0
+ * Version: 2.90.1
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -2805,12 +2805,18 @@ function ew_squad_details() {
 		// only. Willow is read as Ryan Wilson, because Tyree Wilson is named
 		// outright at 14.
 		//
-		// Two are still open and stay null rather than being guessed: Theo
-		// Sackey-Mensah, who was not in the list, and whoever 5 Marshall is
-		// -- that name is not in the squad at all. A null number means the
-		// page falls back to the shirt the player has worn most often, which
-		// is what it did for everyone until today.
+		// Theo Sackey-Mensah is the one still open -- he was not in the list
+		// and Ben is checking whether he has a number or has left. A null
+		// number means the page falls back to the shirt the player has worn
+		// most often, which is what it did for everyone until today.
+		//
+		// Tom Marshall is 5. He has been injured a long while and has not
+		// played this season, so he is not in the appearances feed the squad
+		// page is built from and will not show there until he does. His row
+		// is here so that the day he comes back he already has his number.
+		// The position is the only guess on this list.
 		'Scott Loach'        => array( 1, 'gk' ),
+		'Tom Marshall'       => array( 5, 'df' ),
 		'Louis Nicholson'    => array( 3, 'df' ),
 		'Jake Wright'        => array( 12, 'df' ),
 		'Toby Moore'         => array( 15, 'df' ),
@@ -3223,7 +3229,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.90.0';
+const EW_FWP_VERSION = '2.90.1';
 
 /*
  * Parts loader.
