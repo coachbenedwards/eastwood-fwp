@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.95.0
+ * Version: 2.96.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -219,6 +219,58 @@ function ew_fwp_settings_page() {
 	submit_button( 'Save key' );
 	echo '</form>';
 	echo '<p>Test it: <code>' . esc_html( home_url( '/wp-json/eastwood/v1/fwp?endpoint=league-table&comp=' . EW_COMP ) ) . '</code></p>';
+
+	/* ------------------------------------------------------------------
+	 * Eastwood TV reads the club YouTube channel. It does that with no
+	 * key at all, by reading the channel own pages, and that works --
+	 * but YouTube can change those pages under us, and the fallback
+	 * carries no running times and no way to tell a short from a clip.
+	 * A Data API key is their supported way in and fixes both. It is
+	 * pasted here rather than put in the code, so it never reaches the
+	 * repository.
+	 * ------------------------------------------------------------------ */
+
+	if ( isset( $_POST['ew_yt_key'] ) && check_admin_referer( 'ew_yt_save' ) ) {
+		update_option( 'ew_yt_api_key', sanitize_text_field( wp_unslash( $_POST['ew_yt_key'] ) ) );
+		if ( function_exists( 'ew_yt_forget' ) ) {
+			ew_yt_forget();
+		}
+		echo '<div class="notice notice-success"><p>Saved. Eastwood TV will read the channel again on the next page view.</p></div>';
+	}
+
+	if ( isset( $_POST['ew_yt_refresh'] ) && check_admin_referer( 'ew_yt_refresh' ) ) {
+		if ( function_exists( 'ew_yt_forget' ) ) {
+			ew_yt_forget();
+		}
+		echo '<div class="notice notice-success"><p>Cleared. The next page view goes and looks at the channel again.</p></div>';
+	}
+
+	$yt_key   = function_exists( 'ew_yt_api_key' ) ? ew_yt_api_key() : '';
+	$yt_route = (string) get_option( 'ew_yt_route', '' );
+	$yt_says  = array(
+		'api'  => 'the YouTube Data API',
+		'page' => 'the channel videos page (no key)',
+		'feed' => 'the channel public feed (no key, no running times)',
+	);
+
+	echo '<h2>Eastwood TV</h2>';
+	echo '<p>Channel: <code>' . esc_html( function_exists( 'ew_yt_handle' ) ? ew_yt_handle() : '' ) . '</code>';
+	if ( isset( $yt_says[ $yt_route ] ) ) {
+		echo ' &mdash; last read through ' . esc_html( $yt_says[ $yt_route ] ) . '.';
+	}
+	echo '</p>';
+	echo '<p>YouTube Data API key: <strong>' .
+		esc_html( '' !== $yt_key ? 'set (' . strlen( $yt_key ) . ' characters)' : 'not set' ) .
+		'</strong></p>';
+	echo '<form method="post">';
+	wp_nonce_field( 'ew_yt_save' );
+	echo '<p><input type="password" name="ew_yt_key" size="50" autocomplete="off" placeholder="paste key here"></p>';
+	submit_button( 'Save YouTube key', 'primary', 'submit', false );
+	echo '</form>';
+	echo '<form method="post" style="margin:8px 0 16px">';
+	wp_nonce_field( 'ew_yt_refresh' );
+	submit_button( 'Read the channel again now', 'secondary', 'ew_yt_refresh', false );
+	echo '</form>';
 
 	$teams = ew_badge_candidates( $key );
 
@@ -3224,7 +3276,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.95.0';
+const EW_FWP_VERSION = '2.96.0';
 
 /*
  * Parts loader.

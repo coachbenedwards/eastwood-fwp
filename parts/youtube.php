@@ -116,15 +116,22 @@ function ew_yt_videos( $chan = '', $count = 8, $min_secs = 61 ) {
 	}
 
 	$clips = array();
+	$route = '';
+
 	if ( ew_yt_api_key() ) {
 		$clips = ew_yt_from_api( $cid, $count, $min_secs );
+		$route = $clips ? 'api' : '';
 	}
 	if ( ! $clips ) {
 		$clips = ew_yt_from_page( $cid, $count, $min_secs );
+		$route = $clips ? 'page' : $route;
 	}
 	if ( ! $clips ) {
 		$clips = ew_yt_from_feed( $cid, $count );
+		$route = $clips ? 'feed' : $route;
 	}
+
+	update_option( 'ew_yt_route', $route, false );
 
 	/* A miss is held briefly too, so a YouTube wobble is not a hundred
 	   requests from one busy page. */

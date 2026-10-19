@@ -224,6 +224,7 @@ function ew_hb_teams( $content ) {
 			array( 'label' => "Women's First Team", 'id' => 0 ),
 			array( 'label' => 'Development', 'id' => 0 ),
 			array( 'label' => 'Under 21s', 'id' => 0 ),
+			array( 'label' => 'Academy', 'id' => 0 ),
 		);
 	}
 	return $teams;
@@ -2146,6 +2147,14 @@ function ew_hb_css() {
 .ewp-strip{position:relative;background:#fff;
  margin:0 calc(50% - 50vw);padding:0 0 0 52px;
  border-bottom:1px solid rgba(0,0,0,.09)}
+/* The 52px the cards are pushed in by was left white, so the grey band
+   across the dates stopped short of the left edge. The reference fills
+   that gutter with the same two tones the card is made of -- grey down
+   to 41px, white under it -- so the band reads as one strip the width
+   of the window. Theirs is .fixture-carousel__fill-before. */
+.ewp-strip::before{content:"";position:absolute;left:0;top:0;bottom:0;width:52px;
+ background:linear-gradient(to bottom,rgba(0,0,0,.03) 41px,#fff 41px);
+ pointer-events:none}
 .ewp-stripList{display:flex;list-style:none;margin:0;padding:0;overflow-x:auto;cursor:grab;
  scroll-behavior:smooth;scroll-snap-type:x proximity;scrollbar-width:none;-ms-overflow-style:none}
 .ewp-stripList::-webkit-scrollbar{display:none}
