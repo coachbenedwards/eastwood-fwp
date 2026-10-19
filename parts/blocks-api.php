@@ -39,7 +39,7 @@ function ew_blocks_allowed() {
 		'eastwood_home_news', 'eastwood_home_discover', 'eastwood_home_shop',
 		'eastwood_home_tiles', 'eastwood_home_sponsors', 'eastwood_home_live',
 		'eastwood_teams', 'eastwood_squad', 'eastwood_matches', 'eastwood_tv',
-		'eastwood_gate', 'eastwood_sponsors',
+		'eastwood_gate', 'eastwood_sponsors', 'eastwood_prose',
 	);
 }
 
@@ -97,6 +97,11 @@ function ew_blocks_attr( $v ) {
  */
 function ew_blocks_bad( $fields ) {
 	foreach ( (array) $fields as $k => $v ) {
+		// Not the body. A block's writing can hold other blocks -- the
+		// sponsorship page has the gate figures in the middle of its prose.
+		if ( 'lines' === $k ) {
+			continue;
+		}
 		if ( is_string( $v ) && ( false !== strpos( $v, '[' ) || false !== strpos( $v, ']' ) ) ) {
 			return 'Square brackets cannot go in a block field (' . $k . ').';
 		}
