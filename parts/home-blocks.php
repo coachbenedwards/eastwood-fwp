@@ -2155,6 +2155,15 @@ function ew_hb_css() {
 a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/"]){width:auto;height:30px}
 a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/"]) img{width:auto;height:100%;
  object-fit:contain}
+/* The footer wall. The captured markup gives the two upper rows a 128px
+   slot each, which is fine for a boxy logo with air around it and far
+   too much for a wide wordmark: PodCut came out 427 across and KAM 277,
+   towering over the rows beneath. Eighty-four tall with a ceiling on the
+   width settles every mark on one line without picking on two of them,
+   and leaves the hierarchy intact -- these rows still sit above the 40px
+   partners row below. */
+[class*="lg:h-32"]:has(img[src*="/ew-sponsors/"]){height:84px}
+[class*="lg:h-32"]:has(img[src*="/ew-sponsors/"]) img{max-width:240px;margin:0 auto}
 
 .ewp-news{background:#f3f3f3;padding:32px 0 32px;
  width:100vw;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw)}
