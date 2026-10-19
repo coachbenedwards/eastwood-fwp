@@ -1943,20 +1943,21 @@ function ew_hb_css() {
  background:#fff;border-radius:8px;overflow:hidden}
 .ewp-upcomingGrid .ewp-card{flex:1 1 auto;border-radius:0}
 
-.ewp-upcomingGrid .ewp-cardTop{display:flex;align-items:center;gap:16px;
+.ewp-upcomingGrid .ewp-cardTop{display:flex;align-items:center;gap:8px;
  padding:12px 24px;min-height:65px;background:#fff;border-bottom:1px solid #f3f3f3}
 .ewp-upcomingGrid .ewp-cardComp{width:32px;height:40px;object-fit:contain;flex:none}
-.ewp-upcomingGrid .ewp-when{display:flex;flex-direction:column;align-items:flex-start;
- gap:4px;flex:1 1 auto;min-width:0}
+/* The label on its own line, then the day and the kick-off side by side
+   under it -- a wrapping row, not a column, or the two end up stacked. */
+.ewp-upcomingGrid .ewp-when{display:flex;flex-wrap:wrap;align-items:baseline;
+ gap:4px 7px;flex:1 1 auto;min-width:0}
 .ewp-upcomingGrid .ewp-cardLabel{display:block;font-family:"Instrument Sans",system-ui,sans-serif;
  font-style:normal;font-size:12px;font-weight:700;line-height:16px;color:#101010}
 .ewp-upcomingGrid .ewp-when b{font-family:"Instrument Sans",system-ui,sans-serif;
  font-size:14px;font-weight:400;line-height:16px;letter-spacing:normal;color:#212121}
 .ewp-upcomingGrid .ewp-when i{font-family:"Instrument Sans",system-ui,sans-serif;
  font-size:14px;font-weight:700;font-style:normal;line-height:16px;color:#212121;margin-left:7px}
-/* The day and the kick-off share one line under the label. */
-.ewp-upcomingGrid .ewp-when b,.ewp-upcomingGrid .ewp-when i{display:inline}
-.ewp-upcomingGrid .ewp-cardLabel{width:100%}
+.ewp-upcomingGrid .ewp-cardLabel{flex:0 0 100%}
+.ewp-upcomingGrid .ewp-when i{margin-left:0}
 /* A ring here, not a filled disc. */
 .ewp-upcomingGrid .ewp-ha{width:24px;height:24px;flex:none;border-radius:50%;
  display:flex;align-items:center;justify-content:center;align-self:flex-start;margin-top:8px;
