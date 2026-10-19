@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.78.0
+ * Version: 2.79.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -523,6 +523,128 @@ function ew_fixture_fixes() {
 	return $fixes;
 }
 
+/**
+ * Corrections the feed has since disagreed with.
+ *
+ * A correction records what the feed said at the moment it was made. If
+ * the feed later says something else, the two have fallen out, and the
+ * club's answer is the one the site keeps showing -- but somebody is told,
+ * rather than the change being swallowed.
+ *
+ * This is the rule Ben picked: the edit holds, the row goes red, a person
+ * settles it. The alternatives were the feed overwriting the edit
+ * overnight with nobody told, and the edit winning for ever so that a
+ * game genuinely moved a second time could never reach the site.
+ *
+ * @return array id => array( field => array( 'mine' => string, 'theirs' => string ) )
+ */
+function ew_fixture_clashes() {
+	$out   = array();
+	$saved = (array) get_option( 'ew_fixture_fixes', array() );
+	if ( ! $saved ) {
+		return $out;
+	}
+
+	$feed = ew_fwp_fetch( 'fixtures-results', array( 'team' => EW_TEAM ), true );
+	$all  = (array) ( $feed['fixtures-results']['matches'] ?? array() );
+	if ( ! $all ) {
+		return $out;
+	}
+
+	$by = array();
+	foreach ( $all as $m ) {
+		$by[ (int) ( $m['id'] ?? 0 ) ] = $m;
+	}
+
+	foreach ( $saved as $id => $row ) {
+		$id  = (int) $id;
+		$row = (array) $row;
+		if ( ! isset( $by[ $id ] ) ) {
+			continue;
+		}
+		$seen = isset( $row['seen'] ) ? (array) $row['seen'] : array();
+
+		foreach ( array( 'date', 'time', 'venue' ) as $k ) {
+			if ( ! isset( $row[ $k ] ) || '' === trim( (string) $row[ $k ] ) ) {
+				continue;
+			}
+			// A correction made before the screen started remembering has
+			// nothing to compare against. It is not a disagreement.
+			if ( ! isset( $seen[ $k ] ) ) {
+				continue;
+			}
+			$now = trim( (string) ( $by[ $id ][ $k ] ?? '' ) );
+			if ( '' === $now || $now === trim( (string) $seen[ $k ] ) ) {
+				continue;
+			}
+			$out[ $id ][ $k ] = array(
+				'mine'   => (string) $row[ $k ],
+				'theirs' => $now,
+			);
+		}
+	}
+
+	return $out;
+}
+
+/**
+ * Settle one disagreement.
+ *
+ * Keeping ours moves the mark to what the feed says now, so the row goes
+ * quiet until the feed changes again. Taking theirs drops our correction
+ * for that field and the feed's answer flows through on its own.
+ */
+add_action( 'admin_post_ew_fixture_resolve', function () {
+	if ( ! current_user_can( 'edit_pages' ) ) {
+		wp_die( 'Not allowed.' );
+	}
+	check_admin_referer( 'ew_fixture_resolve' );
+
+	$id    = (int) ( $_REQUEST['id'] ?? 0 );
+	$field = sanitize_key( (string) ( $_REQUEST['field'] ?? '' ) );
+	$keep  = 'keep' === sanitize_key( (string) ( $_REQUEST['choice'] ?? '' ) );
+
+	if ( $id && in_array( $field, array( 'date', 'time', 'venue' ), true ) ) {
+		$saved = (array) get_option( 'ew_fixture_fixes', array() );
+		if ( isset( $saved[ $id ] ) ) {
+			$row = (array) $saved[ $id ];
+
+			if ( $keep ) {
+				$feed = ew_fwp_fetch( 'fixtures-results', array( 'team' => EW_TEAM ), true );
+				foreach ( (array) ( $feed['fixtures-results']['matches'] ?? array() ) as $m ) {
+					if ( (int) ( $m['id'] ?? 0 ) === $id ) {
+						$seen           = isset( $row['seen'] ) ? (array) $row['seen'] : array();
+						$seen[ $field ] = (string) ( $m[ $field ] ?? '' );
+						$row['seen']    = $seen;
+						break;
+					}
+				}
+			} else {
+				unset( $row[ $field ] );
+				if ( isset( $row['seen'] ) ) {
+					$seen = (array) $row['seen'];
+					unset( $seen[ $field ] );
+					$row['seen'] = $seen;
+				}
+			}
+
+			$bare = array_filter( $row, function ( $k ) {
+				return 'seen' !== $k;
+			}, ARRAY_FILTER_USE_KEY );
+
+			if ( $bare ) {
+				$saved[ $id ] = $row;
+			} else {
+				unset( $saved[ $id ] );
+			}
+			update_option( 'ew_fixture_fixes', $saved );
+		}
+	}
+
+	wp_safe_redirect( admin_url( 'admin.php?page=ew-fixtures&settled=1' ) );
+	exit;
+} );
+
 /** One match, with whatever correction applies to it. Null means removed. */
 function ew_fixture_apply( $m ) {
 	$fixes = ew_fixture_fixes();
@@ -619,8 +741,16 @@ function ew_fixture_apply_all( $node ) {
 /* --- Fixtures: the screen that writes those corrections ------------- */
 
 add_action( 'admin_menu', function () {
+	// A red row nobody opens the screen to see is not a flag. The count
+	// rides on the menu the way the plugin-update count does.
+	$n     = count( ew_fixture_clashes() );
+	$title = $n
+		? 'Fixtures <span class="update-plugins count-' . (int) $n . '"><span class="update-count">'
+			. (int) $n . '</span></span>'
+		: 'Fixtures';
+
 	add_menu_page(
-		'Fixtures', 'Fixtures', 'edit_pages', 'ew-fixtures',
+		'Fixtures', $title, 'edit_pages', 'ew-fixtures',
 		'ew_fixtures_admin_page', 'dashicons-calendar-alt', 30
 	);
 } );
@@ -648,6 +778,11 @@ add_filter( 'option_page_capability_ew_fixtures_group', function () {
 function ew_fixture_fixes_sanitise( $in ) {
 	$out = array();
 
+	// What is stored right now, so that a field nobody touched keeps the
+	// mark it already had. Without this, opening the screen and pressing
+	// save would quietly settle every disagreement on it.
+	$was = (array) get_option( 'ew_fixture_fixes', array() );
+
 	foreach ( (array) $in as $id => $row ) {
 		$id  = (int) $id;
 		$row = (array) $row;
@@ -656,6 +791,30 @@ function ew_fixture_fixes_sanitise( $in ) {
 		}
 
 		$keep = array();
+		$seen = array();
+		$was_row  = isset( $was[ $id ] ) ? (array) $was[ $id ] : array();
+		$was_seen = isset( $was_row['seen'] ) ? (array) $was_row['seen'] : array();
+		$now_seen = isset( $row['seen'] ) ? (array) $row['seen'] : array();
+
+		/**
+		 * Remember what the feed said about this field as the box was
+		 * filled in -- unless the box has not changed, in which case the
+		 * mark it already carries is the one that matters.
+		 *
+		 * @param string $k     Field name.
+		 * @param string $value What is being saved.
+		 */
+		$mark = function ( $k, $value ) use ( $was_row, $was_seen, $now_seen, &$seen ) {
+			if ( isset( $was_row[ $k ] ) && (string) $was_row[ $k ] === (string) $value
+				&& isset( $was_seen[ $k ] ) ) {
+				$seen[ $k ] = (string) $was_seen[ $k ];
+				return;
+			}
+			if ( isset( $now_seen[ $k ] ) ) {
+				$seen[ $k ] = sanitize_text_field( (string) $now_seen[ $k ] );
+			}
+		};
+
 		if ( ! empty( $row['drop'] ) ) {
 			$keep['drop'] = true;
 		}
@@ -665,21 +824,28 @@ function ew_fixture_fixes_sanitise( $in ) {
 		$date = trim( (string) ( $row['date'] ?? '' ) );
 		if ( '' !== $date && preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) ) {
 			$keep['date'] = $date;
+			$mark( 'date', $date );
 		}
 		$time = trim( (string) ( $row['time'] ?? '' ) );
 		if ( '' !== $time && preg_match( '/^\d{2}:\d{2}$/', $time ) ) {
 			$keep['time'] = $time;
+			$mark( 'time', $time );
 		}
 		$venue = sanitize_text_field( (string) ( $row['venue'] ?? '' ) );
 		if ( '' !== trim( $venue ) ) {
 			$keep['venue'] = $venue;
+			$mark( 'venue', $venue );
 		}
 		$note = sanitize_text_field( (string) ( $row['note'] ?? '' ) );
 		if ( '' !== trim( $note ) ) {
 			$keep['note'] = $note;
 		}
 
-		if ( $keep ) {
+		if ( $seen ) {
+			$keep['seen'] = $seen;
+		}
+
+		if ( array_diff_key( $keep, array( 'seen' => 1 ) ) ) {
 			$out[ $id ] = $keep;
 		}
 	}
@@ -692,12 +858,14 @@ function ew_fixtures_admin_page() {
 		return;
 	}
 
-	$saved = (array) get_option( 'ew_fixture_fixes', array() );
-	$feed  = ew_fwp_fetch( 'fixtures-results', array( 'team' => EW_TEAM ) );
-	$all   = (array) ( $feed['fixtures-results']['matches'] ?? array() );
+	$saved   = (array) get_option( 'ew_fixture_fixes', array() );
+	$clashes = ew_fixture_clashes();
+	$feed    = ew_fwp_fetch( 'fixtures-results', array( 'team' => EW_TEAM ), true );
+	$all     = (array) ( $feed['fixtures-results']['matches'] ?? array() );
 
-	// What is read here has already been corrected, which is the point:
-	// the screen shows what the site is showing.
+	// The feed as it arrived, not as the site shows it. The boxes hold
+	// what we say; behind each box is what the league says, and the two
+	// can only be told apart if this screen reads the league's own copy.
 	$today = current_time( 'Y-m-d' );
 	$next  = array();
 	foreach ( $all as $m ) {
@@ -716,6 +884,23 @@ function ew_fixtures_admin_page() {
 			top of the homepage, the matches page and the match page itself.
 			<b>Leave a box empty to keep what the feed says.</b>
 		</p>
+		<p style="max-width:48em;font-size:14px">
+			If the league later changes something you have corrected, your
+			answer stays on the site and the row below turns red so somebody
+			can settle it.
+		</p>
+
+		<?php if ( isset( $_GET['settled'] ) ) : ?>
+			<div class="notice notice-success is-dismissible"><p>Settled.</p></div>
+		<?php endif; ?>
+
+		<?php if ( $clashes ) : ?>
+			<div class="notice notice-error"><p>
+				<b><?php echo count( $clashes ); ?></b>
+				<?php echo 1 === count( $clashes ) ? 'fixture has' : 'fixtures have'; ?>
+				a correction the league now disagrees with. They are marked below.
+			</p></div>
+		<?php endif; ?>
 
 		<?php if ( ! $next ) : ?>
 			<p><em>No fixtures came back from the feed just now. Reload in a
@@ -739,8 +924,9 @@ function ew_fixtures_admin_page() {
 					$home = (string) ( $m['home-team']['name'] ?? '' );
 					$away = (string) ( $m['away-team']['name'] ?? '' );
 					$ts   = strtotime( (string) ( $m['date'] ?? '' ) );
+					$clash = isset( $clashes[ $id ] ) ? $clashes[ $id ] : array();
 					?>
-				<tr>
+				<tr<?php echo $clash ? ' style="background:#fcf0f1;box-shadow:inset 4px 0 0 #d63638"' : ''; ?>>
 					<td>
 						<strong><?php echo esc_html( $home . ' v ' . $away ); ?></strong><br>
 						<span style="color:#646970;font-size:12px">
@@ -761,11 +947,46 @@ function ew_fixtures_admin_page() {
 						name="ew_fixture_fixes[<?php echo (int) $id; ?>][venue]"
 						value="<?php echo esc_attr( $row['venue'] ?? '' ); ?>"
 						placeholder="<?php echo esc_attr( (string) ( $m['venue'] ?? '' ) ); ?>"></td>
+					<?php foreach ( array( 'date', 'time', 'venue' ) as $ew_f ) : ?>
+					<input type="hidden"
+						name="ew_fixture_fixes[<?php echo (int) $id; ?>][seen][<?php echo esc_attr( $ew_f ); ?>]"
+						value="<?php echo esc_attr( (string) ( $m[ $ew_f ] ?? '' ) ); ?>">
+					<?php endforeach; ?>
 					<td><label><input type="checkbox" value="1"
 						name="ew_fixture_fixes[<?php echo (int) $id; ?>][drop]"
 						<?php checked( ! empty( $row['drop'] ) ); ?>>
 						Take it off the site</label></td>
 				</tr>
+				<?php if ( $clash ) : ?>
+				<tr style="background:#fcf0f1;box-shadow:inset 4px 0 0 #d63638">
+					<td colspan="5" style="padding-top:0">
+						<?php foreach ( $clash as $field => $pair ) :
+							$label = array(
+								'date'  => 'date',
+								'time'  => 'kick-off',
+								'venue' => 'venue',
+							)[ $field ];
+							$keep  = wp_nonce_url( admin_url( 'admin-post.php?action=ew_fixture_resolve&choice=keep&id='
+								. $id . '&field=' . $field ), 'ew_fixture_resolve' );
+							$take  = wp_nonce_url( admin_url( 'admin-post.php?action=ew_fixture_resolve&choice=theirs&id='
+								. $id . '&field=' . $field ), 'ew_fixture_resolve' );
+							?>
+						<p style="margin:0 0 8px;font-size:13px">
+							The league now says the <?php echo esc_html( $label ); ?> is
+							<b><?php echo esc_html( $pair['theirs'] ); ?></b>.
+							The site is showing <b><?php echo esc_html( $pair['mine'] ); ?></b>.
+							&nbsp;
+							<a class="button button-primary button-small"
+								href="<?php echo esc_url( $keep ); ?>">Keep
+								<?php echo esc_html( $pair['mine'] ); ?></a>
+							<a class="button button-small"
+								href="<?php echo esc_url( $take ); ?>">Use
+								<?php echo esc_html( $pair['theirs'] ); ?></a>
+						</p>
+						<?php endforeach; ?>
+					</td>
+				</tr>
+				<?php endif; ?>
 				<?php endforeach; ?>
 				</tbody>
 			</table>
@@ -2796,7 +3017,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.78.0';
+const EW_FWP_VERSION = '2.79.0';
 
 /*
  * Parts loader.
@@ -4490,14 +4711,14 @@ add_action( 'wp_enqueue_scripts', 'ew_history_assets', 22 );
  * The front page should not wait on a network round trip, and it
  * should render for a crawler that runs no JavaScript.
  */
-function ew_fwp_fetch( $endpoint, $args = array() ) {
+function ew_fwp_fetch( $endpoint, $args = array(), $raw = false ) {
 	$args = array_merge( array( 'team' => EW_TEAM ), $args );
 	$url  = add_query_arg( $args, 'https://api.footballwebpages.co.uk/v2/' . $endpoint . '.json' );
 	$key  = 'ewhome_' . md5( $url );
 
 	$hit = get_transient( $key );
 	if ( false !== $hit ) {
-		return $hit;
+		return $raw ? $hit : ew_fwp_corrections( $hit );
 	}
 
 	$res = wp_remote_get( $url, array(
@@ -4513,10 +4734,16 @@ function ew_fwp_fetch( $endpoint, $args = array() ) {
 		}
 	}
 
-	$data = ew_fwp_corrections( $data );
-
+	/*
+	 * What is cached is the feed as it arrived, and the corrections go on
+	 * afterwards. It used to cache the corrected answer, which meant a
+	 * correction typed into the Fixtures screen did not show on the site
+	 * for up to ten minutes -- and, now that a correction remembers what
+	 * the feed said when it was made, there would be nothing left to
+	 * compare it against.
+	 */
 	set_transient( $key, $data, empty( $data ) ? 2 * MINUTE_IN_SECONDS : 10 * MINUTE_IN_SECONDS );
-	return $data;
+	return $raw ? $data : ew_fwp_corrections( $data );
 }
 
 /**
