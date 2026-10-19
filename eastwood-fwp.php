@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.65.1
+ * Version: 2.66.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -2176,7 +2176,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.65.1';
+const EW_FWP_VERSION = '2.66.0';
 
 /*
  * Parts loader.
@@ -2683,6 +2683,105 @@ function ew_owned_pages() {
 	return $pages;
 }
 
+/* ------------------------------------------------------------------
+ * The dead address, and why changing it in here did nothing.
+ *
+ * info@eastwoodcfc.co.uk is the old club domain. It was taken out of
+ * this plugin a while ago, and it stayed on eleven live pages anyway.
+ *
+ * The reason is worth writing down, because it will catch the next
+ * change too. Ten of those pages were rebuilt in Elementor at some
+ * point. Elementor keeps its own copy of the words in post meta and
+ * renders that, so what this plugin writes into post_content is never
+ * shown on them. Every text fix made here since then has quietly gone
+ * nowhere -- the earlier grassroots@ and safeguarding@ change among
+ * them. The pages are not broken and they do not look stale; they are
+ * simply a photograph of what the text said on the day they were
+ * opened in the builder.
+ *
+ * So this reaches into the stored copy. One pass, one pattern: an
+ * address at the old domain becomes info@eastwoodfc.com. It does NOT
+ * touch https://www.eastwoodcfc.co.uk/... , which is where some
+ * captured images still come from -- the pattern needs a name and an @
+ * in front of the domain, which a URL does not have.
+ * ------------------------------------------------------------------ */
+
+const EW_EMAIL_FIX = 'v1';
+
+function ew_dead_email_re() {
+	return '/[A-Za-z0-9._%+-]+@eastwoodcfc\.co\.uk/';
+}
+
+/** How many it would change, and in what. Used by the settings screen. */
+function ew_dead_email_scan() {
+	global $wpdb;
+
+	$posts = $wpdb->get_results(
+		"SELECT ID, post_title FROM {$wpdb->posts}
+		 WHERE post_status != 'trash' AND post_content LIKE '%eastwoodcfc.co.uk%'"
+	);
+	$meta = $wpdb->get_results(
+		"SELECT p.ID, p.post_title FROM {$wpdb->postmeta} m
+		 JOIN {$wpdb->posts} p ON p.ID = m.post_id
+		 WHERE m.meta_key = '_elementor_data'
+		   AND m.meta_value LIKE '%eastwoodcfc.co.uk%'
+		   AND p.post_status != 'trash'"
+	);
+
+	return array( 'content' => $posts, 'builder' => $meta );
+}
+
+function ew_fix_dead_email() {
+	global $wpdb;
+
+	$re  = ew_dead_email_re();
+	$new = 'info@eastwoodfc.com';
+	$hit = array();
+
+	foreach ( ew_dead_email_scan()['content'] as $row ) {
+		$post = get_post( $row->ID );
+		if ( ! $post ) {
+			continue;
+		}
+		$fixed = preg_replace( $re, $new, $post->post_content );
+		if ( null !== $fixed && $fixed !== $post->post_content ) {
+			// Straight to the row: wp_update_post() on a page the builder
+			// owns can set off a revision and a CSS regeneration for a
+			// change the reader will never see in the builder anyway.
+			$wpdb->update( $wpdb->posts, array( 'post_content' => $fixed ),
+				array( 'ID' => $row->ID ) );
+			clean_post_cache( $row->ID );
+			$hit[] = 'content:' . $row->ID;
+		}
+	}
+
+	foreach ( ew_dead_email_scan()['builder'] as $row ) {
+		$data = get_post_meta( $row->ID, '_elementor_data', true );
+		if ( ! is_string( $data ) || '' === $data ) {
+			continue;
+		}
+		// Both strings are plain ASCII with nothing JSON treats as
+		// special, so this is a safe swap inside the stored JSON.
+		$fixed = preg_replace( $re, $new, $data );
+		if ( null !== $fixed && $fixed !== $data ) {
+			update_post_meta( $row->ID, '_elementor_data', wp_slash( $fixed ) );
+			$hit[] = 'builder:' . $row->ID;
+		}
+	}
+
+	update_option( 'ew_email_fix', EW_EMAIL_FIX );
+	update_option( 'ew_email_fix_log', $hit );
+
+	return $hit;
+}
+
+add_action( 'init', function () {
+	if ( get_option( 'ew_email_fix' ) === EW_EMAIL_FIX ) {
+		return;
+	}
+	ew_fix_dead_email();
+}, 20 );
+
 function ew_install_pages() {
 	$owned = ew_owned_pages();
 	$state = (array) get_option( 'ew_owned_pages', array() );
@@ -2741,16 +2840,23 @@ function ew_install_pages() {
 		$ew_apply_meta( $existing->ID );
 
 		// Ours to update only while nobody has touched it.
-		$known = isset( $state[ $slug ]['hash'] ) ? $state[ $slug ]['hash'] : '';
-		if ( $known && md5( $existing->post_content ) === $known
-			&& $existing->post_content !== $spec['content'] ) {
+		//
+		// The hash that gets recorded has to be of what is ACTUALLY on the
+		// page, never of what we wanted to be on it. It used to be stamped
+		// with the new spec whether or not the update fired, so one skipped
+		// release -- somebody saves the page once, the hashes stop matching
+		// for that pass -- froze the page for good: from then on the stored
+		// hash described a version that had never been written, so it could
+		// never match again. Several pages were sitting like that.
+		$known   = isset( $state[ $slug ]['hash'] ) ? $state[ $slug ]['hash'] : '';
+		$content = $existing->post_content;
+
+		if ( $known && md5( $content ) === $known && $content !== $spec['content'] ) {
 			wp_update_post( array( 'ID' => $existing->ID, 'post_content' => $spec['content'] ) );
+			$content = $spec['content'];
 		}
-		if ( ! isset( $state[ $slug ] ) ) {
-			$state[ $slug ] = array( 'id' => $existing->ID, 'hash' => md5( $existing->post_content ) );
-		} else {
-			$state[ $slug ]['hash'] = md5( $spec['content'] );
-		}
+
+		$state[ $slug ] = array( 'id' => $existing->ID, 'hash' => md5( $content ) );
 	}
 
 	update_option( 'ew_owned_pages', $state );
