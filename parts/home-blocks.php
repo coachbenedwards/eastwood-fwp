@@ -2132,7 +2132,14 @@ function ew_hb_css() {
 /* Measured off the reference, not eyeballed. Section on the page grey,
    a 1248 column, the heading Anton 56 in the club red with its own icon
    above a white 40px tab rail. */
+/* The reference runs a 1248 column here, like the fixture cards. The
+   shared wrap is 1180, which made the cards 372 instead of 405. */
 .ewp-news{background:#f3f3f3;padding:32px 0 32px}
+/* A heading widget emptied in the builder should draw nothing rather
+   than leave its margins behind. The reference carries its heading
+   inside the grey band, so ours comes from the block. */
+.elementor-widget-heading:has(> .elementor-widget-container > .elementor-heading-title:empty){display:none}
+.ewp-news .ewp-wrap{max-width:1280px}
 .ewp-newsH{font-family:Anton,"Instrument Sans",sans-serif;font-size:56px;line-height:56px;
  font-weight:400;color:#CC0000;text-align:center;margin:0 0 32px}
 .ewp-newsIcon{font-family:"Instrument Sans",system-ui,sans-serif;font-size:48px;line-height:56px}
@@ -2152,9 +2159,13 @@ function ew_hb_css() {
 .ewp-newsGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
 .ewp-newsCard{position:relative;display:block;overflow:hidden;border-radius:8px;
  text-decoration:none;color:#fff;aspect-ratio:405/228;background:#101010}
-.ewp-newsShot{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;
+/* The theme sets height:auto on every img, which beat a single class
+   and left the photograph its own height inside a fixed-ratio card.
+   Named through the card so this rule wins. */
+.ewp-newsCard img.ewp-newsShot{position:absolute;inset:0;width:100%;height:100%;
+ object-fit:cover;display:block;max-width:none;
  transition:transform .5s cubic-bezier(.4,0,.2,1)}
-.ewp-newsCard:hover .ewp-newsShot{transform:scale(1.04)}
+.ewp-newsCard:hover img.ewp-newsShot{transform:scale(1.04)}
 /* Dark at the foot so a white headline holds on any photograph. */
 .ewp-newsOver{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;
  gap:8px;padding:12px;background:linear-gradient(to top,rgba(0,0,0,.78) 0%,rgba(0,0,0,.45) 34%,rgba(0,0,0,0) 68%)}
