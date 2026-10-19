@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.0.2
+ * Version: 3.0.3
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1983,7 +1983,12 @@ a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/"]) img{width:auto;height:100%;
    than leaving a title with nothing under it. The wall is not inside a
    <footer> -- it is a band at the foot of the page -- so the group is
    named by its own shape: a centred column with a heading at the top. */
-.flex.flex-col.gap-1.text-center:has(> h2,> h5,> h4):not(:has(a)){display:none}
+/* An anchor counts only if it carries a mark. The captured wall has
+   more slots than the club has sponsors, and an unfilled one is left
+   as href="#" around an empty <picture> -- invisible, but enough to
+   keep a heading standing over nothing. */
+[class*="bg-primary-500"] a[href="#"]:not(:has(img)){display:none}
+.flex.flex-col.gap-1.text-center:has(> h2,> h5,> h4):not(:has(a img)){display:none}
 /* And it breathes. The captured markup sets 4px between a heading and
    the marks under it, and 16px between one group and the next, which
    reads as one crowded block rather than three tiers. */
@@ -3326,7 +3331,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.0.2';
+const EW_FWP_VERSION = '3.0.3';
 
 /*
  * Parts loader.
