@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.68.0
+ * Version: 2.69.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -431,18 +431,302 @@ function ew_stale_matches() {
  * Apply every correction we keep over the feed, in one place, so server-side
  * reads and the browser-side proxy cannot drift apart.
  */
+/**
+ * Corrections to the fixture feed, kept in one place.
+ *
+ * Football Web Pages is the source for every fixture on the site, and when
+ * the league moves a game the feed can carry the old one for weeks. Until
+ * now the only answer was a match id written into the code here, which
+ * meant a release and a push to take one game down, and could only delete
+ * a fixture, never amend one -- so a game moved to a new date vanished
+ * instead of moving.
+ *
+ * Corrections now live in an option that Fixtures in the admin menu
+ * writes, and they are applied at the one point every block reads
+ * through. Change a kick-off once and the strip, the homepage, the
+ * matches page and the match page all agree, because they are all reading
+ * the same corrected answer rather than each being patched.
+ *
+ * @return array id => array( 'drop' => bool, 'date', 'time', 'venue', 'note' )
+ */
+function ew_fixture_fixes() {
+	$fixes = array();
+
+	// The ids that were written into the code before there was a screen.
+	// They stay until the feed agrees, and read as a plain removal.
+	foreach ( ew_stale_matches() as $id ) {
+		$fixes[ (int) $id ] = array( 'drop' => true );
+	}
+
+	foreach ( (array) get_option( 'ew_fixture_fixes', array() ) as $id => $row ) {
+		$id = (int) $id;
+		if ( ! $id ) {
+			continue;
+		}
+		$fixes[ $id ] = array_merge( isset( $fixes[ $id ] ) ? $fixes[ $id ] : array(), (array) $row );
+	}
+
+	return $fixes;
+}
+
+/** One match, with whatever correction applies to it. Null means removed. */
+function ew_fixture_apply( $m ) {
+	$fixes = ew_fixture_fixes();
+	$id    = (int) ( $m['id'] ?? 0 );
+	if ( ! $id || ! isset( $fixes[ $id ] ) ) {
+		return $m;
+	}
+
+	$fix = $fixes[ $id ];
+	if ( ! empty( $fix['drop'] ) ) {
+		return null;
+	}
+
+	// Only the fields somebody actually filled in. An empty box in the
+	// screen means "leave the feed alone", not "blank it".
+	foreach ( array( 'date', 'time', 'venue' ) as $k ) {
+		if ( isset( $fix[ $k ] ) && '' !== trim( (string) $fix[ $k ] ) ) {
+			$m[ $k ] = (string) $fix[ $k ];
+		}
+	}
+
+	return $m;
+}
+
+/**
+ * Every match in a payload, corrected.
+ *
+ * The feed hands matches back in more than one shape -- a list under
+ * fixtures-results, a single game under match -- and a correction has to
+ * reach all of them, or the match page disagrees with the page that linked
+ * to it. So this walks the payload rather than naming one path.
+ */
+function ew_fixture_apply_all( $node ) {
+	if ( ! is_array( $node ) ) {
+		return $node;
+	}
+
+	// A list of matches: correct each, drop the removed, keep it in date order
+	// so a game moved to a new date sits where it now belongs.
+	$is_list = isset( $node[0] ) && is_array( $node[0] ) && isset( $node[0]['id'] );
+	if ( $is_list ) {
+		$out = array();
+		foreach ( $node as $m ) {
+			$m = ew_fixture_apply( (array) $m );
+			if ( null !== $m ) {
+				$out[] = $m;
+			}
+		}
+		usort( $out, function ( $a, $b ) {
+			return strcmp(
+				(string) ( $a['date'] ?? '' ) . (string) ( $a['time'] ?? '' ),
+				(string) ( $b['date'] ?? '' ) . (string) ( $b['time'] ?? '' )
+			);
+		} );
+		return $out;
+	}
+
+	// A single match.
+	if ( isset( $node['id'] ) && ( isset( $node['date'] ) || isset( $node['home-team'] ) ) ) {
+		$fixed = ew_fixture_apply( $node );
+		return null === $fixed ? $node : $fixed;
+	}
+
+	foreach ( $node as $k => $v ) {
+		$node[ $k ] = ew_fixture_apply_all( $v );
+	}
+	return $node;
+}
+
+/* --- Fixtures: the screen that writes those corrections ------------- */
+
+add_action( 'admin_menu', function () {
+	add_menu_page(
+		'Fixtures', 'Fixtures', 'edit_pages', 'ew-fixtures',
+		'ew_fixtures_admin_page', 'dashicons-calendar-alt', 30
+	);
+} );
+
+add_action( 'admin_init', function () {
+	register_setting( 'ew_fixtures_group', 'ew_fixture_fixes', array(
+		'type'              => 'array',
+		'sanitize_callback' => 'ew_fixture_fixes_sanitise',
+		'default'           => array(),
+	) );
+} );
+
+add_filter( 'option_page_capability_ew_fixtures_group', function () {
+	return 'edit_pages';
+} );
+
+/**
+ * Keep only the rows somebody actually filled in.
+ *
+ * A screen with a box against every fixture posts a row for every fixture,
+ * nearly all of them empty. Storing those would turn a short list of
+ * corrections into a wall of nothing, and worse, would look like a
+ * correction when it is not one.
+ */
+function ew_fixture_fixes_sanitise( $in ) {
+	$out = array();
+
+	foreach ( (array) $in as $id => $row ) {
+		$id  = (int) $id;
+		$row = (array) $row;
+		if ( ! $id ) {
+			continue;
+		}
+
+		$keep = array();
+		if ( ! empty( $row['drop'] ) ) {
+			$keep['drop'] = true;
+		}
+		// A date the feed can read back: 2026-11-07. Anything else is
+		// dropped rather than written, because a date the feed cannot
+		// parse would sort the fixture to the top of the season.
+		$date = trim( (string) ( $row['date'] ?? '' ) );
+		if ( '' !== $date && preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) ) {
+			$keep['date'] = $date;
+		}
+		$time = trim( (string) ( $row['time'] ?? '' ) );
+		if ( '' !== $time && preg_match( '/^\d{2}:\d{2}$/', $time ) ) {
+			$keep['time'] = $time;
+		}
+		$venue = sanitize_text_field( (string) ( $row['venue'] ?? '' ) );
+		if ( '' !== trim( $venue ) ) {
+			$keep['venue'] = $venue;
+		}
+		$note = sanitize_text_field( (string) ( $row['note'] ?? '' ) );
+		if ( '' !== trim( $note ) ) {
+			$keep['note'] = $note;
+		}
+
+		if ( $keep ) {
+			$out[ $id ] = $keep;
+		}
+	}
+
+	return $out;
+}
+
+function ew_fixtures_admin_page() {
+	if ( ! current_user_can( 'edit_pages' ) ) {
+		return;
+	}
+
+	$saved = (array) get_option( 'ew_fixture_fixes', array() );
+	$feed  = ew_fwp_fetch( 'fixtures-results', array( 'team' => EW_TEAM ) );
+	$all   = (array) ( $feed['fixtures-results']['matches'] ?? array() );
+
+	// What is read here has already been corrected, which is the point:
+	// the screen shows what the site is showing.
+	$today = current_time( 'Y-m-d' );
+	$next  = array();
+	foreach ( $all as $m ) {
+		if ( (string) ( $m['date'] ?? '' ) >= $today ) {
+			$next[] = $m;
+		}
+	}
+	$next = array_slice( $next, 0, 14 );
+	?>
+	<div class="wrap">
+		<h1>Fixtures</h1>
+		<p style="max-width:48em;font-size:14px">
+			These come from the league feed. When the league moves a game the
+			feed can carry the old one for weeks, and this is where you say so.
+			A change here reaches the whole site at once &mdash; the strip at the
+			top of the homepage, the matches page and the match page itself.
+			<b>Leave a box empty to keep what the feed says.</b>
+		</p>
+
+		<?php if ( ! $next ) : ?>
+			<p><em>No fixtures came back from the feed just now. Reload in a
+				minute &mdash; it rate-limits.</em></p>
+		<?php else : ?>
+		<form method="post" action="options.php">
+			<?php settings_fields( 'ew_fixtures_group' ); ?>
+			<table class="widefat striped" style="max-width:1100px;margin-top:18px">
+				<thead><tr>
+					<th style="width:30%">Fixture</th>
+					<th style="width:14%">Date</th>
+					<th style="width:11%">Kick-off</th>
+					<th style="width:27%">Venue</th>
+					<th style="width:18%">Not happening</th>
+				</tr></thead>
+				<tbody>
+				<?php foreach ( $next as $m ) :
+					$id   = (int) ( $m['id'] ?? 0 );
+					if ( ! $id ) { continue; }
+					$row  = isset( $saved[ $id ] ) ? (array) $saved[ $id ] : array();
+					$home = (string) ( $m['home-team']['name'] ?? '' );
+					$away = (string) ( $m['away-team']['name'] ?? '' );
+					$ts   = strtotime( (string) ( $m['date'] ?? '' ) );
+					?>
+				<tr>
+					<td>
+						<strong><?php echo esc_html( $home . ' v ' . $away ); ?></strong><br>
+						<span style="color:#646970;font-size:12px">
+							<?php echo esc_html( $ts ? date_i18n( 'D j M Y', $ts ) : '' ); ?>
+							<?php echo esc_html( (string) ( $m['time'] ?? '' ) ); ?>
+							&nbsp;·&nbsp; id <?php echo (int) $id; ?>
+						</span>
+					</td>
+					<td><input type="text" style="width:100%"
+						name="ew_fixture_fixes[<?php echo (int) $id; ?>][date]"
+						value="<?php echo esc_attr( $row['date'] ?? '' ); ?>"
+						placeholder="<?php echo esc_attr( (string) ( $m['date'] ?? '' ) ); ?>"></td>
+					<td><input type="text" style="width:100%"
+						name="ew_fixture_fixes[<?php echo (int) $id; ?>][time]"
+						value="<?php echo esc_attr( $row['time'] ?? '' ); ?>"
+						placeholder="<?php echo esc_attr( (string) ( $m['time'] ?? '' ) ); ?>"></td>
+					<td><input type="text" style="width:100%"
+						name="ew_fixture_fixes[<?php echo (int) $id; ?>][venue]"
+						value="<?php echo esc_attr( $row['venue'] ?? '' ); ?>"
+						placeholder="<?php echo esc_attr( (string) ( $m['venue'] ?? '' ) ); ?>"></td>
+					<td><label><input type="checkbox" value="1"
+						name="ew_fixture_fixes[<?php echo (int) $id; ?>][drop]"
+						<?php checked( ! empty( $row['drop'] ) ); ?>>
+						Take it off the site</label></td>
+				</tr>
+				<?php endforeach; ?>
+				</tbody>
+			</table>
+			<p class="description" style="max-width:48em;margin-top:12px">
+				Dates are written <code>2026-11-07</code> and kick-offs
+				<code>15:00</code>. Anything else is ignored rather than saved,
+				because a date the feed cannot read would throw the fixture to
+				the wrong end of the season.
+			</p>
+			<?php submit_button( 'Save the corrections' ); ?>
+		</form>
+		<?php endif; ?>
+
+		<?php
+		$live = ew_fixture_fixes();
+		if ( $live ) : ?>
+		<h2 style="margin-top:34px">In force now</h2>
+		<ul style="font-size:14px">
+			<?php foreach ( $live as $id => $row ) : ?>
+			<li><code>#<?php echo (int) $id; ?></code> &mdash;
+				<?php echo empty( $row['drop'] )
+					? esc_html( implode( ', ', array_filter( array(
+						isset( $row['date'] ) ? 'date ' . $row['date'] : '',
+						isset( $row['time'] ) ? 'kick-off ' . $row['time'] : '',
+						isset( $row['venue'] ) ? 'at ' . $row['venue'] : '',
+					) ) ) )
+					: 'off the site'; ?></li>
+			<?php endforeach; ?>
+		</ul>
+		<p class="description">A game taken off should come back on once the
+			feed agrees, or a real fixture stays hidden.</p>
+		<?php endif; ?>
+	</div>
+	<?php
+}
+
 function ew_fwp_corrections( $data ) {
 	$data = ew_fwp_fix_names( $data );
-
-	$stale = ew_stale_matches();
-	if ( $stale && ! empty( $data['fixtures-results']['matches'] ) ) {
-		$data['fixtures-results']['matches'] = array_values( array_filter(
-			(array) $data['fixtures-results']['matches'],
-			function ( $m ) use ( $stale ) {
-				return ! in_array( (int) ( $m['id'] ?? 0 ), $stale, true );
-			}
-		) );
-	}
+	$data = ew_fixture_apply_all( $data );
 	return $data;
 }
 
@@ -1454,7 +1738,7 @@ function ew_rewrite_markup( $html ) {
 	 */
 	$html = preg_replace( '#(<a\b[^>]*class="ewshop-card"[^>]*>)</p>#', '$1', $html );
 
-	return ew_rewrite_nav( $html );
+	return ew_rewrite_nav( ew_rewrite_topbar( $html ) );
 }
 
 add_action( 'template_redirect', function () {
@@ -2219,7 +2503,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.68.0';
+const EW_FWP_VERSION = '2.69.0';
 
 /*
  * Parts loader.
@@ -2825,6 +3109,64 @@ add_action( 'init', function () {
 	ew_fix_dead_email();
 }, 20 );
 
+/* ------------------------------------------------------------------
+ * Taking the prose pages back off the builder.
+ *
+ * Ten pages this plugin writes were opened in Elementor at some point.
+ * Elementor keeps its own copy of the words and renders that, so from
+ * then on the text in here was never what anyone saw. The emails were the
+ * first symptom; the Academy staff list was the second, and there would
+ * have been a third.
+ *
+ * Nothing was designed in the builder on any of them. Checked before
+ * doing this: every one is headings and text blocks holding the same
+ * ew-prose markup this plugin already writes, chopped up. So the builder
+ * copy is not a design, it is a photocopy -- and a stale one.
+ *
+ * This switches those pages back to rendering their own content. The
+ * builder data is NOT deleted, only switched off: putting
+ * _elementor_edit_mode back to builder on a page returns the old copy
+ * exactly as it was.
+ *
+ * Only pages this plugin owns and has written content for. Pages built
+ * properly in the builder -- the homepage, hospitality, the shop -- are
+ * not touched.
+ * ------------------------------------------------------------------ */
+
+const EW_UNBUILDER = 'v1';
+
+function ew_unbuilder_pages() {
+	$done = array();
+
+	foreach ( array_keys( ew_owned_pages() ) as $slug ) {
+		$page = get_page_by_path( $slug );
+		if ( ! $page || '' === trim( (string) $page->post_content ) ) {
+			continue;
+		}
+		if ( 'builder' !== get_post_meta( $page->ID, '_elementor_edit_mode', true ) ) {
+			continue;
+		}
+
+		// Kept, not deleted: this is reversible by hand from the editor.
+		update_post_meta( $page->ID, '_ew_was_builder', '1' );
+		delete_post_meta( $page->ID, '_elementor_edit_mode' );
+		clean_post_cache( $page->ID );
+		$done[] = $slug;
+	}
+
+	update_option( 'ew_unbuilder', EW_UNBUILDER );
+	update_option( 'ew_unbuilder_log', $done );
+
+	return $done;
+}
+
+add_action( 'init', function () {
+	if ( get_option( 'ew_unbuilder' ) === EW_UNBUILDER ) {
+		return;
+	}
+	ew_unbuilder_pages();
+}, 21 );
+
 function ew_install_pages() {
 	$owned = ew_owned_pages();
 	$state = (array) get_option( 'ew_owned_pages', array() );
@@ -3160,6 +3502,96 @@ function ew_nav_destinations() {
  */
 function ew_retired_nav() {
 	return array( 'Company Details' );
+}
+
+/* ------------------------------------------------------------------
+ * The row above the nav: what each item is called and where it goes.
+ *
+ * The labels and the order came across in the captured markup, so they
+ * were whatever the reference build had. Changing one meant editing the
+ * theme, which is meant to stay a faithful copy. They are listed here
+ * instead and applied on the way out, next to everything else that gets
+ * corrected there.
+ * ------------------------------------------------------------------ */
+
+/** Captured label => array( what it should say, where it should go ). */
+function ew_topbar_changes() {
+	return array(
+		// It was called Matchday and went to the ticket page, which is not
+		// what anyone clicking it is after.
+		'Matchday'  => array( 'Hospitality', '/hospitality/' ),
+		// "The Venue" reads as a place. The thing being sold is the hire.
+		'The Venue' => array( 'Venue Hire', '' ),
+	);
+}
+
+/**
+ * Pairs that must read in this order, by the words they carry AFTER the
+ * relabelling above. They are only swapped when they are the wrong way
+ * round, so running the pass twice cannot put them back.
+ */
+function ew_topbar_order() {
+	return array(
+		array( 'Shop', 'Venue Hire' ),
+	);
+}
+
+/** The whole anchor carrying one label, or '' if it is not on the page. */
+function ew_topbar_anchor( $html, $label ) {
+	$re = '#<a\b[^>]*>(?:(?!</a>).)*?<p class="z-10">'
+		. preg_quote( $label, '#' ) . '</p></a>#s';
+	return preg_match( $re, $html, $m ) ? $m[0] : '';
+}
+
+function ew_rewrite_topbar( $html ) {
+	foreach ( ew_topbar_changes() as $was => $now ) {
+		list( $label, $link ) = $now;
+
+		$anchor = ew_topbar_anchor( $html, $was );
+		if ( '' === $anchor ) {
+			continue;
+		}
+
+		$fixed = str_replace(
+			'<p class="z-10">' . $was . '</p>',
+			'<p class="z-10">' . esc_html( $label ) . '</p>',
+			$anchor
+		);
+		if ( '' !== $link ) {
+			$fixed = preg_replace( '#\shref="[^"]*"#',
+				' href="' . esc_url( home_url( $link ) ) . '"', $fixed, 1 );
+		}
+		// The title attribute still announced the old word on hover and to
+		// a screen reader, the same trap Safeguarding had in the footer.
+		if ( preg_match( '#\stitle="([^"]*)"#', $fixed, $t )
+			&& false === stripos( $t[1], $label ) ) {
+			$fixed = preg_replace( '#\stitle="[^"]*"#',
+				' title="' . esc_attr( $label ) . '"', $fixed, 1 );
+		}
+
+		$html = str_replace( $anchor, $fixed, $html );
+	}
+
+	foreach ( ew_topbar_order() as $pair ) {
+		$a = ew_topbar_anchor( $html, $pair[0] );
+		$b = ew_topbar_anchor( $html, $pair[1] );
+		if ( '' === $a || '' === $b || $a === $b ) {
+			continue;
+		}
+		// Already in the right order: leave it. Swapping unconditionally
+		// means a second pass undoes the first, which is the kind of bug
+		// that only shows up once something else starts running twice.
+		if ( strpos( $html, $a ) < strpos( $html, $b ) ) {
+			continue;
+		}
+		// Through a placeholder, or the second replace would find the
+		// anchor the first one just wrote and put it straight back.
+		$html = str_replace( $a, '<!--ew-swap-->', $html );
+		$html = str_replace( $b, $a, $html );
+		$html = str_replace( '<!--ew-swap-->', $b, $html );
+	}
+
+	return $html;
 }
 
 function ew_rewrite_nav( $html ) {
@@ -4739,9 +5171,6 @@ function ew_academy_content() {
 
 <div class="ew-people">
 	<div class="ew-person"><b>Lewis McGugan</b><span>Head Coach</span></div>
-	<div class="ew-person"><b>John Cole</b><span>Coach</span></div>
-	<div class="ew-person"><b>Lynden Joyce</b><span>Coach</span></div>
-	<div class="ew-person"><b>Adam Fawcett</b><span>Tutor</span></div>
 </div>
 
 <h2>Trials</h2>
