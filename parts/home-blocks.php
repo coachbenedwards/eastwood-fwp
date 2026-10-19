@@ -112,6 +112,8 @@ add_action( 'wp_head', function () {
 	if ( ! ew_home_blocks_present() ) {
 		return;
 	}
+	echo '<link rel="stylesheet" href="https://fonts.googleapis.com/css2'
+		. '?family=Oswald:wght@700&amp;display=swap">' . "\n";
 	echo '<style id="ew-home-blocks">' . ew_hb_css() . '</style>'; // phpcs:ignore
 }, 20 );
 
@@ -1252,8 +1254,8 @@ function ew_hb_player_sc( $atts, $content = '' ) {
 			// Where the printing sits on whatever shirt is supplied.
 			// Fields rather than numbers in the stylesheet, because the
 			// right answer depends on the photograph.
-			'name_top' => '19%',
-			'num_top'  => '27%',
+			'name_top' => '17%',
+			'num_top'  => '40%',
 		),
 		$atts,
 		'eastwood_home_player'
@@ -1417,13 +1419,16 @@ function ew_hb_tiles_sc( $atts, $content = '' ) {
 		return '';
 	}
 
-	$dark = 'dark' === $atts['tone'];
+	// Red is a dark tone with a different background -- every rule about
+	// white type and a lifted thumbnail is the same, so it rides along.
+	$red  = 'red' === $atts['tone'];
+	$dark = $red || 'dark' === $atts['tone'];
 	$cols = max( 2, min( 6, (int) $atts['cols'] ) );
 	$ext  = false !== strpos( $atts['all_url'], 'http' );
 
 	ob_start();
 	?>
-<section class="ewp ewp-tiles<?php echo $dark ? ' is-dark' : ''; ?>">
+<section class="ewp ewp-tiles<?php echo $red ? ' is-red' : ( $dark ? ' is-dark' : '' ); ?>">
 	<div class="ewp-wrap">
 		<?php if ( '' !== $atts['title'] ) : ?>
 		<h2 class="ewp-h2<?php echo $dark ? ' is-light' : ' is-red'; ?>"><?php
@@ -1842,12 +1847,16 @@ function ew_hb_css() {
 /* Photo tiles — Discover, Hospitality, the video row, anything of that shape. */
 .ewp-tiles{background:#f3f3f3;padding:48px 0 54px}
 .ewp-tiles.is-dark{background:#111}
+/* The reference runs its video band in the same red as the fixtures
+   band rather than in black. Everything else about the dark tone is
+   right for it, so the red tone borrows all of it. */
+.ewp-tiles.is-red{background:#990000}
 .ewp-tileGrid{display:grid;grid-template-columns:repeat(var(--ewp-cols,4),1fr);gap:14px;
  list-style:none;margin:0;padding:0}
 .ewp-tileGrid a{display:block;text-decoration:none;color:inherit}
 .ewp-tileImg{display:block;position:relative;aspect-ratio:3/4;border-radius:5px;overflow:hidden;
  background:#1a1a1d;margin:0 0 11px}
-.ewp-tiles.is-dark .ewp-tileImg{background:#17171a}
+.ewp-tiles.is-dark .ewp-tileImg,.ewp-tiles.is-red .ewp-tileImg{background:#17171a}
 .ewp-tileImg img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .35s}
 .ewp-tileGrid a:hover .ewp-tileImg img{transform:scale(1.04)}
 .ewp-tileImg::after{content:"";position:absolute;inset:0;
@@ -1861,10 +1870,10 @@ function ew_hb_css() {
  border-style:solid;border-width:9px 0 9px 15px;border-color:transparent transparent transparent #fff}
 .ewp-tileGrid b{display:block;font-family:Anton,"Instrument Sans",sans-serif;font-size:16px;
  letter-spacing:.04em;text-transform:uppercase;color:#111;line-height:1.2}
-.ewp-tiles.is-dark .ewp-tileGrid b{color:#fff}
+.ewp-tiles.is-dark .ewp-tileGrid b,.ewp-tiles.is-red .ewp-tileGrid b{color:#fff}
 .ewp-tileGrid b span{color:#CC0000;margin-left:4px}
 .ewp-tileSub{display:block;font-style:normal;font-size:13px;color:#6b6b6b;margin-top:5px;line-height:1.4}
-.ewp-tiles.is-dark .ewp-tileSub{color:#9a9aa3}
+.ewp-tiles.is-dark .ewp-tileSub,.ewp-tiles.is-red .ewp-tileSub{color:rgba(255,255,255,.78)}
 
 /* Partners, pulled from the sponsor store rather than typed again. */
 .ewp-sponsors{background:#fff;padding:46px 0 52px}
@@ -2470,11 +2479,21 @@ function ew_hb_css() {
 .ewp-pickShirt.is-left{margin-right:-108px}
 .ewp-pickShirt.is-right{margin-left:-108px}
 .ewp-pickShirt.is-mid{z-index:3}
-.ewp-pickShirt b{position:absolute;left:0;right:0;top:var(--ew-name-top,19%);text-align:center;
- font-family:Anton,"Instrument Sans",sans-serif;font-size:26px;letter-spacing:.02em;
- color:#fff;text-transform:uppercase}
-.ewp-pickShirt i{position:absolute;left:0;right:0;top:var(--ew-num-top,27%);text-align:center;
- font-family:Anton,"Instrument Sans",sans-serif;font-style:normal;font-size:118px;line-height:1;color:#fff}
+/* The printing. Oswald rather than Anton, which is the closest thing
+   to a shirt face among the ones we can licence -- the reference wears
+   the Premier League house font, which is theirs and not for sale. The
+   dark outline is what stops white type disappearing into a red shirt,
+   and the reference carries one too. The gap between name and number
+   is the point of these numbers: the name sits up on the shoulders and
+   the number drops to the middle of the back. */
+.ewp-pickShirt b{position:absolute;left:0;right:0;top:var(--ew-name-top,17%);text-align:center;
+ font-family:Oswald,"Instrument Sans",sans-serif;font-weight:700;font-size:36px;line-height:26px;
+ color:#fff;text-transform:uppercase;
+ -webkit-text-stroke:3px rgba(40,0,6,.9);paint-order:stroke fill}
+.ewp-pickShirt i{position:absolute;left:0;right:0;top:var(--ew-num-top,40%);text-align:center;
+ font-family:Oswald,"Instrument Sans",sans-serif;font-weight:700;font-style:normal;
+ font-size:134px;line-height:98px;color:#fff;
+ -webkit-text-stroke:3px rgba(40,0,6,.9);paint-order:stroke fill}
 .ewp-pickNav{position:absolute;top:50%;transform:translateY(-50%);z-index:5;
  width:44px;height:44px;border:0;border-radius:6px;background:#fff;color:#101010;cursor:pointer;
  display:flex;align-items:center;justify-content:center;
@@ -2508,7 +2527,8 @@ function ew_hb_css() {
  .ewp-pickNum{font-size:120px;line-height:88px;margin-bottom:40px}
  .ewp-pickStage{height:300px}
  .ewp-pickShirt{width:240px}
- .ewp-pickShirt i{font-size:80px}
+ .ewp-pickShirt b{font-size:28px;line-height:20px}
+ .ewp-pickShirt i{font-size:104px;line-height:76px}
  .ewp-pickTabs{margin-top:28px;overflow-x:auto}
  .ewp-pickTabs li{flex:0 0 128px}
 }

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.92.0
+ * Version: 2.93.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1896,8 +1896,11 @@ a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/"]) img{width:auto;height:100%;
    width settles every mark on one line without picking on two of them,
    and leaves the hierarchy intact -- these rows still sit above the 40px
    partners row below. */
-[class*="lg:h-32"]:has(img[src*="/ew-sponsors/"]){height:84px}
-[class*="lg:h-32"]:has(img[src*="/ew-sponsors/"]) img{max-width:240px;margin:0 auto}
+/* Sixty-four, down from eighty-four: the two marks at the top of the
+   wall were louder than the band they sit in. The ceiling on the width
+   comes in with them so a wide wordmark keeps its proportions. */
+[class*="lg:h-32"]:has(img[src*="/ew-sponsors/"]){height:64px}
+[class*="lg:h-32"]:has(img[src*="/ew-sponsors/"]) img{max-width:190px;margin:0 auto}
 
 /* The web address under KAM.
 
@@ -1917,17 +1920,9 @@ a:has(img[src*="/ew-sponsors/kam"]){text-decoration:none}
    than an address -- and it cost KAM a third of their mark to print
    it. The wall below has the room for it; the rail does not. */
 
-/* Seventy-one, not the slot height of 84: the 240px ceiling catches a
-   wordmark that wide, so PodCut lands at 71 tall and a KAM badge filling
-   all 84 would tower over it again. Against 71 the numbers above fall
-   out exactly -- badge 49, gap 5, line 17. */
-[class*="lg:h-32"]:has(img[src*="/ew-sponsors/kam"]){height:71px;display:flex;
- flex-direction:column;justify-content:flex-start;width:fit-content;margin:0 auto}
-[class*="lg:h-32"]:has(img[src*="/ew-sponsors/kam"]) picture{display:block;line-height:0}
-[class*="lg:h-32"]:has(img[src*="/ew-sponsors/kam"]) img{height:49px;width:auto;max-width:240px}
-[class*="lg:h-32"]:has(img[src*="/ew-sponsors/kam"])::after{content:".com";display:block;
- font:italic 700 32px/17px "Barlow Condensed","Instrument Sans",sans-serif;
- color:#fff;text-align:right;margin-top:5px}
+/* No web address under KAM here either. At the size the wall now runs
+   it would be a line of type three pixels tall, and it cost the badge
+   the room to be read at all. */
 ';
 }
 
@@ -3229,7 +3224,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.92.0';
+const EW_FWP_VERSION = '2.93.0';
 
 /*
  * Parts loader.
