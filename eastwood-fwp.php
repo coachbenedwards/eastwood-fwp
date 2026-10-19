@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.84.0
+ * Version: 2.84.1
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -3082,7 +3082,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.84.0';
+const EW_FWP_VERSION = '2.84.1';
 
 /*
  * Parts loader.
@@ -4909,7 +4909,21 @@ function ew_home_badge( $id ) {
 		}
 		$v = $newest ? '?v=' . $newest : '';
 	}
-	return content_url( '/uploads/ew-badges/' . (int) $id . '.png' ) . $v;
+	$id = (int) $id;
+
+	// A crest can also travel with the plugin, the way competition badges do.
+	// The uploads copy always wins when there is one -- that is what the
+	// Badges screen writes -- but a club the feed has never heard of, in a
+	// tie we added ourselves, has no other way of arriving on a fresh
+	// install. Lye Town in the Vase is the case this was written for.
+	if ( ! file_exists( ew_badge_dir() . $id . '.png' ) ) {
+		$ship = plugin_dir_path( __FILE__ ) . 'assets/clubs/' . $id . '.png';
+		if ( file_exists( $ship ) ) {
+			return plugins_url( 'assets/clubs/' . $id . '.png', __FILE__ );
+		}
+	}
+
+	return content_url( '/uploads/ew-badges/' . $id . '.png' ) . $v;
 }
 
 function ew_home_played( $m ) {
