@@ -1680,21 +1680,36 @@ function ew_hb_css() {
 .ewp-strip .ewp-cardTop{display:flex;align-items:center;justify-content:space-between;
  gap:10px;margin:0;padding:0 16px;min-height:41px;background:rgba(0,0,0,.03);border:0;border-radius:0}
 .ewp-strip .ewp-when{display:flex;align-items:baseline;gap:8px}
-.ewp-strip .ewp-when b{font-size:18px;font-weight:300}
-.ewp-strip .ewp-when i{font-size:18px;font-weight:700;font-style:normal;color:#101010}
+/* The day is NOT in Anton. The reference sets it in the body face at its
+   lightest weight, with no letter-spacing, against the bold kick-off
+   beside it -- light then heavy is the whole effect of that line. Ours
+   was picking up Anton and .03em from the rule the match banner uses,
+   further down this sheet, which the font-size here never overrode. */
+.ewp-strip .ewp-when b{font-family:"Instrument Sans",system-ui,sans-serif;
+ font-size:18px;font-weight:100;letter-spacing:normal;line-height:25px;color:#101010}
+.ewp-strip .ewp-when i{font-family:"Instrument Sans",system-ui,sans-serif;
+ font-size:18px;font-weight:700;font-style:normal;line-height:25px;color:#101010}
+/* The disc carries a LETTER, not a picture.
+ *
+ * The reference draws an H or an A in it -- its two icon files, which look
+ * like pictograms from their names, are each a single glyph path, the
+ * letter. This drew a little house for home and an arrow for away, which
+ * is what Ben has been looking at and calling the arrows. The letters were
+ * in our markup all along, hidden behind font-size:0 while the background
+ * image sat on top of them.
+ *
+ * Away is a grey disc with a near-black letter. Only home is red. */
 .ewp-strip .ewp-ha{width:16px;height:16px;flex:none;border:0;border-radius:50%;
- display:flex;align-items:center;justify-content:center;font-size:0;line-height:1;
- background-repeat:no-repeat;background-position:50% 50%;background-size:9px 9px}
-.ewp-strip .ewp-ha.is-home{background-color:#CC0000;
- background-repeat:no-repeat;background-position:50% 50%;background-size:9px 9px;
- background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 10 10%27 fill=%27none%27 stroke=%27white%27 stroke-width=%271.4%27 stroke-linejoin=%27round%27%3E%3Cpath d=%27M1 4.6 5 1.2l4 3.4V9H1z%27/%3E%3C/svg%3E")}
-.ewp-strip .ewp-ha.is-away{background-color:#e8e8e8;
- background-repeat:no-repeat;background-position:50% 50%;background-size:9px 9px;
- background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 10 10%27 fill=%27none%27 stroke=%27%23101010%27 stroke-width=%271.4%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3E%3Cpath d=%27M1.4 5h7.2M5.6 2l3 3-3 3%27/%3E%3C/svg%3E")}
+ display:flex;align-items:center;justify-content:center;
+ font-family:"Instrument Sans",system-ui,sans-serif;
+ font-size:11px;font-weight:700;line-height:1;letter-spacing:normal;
+ background-image:none}
+.ewp-strip .ewp-ha.is-home{background-color:#CC0000;color:#fff;background-image:none}
+.ewp-strip .ewp-ha.is-away{background-color:#e8e8e8;color:#101010;background-image:none}
 .ewp-strip .ewp-cardBody{display:flex;align-items:center;gap:16px;margin:0;padding:0 16px;flex:1}
 .ewp-strip .ewp-cardBody img{width:48px;height:48px;object-fit:contain;flex:none}
 .ewp-strip .ewp-cardText{min-width:0}
-.ewp-strip .ewp-kicker{font-size:10px;font-weight:700;letter-spacing:1px;
+.ewp-strip .ewp-kicker{font-size:10px;font-weight:700;letter-spacing:1px;line-height:10px;
  color:#212121;text-transform:uppercase}
 .ewp-strip .ewp-cardText b{font-size:18px;line-height:1;display:block;
  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
