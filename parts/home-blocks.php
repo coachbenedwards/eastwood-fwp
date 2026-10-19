@@ -2152,8 +2152,12 @@ function ew_hb_css() {
    different heights, which is why the squarer KAM badge towered over
    PodCut. A rail is balanced on height instead, and the height is the
    one PodCut already had at 90 wide -- 25 -- because that one was
-   right. KAM comes down to match it rather than everything going up. */
-a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/"]){width:auto;height:25px}
+   right. KAM comes down to match it rather than everything going up.
+   Twenty-six, not twenty-five, since PodCut became the real sponsorship
+   lockup: that artwork carries .com under the tail of the wordmark, so
+   the wordmark is 62 per cent of the file where the bare mark was 65,
+   and one more pixel of height keeps podcut reading exactly as it did. */
+a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/"]){width:auto;height:26px}
 a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/"]) img{width:auto;height:100%;
  object-fit:contain}
 /* The footer wall. The captured markup gives the two upper rows a 128px
