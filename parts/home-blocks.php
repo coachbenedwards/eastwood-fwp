@@ -2421,6 +2421,10 @@ function ew_hb_css() {
    this band steps out to the window the way the news and discover bands
    do and takes its width from its own wrap. */
 .ewp-picker{padding:0 0 8px;width:100vw;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw)}
+/* The shared wrap on this page is 1180. The reference column is 1248,
+   which is what the panel is measured against, so this band carries its
+   own wrap the way the news band does rather than moving everyone. */
+.ewp-picker .ewp-wrap{max-width:1280px;margin:0 auto;padding:0 16px;box-sizing:border-box}
 .ewp-pickPanel{position:relative;min-height:570px;background:#e9e9e9;
  background-size:cover;background-position:center;border-radius:10px;overflow:hidden;
  padding:62px 24px 22px 68px;
