@@ -1076,10 +1076,8 @@ function ew_hb_discover_sc( $atts, $content = '' ) {
 		 */
 		if ( 0 === strpos( $img, 'stock:' ) ) {
 			$name = preg_replace( '/[^a-z0-9\-]/', '', strtolower( substr( $img, 6 ) ) );
-			$file = plugin_dir_path( dirname( __FILE__ ) ) . 'assets/discover/' . $name . '.jpg';
-			$img  = file_exists( $file )
-				? plugins_url( 'assets/discover/' . $name . '.jpg', dirname( __FILE__ ) . '/eastwood-fwp.php' )
-				: '';
+			$file = dirname( __DIR__ ) . '/assets/discover/' . $name . '.jpg';
+			$img  = file_exists( $file ) ? ew_hb_asset( 'discover/' . $name . '.jpg' ) : '';
 		}
 		// The field used to hold a line of prose. Anything that is not a
 		// path to a picture is ignored rather than printed somewhere it
@@ -2418,7 +2416,11 @@ function ew_hb_css() {
    Ours was built at 120 for the number against 40 of padding, which is
    why it read as a grey box with some type in it rather than as the
    panel it is. */
-.ewp-picker{padding:0 0 8px}
+/* The panel is the full 1248 column on the reference. Inside an
+   Elementor column it came out 1148, because the column pads itself, so
+   this band steps out to the window the way the news and discover bands
+   do and takes its width from its own wrap. */
+.ewp-picker{padding:0 0 8px;width:100vw;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw)}
 .ewp-pickPanel{position:relative;min-height:570px;background:#e9e9e9;
  background-size:cover;background-position:center;border-radius:10px;overflow:hidden;
  padding:62px 24px 22px 68px;
@@ -2478,6 +2480,13 @@ function ew_hb_css() {
 .ewp-pickTab i{font-family:Anton,"Instrument Sans",sans-serif;font-style:normal;font-size:46px;
  line-height:34px;padding-bottom:10px}
 .ewp-pickTab.is-on{color:#101010;border-bottom-color:#CC0000}
+/* The squad has no shirt numbers yet. Rather than leave a 132px hole
+   where the number belongs and blank space under every tab, the number
+   lines come out until there is one, so the panel reads as finished
+   either way and fills itself in the moment the numbers are typed. */
+.ewp-pickNum:empty{display:none}
+.ewp-pickTab i:empty{display:none}
+.ewp-pickShirt i:empty{display:none}
 @media(max-width:1100px){
  .ewp-pickPanel{grid-template-columns:1fr;padding:32px 20px 24px;min-height:0}
  .ewp-pickName{font-size:40px;line-height:30px;margin-bottom:20px}
