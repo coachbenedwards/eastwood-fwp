@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.0.0
+ * Version: 3.0.1
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1980,10 +1980,15 @@ a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/"]) img{width:auto;height:100%;
 [class*="lg:h-32"]:has(img[src*="/ew-sponsors/"]){height:52px}
 [class*="lg:h-32"]:has(img[src*="/ew-sponsors/"]) img{max-width:160px;margin:0 auto}
 /* A group whose last sponsor has gone takes its heading with it, rather
-   than leaving a title with nothing under it. */
-footer .text-center:has(> h2):not(:has(a)),
-footer .text-center:has(> h4):not(:has(a)),
-footer .text-center:has(> h5):not(:has(a)){display:none}
+   than leaving a title with nothing under it. The wall is not inside a
+   <footer> -- it is a band at the foot of the page -- so the group is
+   named by its own shape: a centred column with a heading at the top. */
+.flex.flex-col.gap-1.text-center:has(> h2,> h5,> h4):not(:has(a)){display:none}
+/* And it breathes. The captured markup sets 4px between a heading and
+   the marks under it, and 16px between one group and the next, which
+   reads as one crowded block rather than three tiers. */
+[class*="bg-primary-500"] .flex.flex-col.gap-4.py-8{gap:48px}
+[class*="bg-primary-500"] .flex.flex-col.gap-1.text-center{gap:20px}
 
 /* The web address under KAM.
 
@@ -3321,7 +3326,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.0.0';
+const EW_FWP_VERSION = '3.0.1';
 
 /*
  * Parts loader.
