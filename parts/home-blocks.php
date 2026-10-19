@@ -1671,6 +1671,13 @@ function ew_hb_css() {
 .ewp-stripList{display:flex;list-style:none;margin:0;padding:0;overflow-x:auto;cursor:grab;
  scroll-behavior:smooth;scroll-snap-type:x proximity;scrollbar-width:none;-ms-overflow-style:none}
 .ewp-stripList::-webkit-scrollbar{display:none}
+.ewp-strip .ewp-stripNav{position:absolute;top:38px;z-index:20;
+ width:32px;height:32px;padding:0;border:0;border-radius:50%;background:#fff;color:#101010;
+ display:flex;align-items:center;justify-content:center;cursor:pointer;
+ box-shadow:0 20px 25px -5px rgba(0,0,0,.1),0 8px 10px -6px rgba(0,0,0,.1)}
+.ewp-strip .ewp-stripNav[hidden]{display:none}
+.ewp-strip .ewp-stripNav.is-prev{left:36px}
+.ewp-strip .ewp-stripNav.is-next{right:68px}
 .ewp-strip .ewp-slide{flex:0 0 calc((100% - 102px)/4);max-width:calc((100% - 102px)/4);
  scroll-snap-align:start;
  border-right:1px solid rgba(0,0,0,.09);position:relative}
@@ -2075,11 +2082,37 @@ function ew_hb_js() {
   });
  });
 
- /* Drag the strip, the way the reference does. There is no arrow on it
-    and no scrollbar, so without this a mouse has no way to reach the
-    games off the right-hand side -- a trackpad and a finger already do.
+ /* Drag the strip, the way the reference does. There is no scrollbar,
+    so this and the chevrons above are how a mouse reaches the games off
+    the right-hand side -- a trackpad and a finger already do.
     A press that moves less than five pixels is a click on the card, not
     a drag, so the fixture links keep working. */
+ /* The chevrons. One press is one card; each hides when there is
+    nothing that way, which is what the reference does. */
+ [].forEach.call(document.querySelectorAll('.ewp-strip'), function(strip){
+  var list = strip.querySelector('.ewp-stripList');
+  var prev = strip.querySelector('.ewp-stripNav.is-prev');
+  var next = strip.querySelector('.ewp-stripNav.is-next');
+  if (!list || !prev || !next) { return; }
+
+  var step = function(){
+   var card = list.querySelector('.ewp-slide');
+   return card ? Math.round(card.getBoundingClientRect().width) : 340;
+  };
+
+  var sync = function(){
+   var max = list.scrollWidth - list.clientWidth;
+   prev.hidden = list.scrollLeft <= 1;
+   next.hidden = list.scrollLeft >= max - 1;
+  };
+
+  prev.addEventListener('click', function(){ list.scrollLeft -= step(); });
+  next.addEventListener('click', function(){ list.scrollLeft += step(); });
+  list.addEventListener('scroll', sync);
+  window.addEventListener('resize', sync);
+  sync();
+ });
+
  [].forEach.call(document.querySelectorAll('.ewp-stripList'), function(list){
   var down = false, moved = 0, startX = 0, startLeft = 0;
 
@@ -2217,6 +2250,27 @@ function ew_hb_strip_sc( $atts ) {
 		$out .= ew_hb_card( $m, false );
 	}
 	$out .= '</ul>';
+
+	/*
+	 * The two chevrons. The reference carries them and we did not, so on a
+	 * mouse the only way past the fourth game was to drag the strip --
+	 * which nothing on the page told you was possible.
+	 *
+	 * Measured off the reference: a 32px white disc, the left one 36px in
+	 * from the edge of the band and the right one 68px in from the other
+	 * edge, both centred on the 109px band, with an 18px chevron in near
+	 * black. One press moves the strip exactly one card, 340px at this
+	 * width. Each hides itself when there is nothing that way.
+	 */
+	$chev = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">'
+		. '<path d="%s" fill="none" stroke="currentColor" stroke-width="1.9"'
+		. ' stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+	$out .= '<button type="button" class="ewp-stripNav is-prev" aria-label="Earlier fixtures" hidden>'
+		. sprintf( $chev, 'M16.1 1.9 5.9 12.1 16.1 22.3' ) . '</button>';
+	$out .= '<button type="button" class="ewp-stripNav is-next" aria-label="Later fixtures">'
+		. sprintf( $chev, 'M7.9 1.9 18.1 12.1 7.9 22.3' ) . '</button>';
+
 	$out .= '</section>';
 	$out .= ew_promo_bar_html();
 	return $out;
