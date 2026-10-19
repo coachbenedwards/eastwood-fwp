@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.86.2
+ * Version: 2.87.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1575,7 +1575,6 @@ function ew_sponsor_roster() {
 		// seven days and nobody connects the two events.
 		'podcut'               => array( 'PodCut',                     'Shirt Sponsor', 'https://podcut.com',                                    $base . '1781094797_large.jpg', 'ours' ),
 		'kam-servicing'        => array( 'Kam Servicing',              'Stand Sponsor', 'https://kamservicing.com/',                             $base . '1719140087_large.jpg', 'ours' ),
-		'empire-scaffolding'   => array( 'Empire Scaffolding',         'Sponsor',       'https://empirescaffolding.co.uk/',                      $base . '1719140976_large.jpg' ),
 		'evo-waste'            => array( 'EVO Waste Management',       'Sponsor',       'https://evowms.co.uk/',                                 $base . '1731070829_large.jpg' ),
 		'short-stitch'         => array( 'Short Stitch',               'Sponsor',       'https://www.facebook.com/ShortStitchEmbroidery',        $base . '1719145984_large.jpg' ),
 		'swift-sports-massage' => array( 'Swift Sports Massage',       'Sponsor',       'https://www.instagram.com/swiftsportsmassagetherapy/',  $base . '1719146646_large.jpg' ),
@@ -1605,6 +1604,31 @@ function ew_sponsor_url( $slug ) {
  */
 function ew_sponsor_alt() {
 	return array( 'podcut' => 'podcut-white' );
+}
+
+/**
+ * The right version of a mark for the background it is going on.
+ *
+ * A brand with one mark has one file. A brand with a white-only mark --
+ * PodCut -- needs the white one on the red header and a dark one on a
+ * white section, and until now the white section quietly fell back to
+ * an older logo that is no longer the brand. A mark can also travel
+ * with the plugin, the way crests do, so a fresh install has it.
+ *
+ * @param string $slug Sponsor slug.
+ * @param string $tone 'light' background or 'dark'.
+ * @return string
+ */
+function ew_sponsor_tone_url( $slug, $tone = 'light' ) {
+	$want = 'dark' === $tone ? $slug . '-white' : $slug . '-dark';
+	if ( file_exists( ew_sponsor_dir() . $want . '.png' ) ) {
+		return ew_sponsor_url( $want );
+	}
+	$ship = plugin_dir_path( __FILE__ ) . 'assets/sponsors/' . $want . '.png';
+	if ( file_exists( $ship ) ) {
+		return plugins_url( 'assets/sponsors/' . $want . '.png', __FILE__ );
+	}
+	return ew_sponsor_wall_url( $slug );
 }
 
 function ew_sponsor_wall_url( $slug ) {
@@ -3083,7 +3107,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.86.2';
+const EW_FWP_VERSION = '2.87.0';
 
 /*
  * Parts loader.

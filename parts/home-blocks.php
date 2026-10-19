@@ -1297,7 +1297,9 @@ function ew_hb_sponsors_sc( $atts ) {
 			'name' => (string) ( $row[0] ?? '' ),
 			'tier' => (string) ( $row[1] ?? '' ),
 			'url'  => (string) ( $row[2] ?? '' ),
-			'img'  => ew_sponsor_url( $slug ),
+			'img'  => function_exists( 'ew_sponsor_tone_url' )
+				? ew_sponsor_tone_url( $slug, $atts['tone'] )
+				: ew_sponsor_url( $slug ),
 		);
 	}
 	if ( ! $rows['lead'] && ! $rows['rest'] ) {
@@ -1665,6 +1667,10 @@ function ew_hb_css() {
  letter-spacing:.16em;text-transform:uppercase;color:#9a9aa3}
 .ewp-sponsorRow{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;
  gap:26px 40px;list-style:none;margin:0;padding:0}
+/* The theme puts a marker on every li, which beat list-style on the
+   list itself and left a bullet beside each logo. */
+.ewp-sponsorRow li{list-style:none;margin:0;padding:0}
+.ewp-sponsorRow li::marker{content:""}
 .ewp-sponsorRow img{height:46px;width:auto;max-width:170px;object-fit:contain;display:block;
  opacity:.88;transition:opacity .15s}
 .ewp-sponsorRow.is-lead img{height:66px;max-width:230px}
