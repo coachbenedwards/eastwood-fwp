@@ -2150,9 +2150,10 @@ function ew_hb_css() {
    else up there -- and a width is the wrong thing to pin anyway. Two
    marks of different proportions set to the same width come out
    different heights, which is why the squarer KAM badge towered over
-   PodCut. A rail is balanced on height: both sit 30px tall and take
-   whatever width that needs. */
-a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/"]){width:auto;height:30px}
+   PodCut. A rail is balanced on height instead, and the height is the
+   one PodCut already had at 90 wide -- 25 -- because that one was
+   right. KAM comes down to match it rather than everything going up. */
+a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/"]){width:auto;height:25px}
 a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/"]) img{width:auto;height:100%;
  object-fit:contain}
 /* The footer wall. The captured markup gives the two upper rows a 128px
