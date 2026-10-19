@@ -1148,6 +1148,10 @@ add_shortcode( 'eastwood_home_discover', 'ew_hb_discover_sc' );
  * and takes that phrase back out of the title so a card does not say
  * Match Highlights twice. Set trim_cat="no" to leave titles whole.
  *
+ * only="Highlights" keeps a row to one kind, so highlights and the
+ * series can each have a line of their own. The label on the card is
+ * then dropped, since the heading over the row already says it.
+ *
  * format="wide" is the landscape row -- highlights and the series.
  * format="shorts" is the same block drawn 9:16, carrying only the
  * upright clips. The two are told apart by the upright still YouTube
@@ -1179,6 +1183,7 @@ function ew_hb_tv_sc( $atts, $content = '' ) {
 			'cats'     => 'Match Highlights=Highlights|This Is Eastwood=The Series',
 			'trim_cat' => 'yes',
 			'format'   => 'wide',
+			'only'     => '',
 		),
 		$atts,
 		'eastwood_home_tv'
@@ -1217,9 +1222,16 @@ function ew_hb_tv_sc( $atts, $content = '' ) {
 				continue;
 			}
 
-			$read          = ew_yt_label( $clip['title'], $map, $trim );
+			$read = ew_yt_label( $clip['title'], $map, $trim );
+
+			/* A row can be asked for one kind only, so highlights and the
+			   series each get a line of their own. */
+			if ( '' !== $atts['only'] && 0 !== strcasecmp( $read['cat'], $atts['only'] ) ) {
+				continue;
+			}
+
 			$clip['title'] = $read['title'];
-			$clip['cat']   = $shorts ? '' : $read['cat'];
+			$clip['cat']   = ( $shorts || '' !== $atts['only'] ) ? '' : $read['cat'];
 
 			if ( $shorts && ! empty( $clip['vert'] ) ) {
 				$clip['img'] = $clip['vert'];
@@ -2742,9 +2754,14 @@ function ew_hb_css() {
  border-radius:8px;overflow:hidden;text-decoration:none;color:#101010}
 .ewp-tvShot{position:relative;display:block;height:169px;flex:0 0 169px;background:#101010;
  overflow:hidden}
-.ewp-tvCard img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+.ewp-tvShot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
  max-width:none;display:block;transition:transform .5s cubic-bezier(.4,0,.2,1)}
-.ewp-tvCard:hover img{transform:scale(1.04)}
+.ewp-tvCard:hover .ewp-tvShot img{transform:scale(1.04)}
+/* WordPress turns an emoji in a title into an <img class="emoji">. It is
+   a letter, not a picture, so it is kept out of the way of every rule in
+   here that lays an image out. */
+.ewp img.emoji,.ewp img.wp-smiley{position:static;display:inline-block;width:1em;height:1em;
+ inset:auto;margin:0 .05em;padding:0;vertical-align:-.1em;object-fit:contain;border:0;background:none}
 .ewp-tvPlay{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;
  width:44px;height:44px;border-radius:50%;background:rgba(16,16,16,.55);color:#fff;
  display:flex;align-items:center;justify-content:center}
