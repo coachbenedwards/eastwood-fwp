@@ -1486,6 +1486,21 @@ function ew_hb_css() {
  line-height:1.02;text-transform:uppercase;margin:0 0 26px;text-align:center;color:#111}
 .ewp-h2.is-light{color:#fff}
 .ewp-h2.is-red{color:#CC0000}
+
+/* Four section titles on the homepage are typed as Elementor headings
+   rather than drawn by the block below them, so they came out 40px and
+   ranged left while every title the blocks draw is 54px and centred, and
+   the reference centres all of its. Two systems on one page is the fault,
+   not the alignment, so the h2 headings typed onto the page
+   are brought to the ones the blocks draw. Only h2: the h3s are card titles and belong ranged left.
+   Colour is left alone -- a title over the dark section is white and
+   that is set on the widget. */
+.elementor-template-full-width h2.elementor-heading-title{
+ font-family:Anton,"Instrument Sans",sans-serif;font-size:54px;letter-spacing:.02em;
+ line-height:1.02;text-transform:uppercase;margin:0 0 26px;text-align:center}
+@media(max-width:820px){
+ .elementor-template-full-width h2.elementor-heading-title{font-size:30px;margin-bottom:20px}
+}
 .ewp-allRow{margin:30px 0 0;text-align:center}
 .ewp-all{font-family:Anton,"Instrument Sans",sans-serif;font-size:14px;letter-spacing:.09em;
  text-transform:uppercase;color:#CC0000;text-decoration:none;
