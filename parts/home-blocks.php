@@ -2790,10 +2790,15 @@ function ew_hb_css() {
    label, because a short does not carry one. */
 .ewp-tv.is-shorts{padding-top:0}
 .ewp-tv.is-shorts .ewp-tvSlide{flex:0 0 220px;max-width:220px}
-.ewp-tv.is-shorts .ewp-tvCard{width:220px;height:464px}
+/* A short is the clip and nothing else. The white panel under a
+   landscape card carries a category, a title and an age, and on an
+   upright card it was a label stuck under the picture -- the title is
+   already burned into the frame. The card is the still. */
+.ewp-tv.is-shorts .ewp-tvCard{width:220px;height:391px;background:none}
 .ewp-tv.is-shorts .ewp-tvShot{height:391px;flex:0 0 391px}
-.ewp-tv.is-shorts .ewp-tvCat{display:none}
-.ewp-tv.is-shorts .ewp-tvTitle{margin-top:8px}
+.ewp-tv.is-shorts .ewp-tvCat,
+.ewp-tv.is-shorts .ewp-tvTitle,
+.ewp-tv.is-shorts .ewp-tvWhen{display:none}
 .ewp-tv.is-shorts .ewp-stripNav{top:179px}
 .ewp-tv .ewp-stripNav.is-prev{left:max(16px,calc(50vw - 640px))}
 .ewp-tv .ewp-stripNav.is-next{right:max(16px,calc(50vw - 640px))}
@@ -2806,7 +2811,7 @@ function ew_hb_css() {
  .ewp-tvHead{font-size:28px;line-height:28px;margin-bottom:24px}
  .ewp-tv .ewp-stripNav{display:none}
  .ewp-tv.is-shorts .ewp-tvSlide{flex:0 0 160px;max-width:160px}
- .ewp-tv.is-shorts .ewp-tvCard{width:160px;height:350px}
+ .ewp-tv.is-shorts .ewp-tvCard{width:160px;height:284px}
  .ewp-tv.is-shorts .ewp-tvShot{height:284px;flex:0 0 284px}
 }
 
