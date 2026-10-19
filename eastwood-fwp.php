@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.89.4
+ * Version: 2.90.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -2797,26 +2797,36 @@ add_shortcode( 'eastwood_teams', 'ew_teams_shortcode' );
  */
 function ew_squad_details() {
 	return array(
-		// Positions as Ben gave them, 19 October 2026. Numbers are still to
-		// come, so each row leaves the number null and the page keeps falling
-		// back to the shirt the player has worn most often.
-		'Scott Loach'        => array( null, 'gk' ),
-		'Louis Nicholson'    => array( null, 'df' ),
-		'Jake Wright'        => array( null, 'df' ),
-		'Toby Moore'         => array( null, 'df' ),
-		'Charlie Marzano'    => array( null, 'df' ),
+		// Positions as Ben gave them, 19 October 2026, and the squad numbers
+		// the same day. He gave the numbers by the names the dressing room
+		// uses, so they are matched back to the squad here: Loachy, Charlie
+		// M, Louis, Curtis, Connor D, JP, Tyler, Raws, Walks, Wrighty, Tyree,
+		// Toby, Paddy, Jordi H and Chetts all land on one player and one
+		// only. Willow is read as Ryan Wilson, because Tyree Wilson is named
+		// outright at 14.
+		//
+		// Two are still open and stay null rather than being guessed: Theo
+		// Sackey-Mensah, who was not in the list, and whoever 5 Marshall is
+		// -- that name is not in the squad at all. A null number means the
+		// page falls back to the shirt the player has worn most often, which
+		// is what it did for everyone until today.
+		'Scott Loach'        => array( 1, 'gk' ),
+		'Louis Nicholson'    => array( 3, 'df' ),
+		'Jake Wright'        => array( 12, 'df' ),
+		'Toby Moore'         => array( 15, 'df' ),
+		'Charlie Marzano'    => array( 2, 'df' ),
 		'Theo Sackey-Mensah' => array( null, 'df' ),
-		'Connor Dimaio'      => array( null, 'mf' ),
-		'Jamie Walker'       => array( null, 'mf' ),
-		'Jacob Pearce'       => array( null, 'mf' ),
-		'Ryan Wilson'        => array( null, 'mf' ),
-		'Curtis Thompson'    => array( null, 'mf' ),
-		'Jordan Hallam'      => array( null, 'mf' ),
-		'Callum Chettle'     => array( null, 'mf' ),
-		'Tyree Wilson'       => array( null, 'mf' ),
-		'Luke Rawson'        => array( null, 'fw' ),
-		'Patrick Webb'       => array( null, 'fw' ),
-		'Tyler Blake'        => array( null, 'fw' ),
+		'Connor Dimaio'      => array( 6, 'mf' ),
+		'Jamie Walker'       => array( 11, 'mf' ),
+		'Jacob Pearce'       => array( 7, 'mf' ),
+		'Ryan Wilson'        => array( 8, 'mf' ),
+		'Curtis Thompson'    => array( 4, 'mf' ),
+		'Jordan Hallam'      => array( 17, 'mf' ),
+		'Callum Chettle'     => array( 23, 'mf' ),
+		'Tyree Wilson'       => array( 14, 'mf' ),
+		'Luke Rawson'        => array( 10, 'fw' ),
+		'Patrick Webb'       => array( 16, 'fw' ),
+		'Tyler Blake'        => array( 9, 'fw' ),
 	);
 }
 
@@ -3213,7 +3223,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.89.4';
+const EW_FWP_VERSION = '2.90.0';
 
 /*
  * Parts loader.
