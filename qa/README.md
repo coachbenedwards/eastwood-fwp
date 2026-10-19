@@ -79,3 +79,30 @@ It is not a real device. It will not tell you how fonts and colour render on a
 given handset, how scroll momentum or the on-screen keyboard behave, how an
 older iOS version copes, or what happens on a bad network at the ground. That
 needs real hardware or a paid device cloud.
+
+## baseline.mjs — the before, and the proof
+
+```
+node qa/baseline.mjs --url /pitch-hire/ --save     # while the old page still stands
+node qa/baseline.mjs --url /pitch-hire/ --diff     # after it has been converted
+```
+
+`--save` writes a full-page screenshot and the box geometry of every
+element at 1512, 1440, 820 and 390 into `qa/baseline/<page>/`. `--diff`
+re-measures and compares, and exits non-zero on any of:
+
+- an element more than 2px from where it was (`--tolerance` to change it)
+- the page text differing by a character
+- a link whose href has changed
+- the page scrolling sideways at any width
+- an element that has disappeared
+
+Elements are keyed by their position in the tree, not by class, because
+the classes are the first thing a conversion changes.
+
+**No baselines are committed.** A baseline is captured for one page at
+the moment its conversion starts, and recording them in advance would
+bank today's layout as correct for pages nobody has looked at yet.
+
+Needs Playwright. If it is not in the repo's own `node_modules`, point
+`NODE_PATH` at the folder that holds it.
