@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.70.0
+ * Version: 2.70.1
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1771,6 +1771,28 @@ add_filter( 'front_page_template', function ( $template ) {
 	return $template;
 } );
 
+/**
+ * The homepage has one address.
+ *
+ * The page kept answering on its own slug as well as on the root, so the
+ * same homepage sat at two addresses -- which search engines read as two
+ * pages competing with each other, and which leaves the old link in
+ * circulation. WordPress usually redirects this itself; it is not doing
+ * it here, so this does.
+ */
+add_action( 'template_redirect', function () {
+	$front = (int) get_option( 'page_on_front' );
+	if ( ! $front || ! is_page( $front ) || is_admin() ) {
+		return;
+	}
+	$path = trim( (string) wp_parse_url( (string) ( $_SERVER['REQUEST_URI'] ?? '/' ), PHP_URL_PATH ), '/' );
+	if ( '' === $path ) {
+		return;
+	}
+	wp_safe_redirect( home_url( '/' ), 301 );
+	exit;
+}, 2 );
+
 
 
 /* ------------------------------------------------------------------
@@ -2530,7 +2552,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.70.0';
+const EW_FWP_VERSION = '2.70.1';
 
 /*
  * Parts loader.
