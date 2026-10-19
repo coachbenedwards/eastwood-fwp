@@ -96,7 +96,7 @@ function ew_home_blocks_present() {
 	foreach ( array( 'eastwood_home_banner', 'eastwood_home_hero', 'eastwood_home_fixtures',
 		'eastwood_home_upcoming', 'eastwood_home_shop', 'eastwood_home_tiles',
 		'eastwood_home_sponsors', 'eastwood_home_discover', 'eastwood_home_news',
-		'eastwood_home_player',
+		'eastwood_home_player', 'eastwood_home_tv',
 		'eastwood_home_strip', 'eastwood_home_live',
 		'eastwood_matches', 'eastwood_teams', 'eastwood_squad' ) as $tag ) {
 		foreach ( $hay as $text ) {
@@ -1127,6 +1127,117 @@ function ew_hb_discover_sc( $atts, $content = '' ) {
 	return ob_get_clean();
 }
 add_shortcode( 'eastwood_home_discover', 'ew_hb_discover_sc' );
+
+/* ------------------------------------------------------------------
+ * [eastwood_home_tv mark="Eastwood TV" heading="Latest"
+ *                   all="Visit Eastwood TV" all_url="https://..."]
+ * Title | https://watch/here | Category | 24:10 | https://thumb.jpg | 3 months ago
+ * [/eastwood_home_tv]
+ *
+ * The reference runs its video band as its own thing and nothing else
+ * on their page looks like it: a red band the width of the window, the
+ * channel name across the middle, a section heading hard against the
+ * left of the column, and a rail of white cards. Measured off their
+ * page at 1512: cards 300 by 279 with an 8px corner, 16 apart, the
+ * first on the column at x=132; the still 300 by 169; the category 12
+ * in grey, the title Anton 16 in near-black, and the age of the clip
+ * on the last line. The heading is Anton 40 in white with 40 under it.
+ *
+ * Ours was a grid of thumbnails on black, which is the one band on the
+ * homepage that looked like nothing on theirs.
+ * ------------------------------------------------------------------ */
+
+function ew_hb_tv_sc( $atts, $content = '' ) {
+	$atts = shortcode_atts(
+		array(
+			'mark'    => 'Eastwood TV',
+			'heading' => 'Latest',
+			'all'     => 'Visit Eastwood TV',
+			'all_url' => '/eastwood-tv/',
+		),
+		$atts,
+		'eastwood_home_tv'
+	);
+
+	$clips = array();
+	foreach ( ew_hb_lines( $content ) as $line ) {
+		$parts = array_map( 'trim', explode( '|', $line ) );
+		if ( '' === $parts[0] || ! isset( $parts[1] ) || '' === $parts[1] ) {
+			continue;
+		}
+		$url = $parts[1];
+		if ( 0 !== strpos( $url, 'http' ) ) {
+			$url = home_url( '/' . ltrim( $url, '/' ) );
+		}
+		$clips[] = array(
+			'title' => $parts[0],
+			'url'   => $url,
+			'cat'   => isset( $parts[2] ) ? $parts[2] : '',
+			'time'  => isset( $parts[3] ) ? $parts[3] : '',
+			'img'   => isset( $parts[4] ) ? $parts[4] : '',
+			'when'  => isset( $parts[5] ) ? $parts[5] : '',
+		);
+	}
+
+	if ( ! $clips ) {
+		return '';
+	}
+
+	ob_start();
+	?>
+<section class="ewp ewp-tv">
+	<?php if ( '' !== $atts['mark'] ) : ?>
+	<p class="ewp-tvMark"><?php echo esc_html( $atts['mark'] ); ?></p>
+	<?php endif; ?>
+	<?php if ( '' !== $atts['heading'] ) : ?>
+	<h2 class="ewp-tvHead"><?php echo esc_html( $atts['heading'] ); ?></h2>
+	<?php endif; ?>
+	<div class="ewp-tvRail">
+		<ul class="ewp-stripList ewp-tvList">
+			<?php foreach ( $clips as $clip ) : ?>
+			<li class="ewp-tvSlide">
+				<a class="ewp-tvCard" href="<?php echo esc_url( $clip['url'] ); ?>">
+					<span class="ewp-tvShot">
+						<?php if ( '' !== $clip['img'] ) : ?>
+						<img src="<?php echo esc_url( $clip['img'] ); ?>" alt="" loading="lazy">
+						<?php endif; ?>
+						<span class="ewp-tvPlay" aria-hidden="true">
+							<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+						</span>
+						<?php if ( '' !== $clip['time'] ) : ?>
+						<i class="ewp-tvTime"><?php echo esc_html( $clip['time'] ); ?></i>
+						<?php endif; ?>
+					</span>
+					<?php if ( '' !== $clip['cat'] ) : ?>
+					<span class="ewp-tvCat"><?php echo esc_html( $clip['cat'] ); ?></span>
+					<?php endif; ?>
+					<b class="ewp-tvTitle"><?php echo esc_html( $clip['title'] ); ?></b>
+					<?php if ( '' !== $clip['when'] ) : ?>
+					<i class="ewp-tvWhen"><?php echo esc_html( $clip['when'] ); ?></i>
+					<?php endif; ?>
+				</a>
+			</li>
+			<?php endforeach; ?>
+		</ul>
+		<button type="button" class="ewp-stripNav is-prev" aria-label="Back" hidden>
+			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+				stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+		</button>
+		<button type="button" class="ewp-stripNav is-next" aria-label="More">
+			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+				stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+		</button>
+	</div>
+	<?php if ( '' !== $atts['all'] ) : ?>
+	<p class="ewp-tvAll"><a href="<?php echo esc_url(
+		0 === strpos( $atts['all_url'], 'http' ) ? $atts['all_url'] : home_url( $atts['all_url'] ) ); ?>"><?php
+		echo esc_html( $atts['all'] ); ?> <span aria-hidden="true">&rarr;</span></a></p>
+	<?php endif; ?>
+</section>
+	<?php
+	return ob_get_clean();
+}
+add_shortcode( 'eastwood_home_tv', 'ew_hb_tv_sc' );
 
 /* ------------------------------------------------------------------
  * [eastwood_home_shop title="..." all="Shop all" all_url="/shop/"]
@@ -2533,6 +2644,64 @@ function ew_hb_css() {
  .ewp-pickTabs li{flex:0 0 128px}
 }
 
+/* Eastwood TV. Every figure read off the reference at 1512 wide: a red
+   band the width of the window, the channel name across the middle, the
+   section heading hard against the left of the 1248 column with 40 of
+   air under it, cards 300 by 279 with an 8px corner and 16 between
+   them, the still 300 by 169, the category 12 in grey, the title Anton
+   16 in near-black and the age of the clip on the last line. */
+.ewp-tv{position:relative;background:#990000;padding:40px 0 48px;
+ width:100vw;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw)}
+.ewp-tvMark{margin:0 0 30px;text-align:center;color:#fff;
+ font-family:Anton,"Instrument Sans",sans-serif;font-size:44px;line-height:44px;
+ font-weight:400;text-transform:uppercase;letter-spacing:.01em}
+.ewp-tvHead{margin:0 0 40px;padding:0 max(16px,calc(50vw - 624px));color:#fff;text-align:left;
+ font-family:Anton,"Instrument Sans",sans-serif;font-size:40px;line-height:40px;
+ font-weight:400;text-transform:uppercase}
+.ewp-tvRail{position:relative}
+.ewp-tvList{display:flex;gap:16px;list-style:none;margin:0;
+ padding:0 max(16px,calc(50vw - 624px));overflow-x:auto;cursor:grab;
+ scroll-behavior:smooth;scrollbar-width:none;-ms-overflow-style:none}
+.ewp-tvList::-webkit-scrollbar{display:none}
+.ewp-tvSlide{flex:0 0 300px;max-width:300px;list-style:none;margin:0;padding:0}
+.ewp-tvSlide::marker{content:""}
+.ewp-tvCard{display:flex;flex-direction:column;width:300px;height:279px;background:#fff;
+ border-radius:8px;overflow:hidden;text-decoration:none;color:#101010}
+.ewp-tvShot{position:relative;display:block;height:169px;flex:0 0 169px;background:#101010;
+ overflow:hidden}
+.ewp-tvCard img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+ max-width:none;display:block;transition:transform .5s cubic-bezier(.4,0,.2,1)}
+.ewp-tvCard:hover img{transform:scale(1.04)}
+.ewp-tvPlay{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;
+ width:44px;height:44px;border-radius:50%;background:rgba(16,16,16,.55);color:#fff;
+ display:flex;align-items:center;justify-content:center}
+.ewp-tvTime{position:absolute;right:8px;bottom:8px;z-index:2;font-style:normal;
+ font-family:"Instrument Sans",sans-serif;font-size:11px;line-height:11px;color:#fff;
+ background:rgba(16,16,16,.75);border-radius:3px;padding:4px 6px}
+.ewp-tvCat{display:block;margin:8px 8px 0;font-family:"Instrument Sans",sans-serif;
+ font-size:12px;line-height:12px;color:#6b6b6b}
+.ewp-tvTitle{display:block;margin:1px 8px 0;font-family:Anton,"Instrument Sans",sans-serif;
+ font-size:16px;line-height:19px;font-weight:400;color:#101010;text-transform:uppercase;
+ overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.ewp-tvWhen{display:block;margin:auto 8px 8px;font-style:normal;
+ font-family:"Instrument Sans",sans-serif;font-size:12px;line-height:12px;color:#6b6b6b}
+.ewp-tv .ewp-stripNav{position:absolute;top:123px;z-index:20;
+ width:32px;height:32px;padding:0;border:0;border-radius:50%;background:#fff;color:#101010;
+ display:flex;align-items:center;justify-content:center;cursor:pointer;
+ box-shadow:0 20px 25px -5px rgba(0,0,0,.18),0 8px 10px -6px rgba(0,0,0,.15)}
+.ewp-tv .ewp-stripNav[hidden]{display:none}
+.ewp-tv .ewp-stripNav.is-prev{left:max(16px,calc(50vw - 640px))}
+.ewp-tv .ewp-stripNav.is-next{right:max(16px,calc(50vw - 640px))}
+.ewp-tvAll{margin:36px 0 0;text-align:center}
+.ewp-tvAll a{font-family:Anton,"Instrument Sans",sans-serif;font-size:14px;letter-spacing:.1em;
+ text-transform:uppercase;color:#fff;text-decoration:none;
+ border-bottom:2px solid rgba(255,255,255,.9);padding-bottom:5px}
+@media(max-width:820px){
+ .ewp-tvMark{font-size:32px;line-height:32px;margin-bottom:20px}
+ .ewp-tvHead{font-size:28px;line-height:28px;margin-bottom:24px}
+ .ewp-tv .ewp-stripNav{display:none}
+}
+
 .ewp-news{background:#f3f3f3;padding:32px 0 32px;
  width:100vw;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw)}
 /* A heading widget emptied in the builder should draw nothing rather
@@ -2819,7 +2988,7 @@ function ew_hb_js() {
     a drag, so the fixture links keep working. */
  /* The chevrons. One press is one card; each hides when there is
     nothing that way, which is what the reference does. */
- [].forEach.call(document.querySelectorAll('.ewp-strip, .ewp-disc'), function(strip){
+ [].forEach.call(document.querySelectorAll('.ewp-strip, .ewp-disc, .ewp-tv'), function(strip){
   var list = strip.querySelector('.ewp-stripList');
   var prev = strip.querySelector('.ewp-stripNav.is-prev');
   var next = strip.querySelector('.ewp-stripNav.is-next');
