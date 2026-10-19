@@ -1,3 +1,14 @@
+// Without php there is nothing to lint, and this used to report every
+// file as broken -- which is worse than not running, because it is a
+// wrong answer rather than no answer. Say so and stop.
+import { execSync } from 'node:child_process';
+try {
+  execSync('php -v', { stdio: 'ignore' });
+} catch (e) {
+  console.error('php is not on this machine, so nothing was checked.');
+  console.error('Run this where php is, or lint the files there.');
+  process.exit(2);
+}
 /**
  * Does every PHP file still parse?
  *

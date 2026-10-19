@@ -252,7 +252,7 @@ function ew_hb_hero_id( $set = null ) {
 }
 
 /** One fixture card, in the captured design, from live data. */
-function ew_hb_card( $m, $done = false, $cta = array() ) {
+function ew_hb_card( $m, $done = false, $cta = array(), $label = '' ) {
 	$home  = (int) ( $m['home-team']['id'] ?? 0 ) === (int) EW_TEAM;
 	$opp   = $home ? ( $m['away-team'] ?? array() ) : ( $m['home-team'] ?? array() );
 	$ts    = strtotime( $m['date'] ?? '' );
@@ -270,7 +270,24 @@ function ew_hb_card( $m, $done = false, $cta = array() ) {
 <li class="ewp-slide">
 	<a class="ewp-card" href="<?php echo esc_url( home_url( '/match/' . (int) ( $m['id'] ?? 0 ) . '/' ) ); ?>">
 		<span class="ewp-cardTop">
+			<?php
+			/*
+			 * The bigger card -- the one in Upcoming Matches -- carries the
+			 * competition badge and a line saying what the card is, with the
+			 * date underneath. The strip's narrow cell carries neither. Same
+			 * shape as the reference, with our league in place of theirs.
+			 */
+			$comp_id  = (int) ( $m['competition']['id'] ?? 0 );
+			$comp_img = ( '' !== $label && $comp_id ) ? ew_comp_badge( $comp_id ) : '';
+			?>
+			<?php if ( '' !== $comp_img ) : ?>
+			<img class="ewp-cardComp" src="<?php echo esc_url( $comp_img ); ?>" alt=""
+				loading="lazy" decoding="async">
+			<?php endif; ?>
 			<span class="ewp-when">
+				<?php if ( '' !== $label ) : ?>
+				<em class="ewp-cardLabel"><?php echo esc_html( $label ); ?></em>
+				<?php endif; ?>
 				<b><?php echo esc_html( $ts ? date_i18n( 'D j M', $ts ) : '' ); ?></b>
 				<?php if ( $done ) : ?>
 				<i>FT</i>
@@ -941,6 +958,7 @@ function ew_hb_upcoming_sc( $atts, $content = '' ) {
 	$atts = shortcode_atts(
 		array(
 			'title'   => 'Upcoming Matches',
+			'label'   => 'Upcoming Match',
 			'count'   => '3',
 			'all'     => 'View all matches',
 			'all_url' => '/matches/',
@@ -997,7 +1015,7 @@ function ew_hb_upcoming_sc( $atts, $content = '' ) {
 			<ul class="ewp-upcomingGrid">
 				<?php
 				foreach ( $team['matches'] as $m ) {
-					echo ew_hb_card( $m, false, $cta ); // phpcs:ignore
+					echo ew_hb_card( $m, false, $cta, $atts['label'] ); // phpcs:ignore
 				}
 				?>
 			</ul>
@@ -1887,12 +1905,59 @@ function ew_hb_css() {
 
 /* Upcoming Matches — the red band under the news. */
 .ewp-upcoming{background:#990000;padding:44px 0 48px}
+/* The reference lays these three cards in the same 1248 column as the rest
+   of the site, which makes each one 405 wide. Ours was in the 1148 column
+   this sheet uses by default, so they came out 375. */
+.ewp-upcoming .ewp-wrap{max-width:1280px}
+/* The Upcoming Matches card.
+ *
+ * Measured off the reference, which runs a different and bigger card here
+ * than in the strip at the top: 405 by 215 in a 1248 column, three across
+ * with 16px between them. It carries the competition badge, a line saying
+ * what the card is, the date and kick-off under that, and a ring at the
+ * right rather than the filled disc the strip uses. The crest is 72, not 48.
+ *
+ * Ours was the narrow cell from the strip blown up, with no badge, no label and
+ * the day set in Anton where the reference uses the body face.
+ */
 .ewp-upcomingGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(272px,1fr));
- gap:12px;list-style:none;margin:0;padding:0}
+ gap:16px;list-style:none;margin:0;padding:0}
 .ewp-upcoming .ewp-card:hover{box-shadow:0 3px 18px rgba(0,0,0,.28)}
 .ewp-upcomingGrid .ewp-slide{display:flex;flex-direction:column;flex:1 1 auto;max-width:none;
- background:#fff;border-radius:4px;overflow:hidden}
+ background:#fff;border-radius:8px;overflow:hidden}
 .ewp-upcomingGrid .ewp-card{flex:1 1 auto;border-radius:0}
+
+.ewp-upcomingGrid .ewp-cardTop{display:flex;align-items:center;gap:16px;
+ padding:12px 24px;min-height:65px;background:#fff;border-bottom:1px solid #f3f3f3}
+.ewp-upcomingGrid .ewp-cardComp{width:32px;height:40px;object-fit:contain;flex:none}
+.ewp-upcomingGrid .ewp-when{display:flex;flex-direction:column;align-items:flex-start;
+ gap:4px;flex:1 1 auto;min-width:0}
+.ewp-upcomingGrid .ewp-cardLabel{display:block;font-family:"Instrument Sans",system-ui,sans-serif;
+ font-style:normal;font-size:12px;font-weight:700;line-height:16px;color:#101010}
+.ewp-upcomingGrid .ewp-when b{font-family:"Instrument Sans",system-ui,sans-serif;
+ font-size:14px;font-weight:400;line-height:16px;letter-spacing:normal;color:#212121}
+.ewp-upcomingGrid .ewp-when i{font-family:"Instrument Sans",system-ui,sans-serif;
+ font-size:14px;font-weight:700;font-style:normal;line-height:16px;color:#212121;margin-left:7px}
+/* The day and the kick-off share one line under the label. */
+.ewp-upcomingGrid .ewp-when b,.ewp-upcomingGrid .ewp-when i{display:inline}
+.ewp-upcomingGrid .ewp-cardLabel{width:100%}
+/* A ring here, not a filled disc. */
+.ewp-upcomingGrid .ewp-ha{width:24px;height:24px;flex:none;border-radius:50%;
+ display:flex;align-items:center;justify-content:center;align-self:flex-start;margin-top:8px;
+ font-family:"Instrument Sans",system-ui,sans-serif;font-size:12px;font-weight:400;line-height:1;
+ background:#fff;border:1px solid #CC0000;color:#CC0000;background-image:none}
+.ewp-upcomingGrid .ewp-ha.is-home{background:#fff;color:#CC0000;border-color:#CC0000}
+.ewp-upcomingGrid .ewp-ha.is-away{background:#fff;color:#CC0000;border-color:#CC0000}
+
+.ewp-upcomingGrid .ewp-cardBody{display:flex;align-items:center;gap:16px;padding:12px 24px}
+.ewp-upcomingGrid .ewp-cardBody img{width:72px;height:72px;object-fit:contain;flex:none}
+.ewp-upcomingGrid .ewp-cardText{display:flex;flex-direction:column;gap:4px;min-width:0}
+.ewp-upcomingGrid .ewp-cardText > *{display:block;margin:0}
+.ewp-upcomingGrid .ewp-kicker{font-size:10px;font-weight:700;letter-spacing:1px;line-height:10px;
+ color:#212121;text-transform:uppercase}
+.ewp-upcomingGrid .ewp-cardText b{font-family:Anton,"Instrument Sans",sans-serif;
+ font-size:20px;line-height:20px;color:#101010}
+.ewp-upcomingGrid .ewp-venue{font-size:12px;line-height:12px;font-weight:400;color:#212121}
 .ewp-cardCta{display:block;margin:0 14px 15px;padding:11px 14px;background:#CC0000;color:#fff;
  font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;text-align:center;
  text-decoration:none;border-radius:3px;transition:background .15s}
