@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.79.0
+ * Version: 2.79.1
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -538,6 +538,46 @@ function ew_fixture_fixes() {
  *
  * @return array id => array( field => array( 'mine' => string, 'theirs' => string ) )
  */
+/**
+ * The league's own list of our games, and nothing of ours on top of it.
+ *
+ * Two things are not corrections and always apply: the feed calls us
+ * "Eastwood CFC", and a cup tie the feed does not carry at all has to be
+ * in the list or it cannot be seen. Everything else -- a kick-off we have
+ * changed, a game we have taken off -- is ours, and is deliberately NOT
+ * applied here, because this is the copy our own answers get compared
+ * against.
+ *
+ * @return array
+ */
+function ew_fixtures_league_list() {
+	$feed = ew_fwp_fetch( 'fixtures-results', array( 'team' => EW_TEAM ), true );
+	$all  = (array) ( $feed['fixtures-results']['matches'] ?? array() );
+	if ( ! $all ) {
+		return array();
+	}
+
+	$all  = ew_fwp_fix_names( $all );
+	$have = array();
+	foreach ( $all as $m ) {
+		$have[ (int) ( $m['id'] ?? 0 ) ] = true;
+	}
+	foreach ( ew_fixture_adds() as $add ) {
+		if ( empty( $have[ (int) $add['id'] ] ) ) {
+			$all[] = $add;
+		}
+	}
+
+	usort( $all, function ( $a, $b ) {
+		return strcmp(
+			(string) ( $a['date'] ?? '' ) . (string) ( $a['time'] ?? '' ),
+			(string) ( $b['date'] ?? '' ) . (string) ( $b['time'] ?? '' )
+		);
+	} );
+
+	return $all;
+}
+
 function ew_fixture_clashes() {
 	$out   = array();
 	$saved = (array) get_option( 'ew_fixture_fixes', array() );
@@ -545,8 +585,7 @@ function ew_fixture_clashes() {
 		return $out;
 	}
 
-	$feed = ew_fwp_fetch( 'fixtures-results', array( 'team' => EW_TEAM ), true );
-	$all  = (array) ( $feed['fixtures-results']['matches'] ?? array() );
+	$all = ew_fixtures_league_list();
 	if ( ! $all ) {
 		return $out;
 	}
@@ -610,8 +649,7 @@ add_action( 'admin_post_ew_fixture_resolve', function () {
 			$row = (array) $saved[ $id ];
 
 			if ( $keep ) {
-				$feed = ew_fwp_fetch( 'fixtures-results', array( 'team' => EW_TEAM ), true );
-				foreach ( (array) ( $feed['fixtures-results']['matches'] ?? array() ) as $m ) {
+				foreach ( ew_fixtures_league_list() as $m ) {
 					if ( (int) ( $m['id'] ?? 0 ) === $id ) {
 						$seen           = isset( $row['seen'] ) ? (array) $row['seen'] : array();
 						$seen[ $field ] = (string) ( $m[ $field ] ?? '' );
@@ -860,8 +898,8 @@ function ew_fixtures_admin_page() {
 
 	$saved   = (array) get_option( 'ew_fixture_fixes', array() );
 	$clashes = ew_fixture_clashes();
-	$feed    = ew_fwp_fetch( 'fixtures-results', array( 'team' => EW_TEAM ), true );
-	$all     = (array) ( $feed['fixtures-results']['matches'] ?? array() );
+	$live    = ew_fixture_fixes();
+	$all     = ew_fixtures_league_list();
 
 	// The feed as it arrived, not as the site shows it. The boxes hold
 	// what we say; behind each box is what the league says, and the two
@@ -952,10 +990,20 @@ function ew_fixtures_admin_page() {
 						name="ew_fixture_fixes[<?php echo (int) $id; ?>][seen][<?php echo esc_attr( $ew_f ); ?>]"
 						value="<?php echo esc_attr( (string) ( $m[ $ew_f ] ?? '' ) ); ?>">
 					<?php endforeach; ?>
+					<?php
+					$in_code = ! empty( $live[ $id ]['drop'] ) && empty( $row['drop'] );
+					?>
 					<td><label><input type="checkbox" value="1"
 						name="ew_fixture_fixes[<?php echo (int) $id; ?>][drop]"
-						<?php checked( ! empty( $row['drop'] ) ); ?>>
-						Take it off the site</label></td>
+						<?php checked( ! empty( $row['drop'] ) || $in_code ); ?>
+						<?php disabled( $in_code ); ?>>
+						Take it off the site</label>
+						<?php if ( $in_code ) : ?>
+						<span style="display:block;color:#646970;font-size:12px;margin-top:4px">
+							Already off, by a rule in the plugin
+						</span>
+						<?php endif; ?>
+					</td>
 				</tr>
 				<?php if ( $clash ) : ?>
 				<tr style="background:#fcf0f1;box-shadow:inset 4px 0 0 #d63638">
@@ -3017,7 +3065,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.79.0';
+const EW_FWP_VERSION = '2.79.1';
 
 /*
  * Parts loader.
