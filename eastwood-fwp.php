@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.66.0
+ * Version: 2.67.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -920,10 +920,13 @@ add_action( 'wp_enqueue_scripts', function () {
 function ew_sponsor_roster() {
 	$base = 'https://images.pitchero.com/club_sponsors/43098/';
 	return array(
-		'podcut'               => array( 'PodCut',                     'Shirt Sponsor', 'https://podcut.com',                                    $base . '1781094797_large.jpg' ),
-		'podfirst'             => array( 'PodFirst',                   'Event Sponsor', 'https://podfirst.com',                                  $base . '1781096545_large.jpg' ),
-		'sb-outdoor-living'    => array( 'SB Outdoor Living',          'Club Sponsor',  'https://www.instagram.com/sb_outdoorliving/',           $base . '1782811916_large.jpg' ),
-		'kam-servicing'        => array( 'Kam Servicing',              'Stand Sponsor', 'https://kamservicing.com/',                             $base . '1719140087_large.jpg' ),
+		// PodCut and Kam Servicing carry 'ours' as a fifth field. It means
+		// the file on disk was put there deliberately and is better than
+		// whatever Pitchero holds, so the weekly job must leave it alone.
+		// Without it the refresh quietly pulls the old artwork back every
+		// seven days and nobody connects the two events.
+		'podcut'               => array( 'PodCut',                     'Shirt Sponsor', 'https://podcut.com',                                    $base . '1781094797_large.jpg', 'ours' ),
+		'kam-servicing'        => array( 'Kam Servicing',              'Stand Sponsor', 'https://kamservicing.com/',                             $base . '1719140087_large.jpg', 'ours' ),
 		'empire-scaffolding'   => array( 'Empire Scaffolding',         'Sponsor',       'https://empirescaffolding.co.uk/',                      $base . '1719140976_large.jpg' ),
 		'evo-waste'            => array( 'EVO Waste Management',       'Sponsor',       'https://evowms.co.uk/',                                 $base . '1731070829_large.jpg' ),
 		'short-stitch'         => array( 'Short Stitch',               'Sponsor',       'https://www.facebook.com/ShortStitchEmbroidery',        $base . '1719145984_large.jpg' ),
@@ -1030,6 +1033,10 @@ add_action( 'rest_api_init', function () {
 		'callback'            => function () {
 			$out = array();
 			foreach ( ew_sponsor_roster() as $slug => $row ) {
+				if ( 'ours' === ( $row[4] ?? '' ) ) {
+					$out[ $slug ] = 'kept — artwork marked as ours';
+					continue;
+				}
 				$r = ew_sponsor_install( $slug, $row[3] );
 				$out[ $slug ] = is_wp_error( $r ) ? $r->get_error_message() : $r;
 			}
@@ -1041,9 +1048,11 @@ add_action( 'rest_api_init', function () {
 // Sponsors change less often than crests, but the weekly crest sweep is
 // already running, so ride along with it.
 add_action( 'ew_badge_refresh', function () {
-	$meta = get_option( 'ew_sponsor_sources', array() );
+	$roster = ew_sponsor_roster();
+	$meta   = get_option( 'ew_sponsor_sources', array() );
 	foreach ( $meta as $slug => $row ) {
 		if ( empty( $row['url'] ) ) { continue; }
+		if ( 'ours' === ( $roster[ $slug ][4] ?? '' ) ) { continue; }
 		ew_sponsor_install( $slug, $row['url'] );
 	}
 } );
@@ -1310,6 +1319,21 @@ function ew_rewrite_markup( $html ) {
 			);
 		}
 	}
+
+	// A sponsor taken off the roster has to leave the wall, not just stop
+	// being updated. The captured markup decides how many slots there are,
+	// and this pass only ever filled them in, so PodFirst and SB Outdoor
+	// Living were still on every page in the footer long after they came
+	// off the list. Any slot whose artwork belongs to nobody on the roster
+	// now goes, anchor and all. Anchors do not nest, so the lazy match
+	// between one opening tag and the next </a> is the whole slot.
+	$html = preg_replace_callback(
+		'#<a\b[^>]*>(?:(?!</a>).)*?/ew-sponsors/([a-z0-9\-]+)\.png(?:(?!</a>).)*?</a>#s',
+		function ( $m ) use ( $roster ) {
+			return isset( $roster[ $m[1] ] ) ? $m[0] : '';
+		},
+		$html
+	);
 
 	// The five social buttons in the captured footer are that club's, and
 	// their icon files are dead links even at source. Eastwood has three
@@ -2176,7 +2200,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.66.0';
+const EW_FWP_VERSION = '2.67.0';
 
 /*
  * Parts loader.
