@@ -1938,8 +1938,8 @@ function ew_hb_css() {
    1248px and lines up with the title band above it. */
 .ewp-fixtures{width:100vw;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw)}
 .ewp-fixtures .ewp-wrap{max-width:1280px}
-.ewp-h2{font-family:Anton,"Instrument Sans",sans-serif;font-size:54px;letter-spacing:.02em;
- line-height:1.02;text-transform:uppercase;margin:0 0 26px;text-align:center;color:#111}
+.ewp-h2{font-family:Anton,"Instrument Sans",sans-serif;font-size:56px;letter-spacing:.02em;
+ line-height:56px;text-transform:uppercase;margin:0 0 24px;text-align:center;color:#111}
 .ewp-h2.is-light{color:#fff}
 .ewp-h2.is-red{color:#CC0000}
 
@@ -1991,7 +1991,7 @@ function ew_hb_css() {
 .ewp-fixturesBody{padding:36px 0 48px}
 
 /* Photo tiles — Discover, Hospitality, the video row, anything of that shape. */
-.ewp-tiles{background:#f3f3f3;padding:48px 0 54px}
+.ewp-tiles{background:#f3f3f3;padding:32px 0}
 .ewp-tiles.is-dark{background:#111}
 /* The reference runs its video band in the same red as the fixtures
    band rather than in black. Everything else about the dark tone is
@@ -2389,7 +2389,7 @@ function ew_hb_css() {
 .ewp-empty.is-light{color:rgba(255,255,255,.72);text-align:center}
 
 /* Upcoming Matches — the red band under the news. */
-.ewp-upcoming{background:#990000;padding:44px 0 48px}
+.ewp-upcoming{background:#990000;padding:32px 0}
 /* The reference lays these three cards in the same 1248 column as the rest
    of the site, which makes each one 405 wide. Ours was in the 1148 column
    this sheet uses by default, so they came out 375. */
@@ -2538,7 +2538,7 @@ function ew_hb_css() {
 .ewp-disc{position:relative;background:#f3f3f3;padding:32px 0;
  width:100vw;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw)}
 .ewp-discH{font-family:Anton,"Instrument Sans",sans-serif;font-size:56px;line-height:56px;
- font-weight:400;color:#CC0000;text-align:center;text-transform:uppercase;margin:0 0 48px}
+ font-weight:400;color:#CC0000;text-align:center;text-transform:uppercase;margin:0 0 24px}
 .ewp-discRail{position:relative}
 .ewp-discList{display:flex;gap:16px;list-style:none;margin:0;
  padding:0 max(16px,calc(50vw - 624px));overflow-x:auto;cursor:grab;
@@ -2603,7 +2603,12 @@ function ew_hb_css() {
  background-size:cover;background-position:center;border-radius:10px;overflow:hidden;
  padding:62px 24px 22px 68px;
  display:grid;grid-template-columns:434px minmax(0,1fr);gap:0;align-items:start}
-.ewp-pickPanel::before{content:"";position:absolute;inset:0;background:rgba(233,233,233,.8)}
+/* The veil over the backdrop. Sampled off the reference panel: a clean
+   strip of their backdrop reads mean 228.9 with a standard deviation
+   of 3.05. At .8 ours came out at 230.5 / 1.51 -- half the texture,
+   so the photo behind it had all but disappeared. At .6 it is
+   227.9 / 3.02, which is their panel to within a point. */
+.ewp-pickPanel::before{content:"";position:absolute;inset:0;background:rgba(233,233,233,.6)}
 .ewp-pickSide,.ewp-pickRight{position:relative;z-index:2}
 .ewp-pickKicker{margin:0 0 26px;font-family:"Instrument Sans",sans-serif;font-size:14px;line-height:11px;
  font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#CC0000}
@@ -2763,7 +2768,7 @@ function ew_hb_css() {
    themselves, so a title typed in sentence case is lifted here rather
    than shouted into the field. */
 .ewp-newsH{font-family:Anton,"Instrument Sans",sans-serif;font-size:56px;line-height:56px;
- font-weight:400;color:#CC0000;text-align:center;text-transform:uppercase;margin:0 0 32px}
+ font-weight:400;color:#CC0000;text-align:center;text-transform:uppercase;margin:0 0 24px}
 .ewp-newsIcon{font-family:"Instrument Sans",system-ui,sans-serif;font-size:48px;line-height:56px}
 /* 4px of padding, 4px between tabs, 2px corners: the rail on the
    reference, to the pixel. */
@@ -3149,7 +3154,7 @@ function ew_home_preview_content() {
 		. "[/eastwood_home_shop]\n\n"
 		. "[eastwood_home_discover title=\"Discover Eastwood\"]\n"
 		. "Matchday | /matchday/ | Coming to a game at Coronation Park\n"
-		. "The Venue | /thevenue/ | Function room and bar hire\n"
+		. "Venue Hire | /thevenue/ | Function room and bar hire\n"
 		. "Pitch Hire | /pitch-hire/ | Floodlit 3G, all year round\n"
 		. "Academy | /academy/ | Full-time football and education\n"
 		. "Sponsorship | /sponsorship/ | Partner with the club\n"

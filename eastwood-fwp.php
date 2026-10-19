@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.96.0
+ * Version: 2.97.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -3276,7 +3276,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.96.0';
+const EW_FWP_VERSION = '2.97.0';
 
 /*
  * Parts loader.
@@ -3737,7 +3737,7 @@ function ew_owned_pages() {
 			'content' => ew_matchday_content(),
 		),
 		'thevenue' => array(
-			'title'   => 'The Venue',
+			'title'   => 'Venue Hire',
 			'content' => ew_venue_content(),
 		),
 		'pitch-hire' => array(
@@ -4356,6 +4356,10 @@ function ew_topbar_changes() {
 		// It was called Matchday and went to the ticket page, which is not
 		// what anyone clicking it is after.
 		'Matchday' => array( 'Hospitality', '/hospitality/' ),
+
+		// The room is hired out; that is what the click is for. Hospitality
+		// is the match-day product and is its own item two along.
+		'The Venue' => array( 'Venue Hire', '/thevenue/' ),
 	);
 }
 
@@ -4366,7 +4370,10 @@ function ew_topbar_changes() {
  */
 function ew_topbar_order() {
 	return array(
-		array( 'Shop', 'TheVenue' ),
+		array( 'Shop', 'Venue Hire' ),
+		// Sponsorship earns the club money; hiring the room is a service.
+		// The money comes first.
+		array( 'Sponsorship', 'Venue Hire' ),
 	);
 }
 
@@ -4384,7 +4391,7 @@ function ew_topbar_order() {
 function ew_topbar_additions() {
 	return array(
 		// Beside the room the events happen in.
-		'TheVenue' => array( 'Events', '/events/', 'ew-events' ),
+		'Venue Hire' => array( 'Events', '/events/', 'ew-events' ),
 	);
 }
 
