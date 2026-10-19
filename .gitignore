@@ -1,1 +1,5 @@
 .DS_Store
+
+# Baseline screenshots are for looking at, not for shipping in the
+# plugin zip. The geometry file beside them is what the diff reads.
+qa/baseline/**/*.png

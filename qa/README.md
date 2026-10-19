@@ -95,14 +95,39 @@ re-measures and compares, and exits non-zero on any of:
 - the page text differing by a character
 - a link whose href has changed
 - the page scrolling sideways at any width
-- an element that has disappeared
+- an element that has disappeared, or one that has appeared
 
-Elements are keyed by their position in the tree, not by class, because
-the classes are the first thing a conversion changes.
+### What an element is keyed by
 
-**No baselines are committed.** A baseline is captured for one page at
-the moment its conversion starts, and recording them in advance would
-bank today's layout as correct for pages nobody has looked at yet.
+This is the part that decides whether the whole thing works, and the
+first two answers were both wrong.
+
+Keying by class is wrong: the classes are the first thing a conversion
+changes. Keying by position in the tree is wrong too, and worse. Moving
+a page into the builder wraps every block in three new divs, which
+shifts the position of everything on the page, so the first run of this
+against a converted page reported all 562 elements missing — a flood of
+noise that said nothing about whether the page was right. A harness that
+cannot tell a conversion from a catastrophe is no harness.
+
+So an element is keyed by what it is: its tag and the words it holds
+itself, or for a picture its file. Wrappers that hold no words and paint
+nothing are skipped — they are exactly what the builder adds and
+removes, and anything real inside one carries its own position with it.
+A box that paints something, a band or a rule, is kept and keyed by what
+it paints, because a reader can see it even without words. Where two
+elements are identical — two "Match Centre" links — they are numbered in
+the order they appear.
+
+The clock on the next-match card is set to a fixed `00` before anything
+is measured. Otherwise every capture differs from the last by a few
+seconds, and the diff reports the passage of time as a change to the
+page. Anything else that legitimately moves on its own can be added with
+`--volatile`.
+
+**The geometry is committed, the screenshots are not.** The geometry
+file is what the diff reads and it is small; the screenshots are for
+looking at and would put tens of megabytes into every plugin update.
 
 Needs Playwright. If it is not in the repo's own `node_modules`, point
 `NODE_PATH` at the folder that holds it.
