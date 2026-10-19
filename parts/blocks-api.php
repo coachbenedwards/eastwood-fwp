@@ -40,6 +40,7 @@ function ew_blocks_allowed() {
 		'eastwood_home_tiles', 'eastwood_home_sponsors', 'eastwood_home_live',
 		'eastwood_teams', 'eastwood_squad', 'eastwood_matches', 'eastwood_tv',
 		'eastwood_gate', 'eastwood_sponsors', 'eastwood_prose',
+		'eastwood_sponsor_cards',
 	);
 }
 
@@ -255,6 +256,36 @@ function ew_blocks_walk( &$nodes, $fn ) {
  * widget that is wrong rather than empty -- a shortcode nobody registered
  * prints its own name on the page, and no field change makes that stop.
  */
+/**
+ * Put a new widget next to one that is already on the page.
+ *
+ * The channel could change a block and it could take one away, but it
+ * could not add one, so the only way to put a new section on a page
+ * was to lay the whole page out again -- which throws away everything
+ * a person has done in the builder since. This walks to whichever row
+ * holds $id and drops the widget in beside it.
+ *
+ * @param array  $nodes  The document, by reference.
+ * @param string $id     The id to sit next to.
+ * @param array  $widget The widget to put in.
+ * @param string $where  'after' or 'before'.
+ * @return bool
+ */
+function ew_blocks_insert( &$nodes, $id, $widget, $where = 'after' ) {
+	foreach ( $nodes as $i => &$node ) {
+		if ( ( $node['id'] ?? '' ) === $id ) {
+			array_splice( $nodes, 'before' === $where ? $i : $i + 1, 0, array( $widget ) );
+			return true;
+		}
+		if ( ! empty( $node['elements'] ) && is_array( $node['elements'] ) ) {
+			if ( ew_blocks_insert( $node['elements'], $id, $widget, $where ) ) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 function ew_blocks_remove( &$nodes, $id ) {
 	$hit = false;
 	foreach ( $nodes as $i => $node ) {
@@ -411,6 +442,77 @@ add_action( 'rest_api_init', function () {
 				return array( 'ok' => true, 'page' => $post->post_name, 'id' => $id, 'fields' => $after );
 			},
 		),
+	) );
+
+	/*
+	 * Add one widget to a page that already exists, without touching
+	 * anything else on it. page-blocks below lays a whole page out
+	 * again, which is right for a page being built and wrong for a page
+	 * somebody is already working on.
+	 */
+	register_rest_route( 'eastwood/v1', '/block', array(
+		'methods'             => 'POST',
+		'permission_callback' => function () { return current_user_can( 'edit_pages' ); },
+		'callback'            => function ( $req ) {
+			$post = ew_blocks_page( $req->get_param( 'page' ) );
+			if ( ! $post ) {
+				return new WP_Error( 'ew_no_page', 'No page by that name.', array( 'status' => 404 ) );
+			}
+
+			$after  = (string) $req->get_param( 'after' );
+			$before = (string) $req->get_param( 'before' );
+			if ( '' === $after && '' === $before ) {
+				return new WP_Error( 'ew_args',
+					'Say which block it goes after, or before.', array( 'status' => 400 ) );
+			}
+
+			$spec = array(
+				'widget' => (string) $req->get_param( 'widget' ),
+				'block'  => (string) $req->get_param( 'block' ),
+				'fields' => (array) $req->get_param( 'fields' ),
+				'lines'  => (string) $req->get_param( 'lines' ),
+			);
+
+			if ( '' !== $spec['block'] ) {
+				if ( ! in_array( $spec['block'], ew_blocks_allowed(), true ) ) {
+					return new WP_Error( 'ew_block',
+						'Not a block this channel writes: ' . $spec['block'],
+						array( 'status' => 400 ) );
+				}
+				$bad = ew_blocks_bad( $spec['fields'] );
+				if ( $bad ) {
+					return new WP_Error( 'ew_field', $bad, array( 'status' => 400 ) );
+				}
+			} else {
+				unset( $spec['block'] );
+			}
+
+			$widget = ew_blocks_widget( $spec );
+			if ( null === $widget ) {
+				return new WP_Error( 'ew_widget',
+					'Not a widget this channel writes: ' . $spec['widget'],
+					array( 'status' => 400 ) );
+			}
+
+			$doc = ew_blocks_read( $post );
+			$ok  = ew_blocks_insert(
+				$doc,
+				'' !== $after ? $after : $before,
+				$widget,
+				'' !== $after ? 'after' : 'before'
+			);
+			if ( ! $ok ) {
+				return new WP_Error( 'ew_no_block',
+					'No block with that id on that page.', array( 'status' => 404 ) );
+			}
+
+			ew_blocks_write( $post, $doc );
+			return array(
+				'ok'   => true,
+				'page' => $post->post_name,
+				'id'   => $widget['id'],
+			);
+		},
 	) );
 
 	register_rest_route( 'eastwood/v1', '/page-blocks', array(
