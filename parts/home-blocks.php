@@ -1698,9 +1698,25 @@ function ew_hb_css() {
 .ewp-strip .ewp-stripNav.is-next{right:68px}
 .ewp-strip .ewp-slide{flex:0 0 calc((100% - 102px)/4);max-width:calc((100% - 102px)/4);
  scroll-snap-align:start;
- border-right:1px solid rgba(0,0,0,.09);position:relative}
+ /* The line between cells is a grey the reference states outright --
+    #9ca3af -- not black at nine percent, which came out far paler. */
+ border-right:1px solid #9ca3af;position:relative}
 .ewp-strip .ewp-card{display:flex;flex-direction:column;gap:0;min-height:109px;height:100%;
- padding:0;background:#fff;border:0;border-radius:0;box-shadow:none}
+ padding:0;background:#fff;border:0;border-radius:0;box-shadow:none;position:relative}
+/* The red line under a card you are pointing at.
+ *
+ * The reference pins a 4px bar of club red to the bottom of the cell,
+ * holds it at scaleX(0) and runs it out to full width from the centre
+ * over half a second. Measured off it: height, colour, origin, duration
+ * and the easing curve are all theirs. */
+.ewp-strip .ewp-card::after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;
+ background:#CC0000;transform:scaleX(0);transform-origin:50% 50%;
+ transition:transform .5s cubic-bezier(.4,0,.2,1)}
+.ewp-strip .ewp-card:hover::after,
+.ewp-strip .ewp-card:focus-visible::after{transform:scaleX(1)}
+@media (prefers-reduced-motion:reduce){
+ .ewp-strip .ewp-card::after{transition:none}
+}
 /* The date runs the full width of the cell on a tint, not in an inset box. */
 .ewp-strip .ewp-cardTop{display:flex;align-items:center;justify-content:space-between;
  gap:10px;margin:0;padding:0 16px;min-height:41px;background:rgba(0,0,0,.03);border:0;border-radius:0}
