@@ -2147,8 +2147,14 @@ function ew_hb_css() {
    section in it, so this section steps outside its own column. */
 /* The sponsor rail across the top of every page. The captured header
    pins each mark to 60px wide, which left them smaller than anything
-   else up there. Ninety still clears the divider beside them. */
-a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/"]){width:90px}
+   else up there -- and a width is the wrong thing to pin anyway. Two
+   marks of different proportions set to the same width come out
+   different heights, which is why the squarer KAM badge towered over
+   PodCut. A rail is balanced on height: both sit 30px tall and take
+   whatever width that needs. */
+a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/"]){width:auto;height:30px}
+a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/"]) img{width:auto;height:100%;
+ object-fit:contain}
 
 .ewp-news{background:#f3f3f3;padding:32px 0 32px;
  width:100vw;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw)}
