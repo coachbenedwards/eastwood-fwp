@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.98.0
+ * Version: 2.99.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1627,13 +1627,39 @@ function ew_sponsor_roster() {
 		// seven days and nobody connects the two events.
 		'podcut'               => array( 'PodCut',                     'Shirt Sponsor', 'https://podcut.com',                                    $base . '1781094797_large.jpg', 'ours' ),
 		'kam-servicing'        => array( 'Kam Servicing',              'Stand Sponsor', 'https://kamservicing.com/',                             $base . '1719140087_large.jpg', 'ours' ),
-		'evo-waste'            => array( 'EVO Waste Management',       'Sponsor',       'https://evowms.co.uk/',                                 $base . '1731070829_large.jpg' ),
-		'short-stitch'         => array( 'Short Stitch',               'Sponsor',       'https://www.facebook.com/ShortStitchEmbroidery',        $base . '1719145984_large.jpg' ),
-		'swift-sports-massage' => array( 'Swift Sports Massage',       'Sponsor',       'https://www.instagram.com/swiftsportsmassagetherapy/',  $base . '1719146646_large.jpg' ),
-		'stadia-signs'         => array( 'Stadia Signs',               'Partner',       'https://stadiasigns.co.uk/',                            $base . '1719147209_large.jpg' ),
-		'eastwood-cars'        => array( 'Eastwood Cars',              'Sponsor',       'https://eastwoodcars.co.uk/',                           $base . '1720123343_large.jpg' ),
-		'evolve-scaffolding'   => array( 'Evolve Scaffolding',         'Partner',       '',                                                      $base . '1723676265_large.jpg' ),
+		'evolve-scaffolding'   => array( 'Evolve Scaffolding',         'Sponsor',       '',                                                      $base . '1723676265_large.jpg', 'ours' ),
 	);
+}
+
+/**
+ * Sponsors who are no longer with the club.
+ *
+ * The wall is captured markup with a fixed run of slots, so dropping a
+ * name from the roster is not enough on its own -- the slot stays, and
+ * it stays holding whatever the capture put there. Named here, the
+ * whole anchor comes off the page, which also takes the click with it:
+ * a wall is a list of people paying, and a lapsed one should not still
+ * be sending the club's visitors to their website.
+ */
+function ew_sponsor_retired() {
+	return array( 'evo-waste', 'short-stitch', 'swift-sports-massage', 'stadia-signs', 'eastwood-cars' );
+}
+
+/** The whole anchor around one sponsor's mark, or '' if it is not there. */
+function ew_sponsor_anchor( $html, $slug ) {
+	$at = strpos( $html, 'ew-sponsors/' . $slug . '.png' );
+	if ( false === $at ) {
+		return '';
+	}
+	$open = strrpos( substr( $html, 0, $at ), '<a ' );
+	if ( false === $open ) {
+		return '';
+	}
+	$shut = strpos( $html, '</a>', $at );
+	if ( false === $shut ) {
+		return '';
+	}
+	return substr( $html, $open, ( $shut + 4 ) - $open );
 }
 
 function ew_sponsor_dir() {
@@ -1951,8 +1977,13 @@ a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/"]) img{width:auto;height:100%;
 /* Sixty-four, down from eighty-four: the two marks at the top of the
    wall were louder than the band they sit in. The ceiling on the width
    comes in with them so a wide wordmark keeps its proportions. */
-[class*="lg:h-32"]:has(img[src*="/ew-sponsors/"]){height:64px}
-[class*="lg:h-32"]:has(img[src*="/ew-sponsors/"]) img{max-width:190px;margin:0 auto}
+[class*="lg:h-32"]:has(img[src*="/ew-sponsors/"]){height:52px}
+[class*="lg:h-32"]:has(img[src*="/ew-sponsors/"]) img{max-width:160px;margin:0 auto}
+/* A group whose last sponsor has gone takes its heading with it, rather
+   than leaving a title with nothing under it. */
+footer .text-center:has(> h2):not(:has(a)),
+footer .text-center:has(> h4):not(:has(a)),
+footer .text-center:has(> h5):not(:has(a)){display:none}
 
 /* The web address under KAM.
 
@@ -2092,12 +2123,15 @@ function ew_sponsor_slot_map() {
 		'a2015b20-ceac-11f0-8b2a-51cd23d40448.webp' => 'sb-outdoor-living',
 		'a1fcee50-ceac-11f0-a647-af2eccb11ff2.webp' => 'kam-servicing',
 		'a1fcee50-ceac-11f0-9760-b3036bd583df.webp' => 'empire-scaffolding',
-		'c0cb65d0-c099-11f0-9384-3df27b8e225c.webp' => 'evo-waste',
+		// Evolve is the club's one sponsor, so it takes the first slot in
+		// the sponsors row. The rest of the row, and the partners row
+		// under it, belong to companies who are no longer with the club;
+		// ew_sponsor_retired() takes those links off the page.
+		'c0cb65d0-c099-11f0-9384-3df27b8e225c.webp' => 'evolve-scaffolding',
 		'71416870-7c3c-11f1-8494-d5247a06fcb1.webp' => 'short-stitch',
 		'683e54b0-00fc-11f1-8913-b7f1aeca7b09.webp' => 'swift-sports-massage',
 		'5d6eec60-cead-11f0-a647-af2eccb11ff2.webp' => 'stadia-signs',
 		'433c47b0-a7b1-11f1-9cc4-0bf0a35b648c.webp' => 'eastwood-cars',
-		'a6d66b80-9a4f-11f1-a3a5-d78e1898ef65.webp' => 'evolve-scaffolding',
 	);
 }
 
@@ -2154,6 +2188,17 @@ function ew_rewrite_markup( $html ) {
 				'alt="' . esc_attr( $roster[ $slug ][0] ) . '"',
 				$html
 			);
+		}
+	}
+
+	// Sponsors who have left take their whole anchor with them.
+	foreach ( ew_sponsor_retired() as $gone ) {
+		for ( $i = 0; $i < 6; $i++ ) {
+			$anchor = ew_sponsor_anchor( $html, $gone );
+			if ( '' === $anchor ) {
+				break;
+			}
+			$html = str_replace( $anchor, '', $html );
 		}
 	}
 
@@ -3276,7 +3321,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.98.0';
+const EW_FWP_VERSION = '2.99.0';
 
 /*
  * Parts loader.

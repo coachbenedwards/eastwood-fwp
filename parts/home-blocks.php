@@ -1472,7 +1472,8 @@ function ew_hb_player_sc( $atts, $content = '' ) {
 		<?php endif; ?>
 
 		<div class="ewp-pickPanel" style="<?php
-			if ( '' !== $atts['bg'] ) { echo 'background-image:url(' . esc_url( $atts['bg'] ) . ');'; }
+			$bg = '' !== $atts['bg'] ? $atts['bg'] : ew_hb_asset( 'picker/coronation.jpg' );
+			if ( '' !== $bg ) { echo 'background-image:url(' . esc_url( $bg ) . ');'; }
 			echo '--ew-name-top:' . esc_attr( $atts['name_top'] ) . ';';
 			echo '--ew-num-top:' . esc_attr( $atts['num_top'] ) . ';'; ?>">
 
