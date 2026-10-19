@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.77.2
+ * Version: 2.77.3
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -2796,7 +2796,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.77.2';
+const EW_FWP_VERSION = '2.77.3';
 
 /*
  * Parts loader.
@@ -4005,6 +4005,40 @@ add_filter( 'the_content', function ( $html ) {
 	}
 	return '<h1 class="ew-title">' . esc_html( $title ) . '</h1>' . $html;
 }, 9 );
+
+/**
+ * The rows this plugin writes into Elementor.
+ *
+ * Every one carries ew-blockrow, and all this does is stop the container
+ * contributing spacing of its own: Elementor puts twenty pixels between
+ * the widgets in a container, which on a page split into one widget per
+ * section appeared seven or eight times down the page and made every
+ * written page taller than it was.
+ *
+ * It lives here, printed on any page that has such a row, rather than in
+ * the homepage stylesheet where it started. That stylesheet only prints
+ * when a homepage block is on the page, so the written pages never
+ * received it -- the same shape of fault as the prose styling gate, and
+ * found the same way, by comparing the picture rather than the numbers.
+ */
+function ew_blockrow_css() {
+	return '.e-con.ew-blockrow,.e-con.ew-blockrow>.e-con-inner{'
+		. 'gap:0;--gap:0px;--row-gap:0px;--column-gap:0px;'
+		. 'row-gap:0;column-gap:0;max-width:none}';
+}
+
+add_action( 'wp_enqueue_scripts', function () {
+	if ( ! is_singular() ) {
+		return;
+	}
+	$post = get_post();
+	if ( ! $post || ! ew_post_contains( $post, 'ew-blockrow' ) ) {
+		return;
+	}
+	wp_register_style( 'ew-blockrow', false, array(), EW_FWP_VERSION );
+	wp_enqueue_style( 'ew-blockrow' );
+	wp_add_inline_style( 'ew-blockrow', ew_blockrow_css() );
+}, 22 );
 
 function ew_prose_css_inline() {
 	return '

@@ -176,6 +176,20 @@ count them, and replace the test with one named function they all call.
 A condition written out in more than one place is a condition that will
 be fixed in one place.
 
+Then a third time, in a shape worth naming on its own: the rule that
+removes the 20px Elementor puts between widgets in a container lived in
+the homepage stylesheet, which prints only when a homepage block is on
+the page. The written pages have no homepage block, so they never
+received it, and every one of them came out seven or eight gaps taller
+than the page it replaced.
+
+So a stylesheet is a gate too. A CSS rule belongs in a sheet that prints
+wherever the markup it styles can appear -- gated on that markup, not on
+some other feature of the page it happened to be written for. When a
+measurement says a rule is not applying, enumerate the rules that match
+the element before changing the rule: an empty list means the sheet is
+not on the page, and no amount of editing the declaration will help.
+
 ## 12. A shortcode's body is not run through WordPress's typography
 
 These pages printed through the_content, which curls quotes and turns a
