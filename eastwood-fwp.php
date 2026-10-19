@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.0.3
+ * Version: 3.0.4
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1979,6 +1979,12 @@ a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/"]) img{width:auto;height:100%;
    comes in with them so a wide wordmark keeps its proportions. */
 [class*="lg:h-32"]:has(img[src*="/ew-sponsors/"]){height:52px}
 [class*="lg:h-32"]:has(img[src*="/ew-sponsors/"]) img{max-width:160px;margin:0 auto}
+/* A wall slot is 52px tall, which suits a wordmark laid out in a line.
+   the Evolve mark stacks a monogram over two lines of type, so at 52 the
+   type came out around 8px and could not be read. At 84 those lines sit
+   at about 14px, which is where the other two marks read. */
+[class*="lg:h-32"]:has(img[src*="/ew-sponsors/evolve-scaffolding"]){height:84px}
+[class*="lg:h-32"]:has(img[src*="/ew-sponsors/evolve-scaffolding"]) img{max-width:200px}
 /* A group whose last sponsor has gone takes its heading with it, rather
    than leaving a title with nothing under it. The wall is not inside a
    <footer> -- it is a band at the foot of the page -- so the group is
@@ -3331,7 +3337,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.0.3';
+const EW_FWP_VERSION = '3.0.4';
 
 /*
  * Parts loader.
