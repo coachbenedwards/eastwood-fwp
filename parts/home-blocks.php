@@ -2145,6 +2145,11 @@ function ew_hb_css() {
    stopped short either side and the cards came out 372 instead of 405.
    The row cannot be widened from here without moving every other
    section in it, so this section steps outside its own column. */
+/* The sponsor rail across the top of every page. The captured header
+   pins each mark to 60px wide, which left them smaller than anything
+   else up there. Ninety still clears the divider beside them. */
+a[class*="w-[60px]"]:has(img[src*="/ew-sponsors/"]){width:90px}
+
 .ewp-news{background:#f3f3f3;padding:32px 0 32px;
  width:100vw;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw)}
 /* A heading widget emptied in the builder should draw nothing rather

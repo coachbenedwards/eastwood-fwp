@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.87.0
+ * Version: 2.88.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1590,7 +1590,21 @@ function ew_sponsor_dir() {
 	return $dir;
 }
 
+/**
+ * A sponsor's artwork.
+ *
+ * A file shipped in the plugin wins over the uploads copy. Shipping one
+ * IS the deliberate act -- it is in the repository, it survives the
+ * weekly Pitchero refresh that rewrites uploads, and a fresh install
+ * has it. The folder is named ew-sponsors rather than sponsors because
+ * the link lookup and the pass that retires a sponsor both read the
+ * slug out of the path.
+ */
 function ew_sponsor_url( $slug ) {
+	$ship = plugin_dir_path( __FILE__ ) . 'assets/ew-sponsors/' . $slug . '.png';
+	if ( file_exists( $ship ) ) {
+		return plugins_url( 'assets/ew-sponsors/' . $slug . '.png', __FILE__ );
+	}
 	return content_url( '/uploads/ew-sponsors/' . $slug . '.png' );
 }
 
@@ -1624,9 +1638,9 @@ function ew_sponsor_tone_url( $slug, $tone = 'light' ) {
 	if ( file_exists( ew_sponsor_dir() . $want . '.png' ) ) {
 		return ew_sponsor_url( $want );
 	}
-	$ship = plugin_dir_path( __FILE__ ) . 'assets/sponsors/' . $want . '.png';
+	$ship = plugin_dir_path( __FILE__ ) . 'assets/ew-sponsors/' . $want . '.png';
 	if ( file_exists( $ship ) ) {
-		return plugins_url( 'assets/sponsors/' . $want . '.png', __FILE__ );
+		return plugins_url( 'assets/ew-sponsors/' . $want . '.png', __FILE__ );
 	}
 	return ew_sponsor_wall_url( $slug );
 }
@@ -3107,7 +3121,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.87.0';
+const EW_FWP_VERSION = '2.88.0';
 
 /*
  * Parts loader.
