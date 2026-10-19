@@ -53,8 +53,27 @@ function ew_prose_sc( $atts, $content = '' ) {
 		$out .= '<h1 class="ew-title">' . esc_html( $atts['title'] ) . '</h1>';
 	}
 
-	// do_shortcode, because a block inside the writing has to run: the
-	// sponsorship page carries the gate figures and the sponsor wall.
-	return $out . '<div class="ew-prose">' . "\n\n" . do_shortcode( $body ) . "\n\n" . '</div>';
+	/*
+	 * The same treatment the writing used to get.
+	 *
+	 * These pages printed through the_content, which runs WordPress's
+	 * typography over them: straight quotes become curly, a double hyphen
+	 * becomes a dash. A shortcode's body gets none of that, so the first
+	 * conversion turned every apostrophe on eleven pages from ’ into ' --
+	 * identical in length, invisible in a screenshot, and caught at once
+	 * by comparing the words against the capture.
+	 *
+	 * So the same filters are applied here, in the order the_content
+	 * applies them, and do_shortcode last because a block inside the
+	 * writing has to run: the sponsorship page carries the gate figures
+	 * and the sponsor wall in the middle of its prose.
+	 */
+	$body = wptexturize( $body );
+	$body = convert_smilies( $body );
+	$body = wpautop( $body );
+	$body = shortcode_unautop( $body );
+	$body = do_shortcode( $body );
+
+	return $out . '<div class="ew-prose">' . "\n\n" . $body . "\n\n" . '</div>';
 }
 add_shortcode( 'eastwood_prose', 'ew_prose_sc' );

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 2.76.0
+ * Version: 2.76.1
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -2777,7 +2777,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '2.76.0';
+const EW_FWP_VERSION = '2.76.1';
 
 /*
  * Parts loader.
@@ -4038,7 +4038,16 @@ function ew_prose_css_inline() {
 function ew_prose_assets() {
 	if ( ! is_singular() ) { return; }
 	$post = get_post();
-	if ( ! ew_post_contains( $post, 'ew-prose' ) ) { return; }
+	/*
+	 * Either spelling. A page that still renders its own content carries
+	 * the class ew-prose; a page converted to a block carries the block's
+	 * name instead, and eastwood_prose does not contain the string
+	 * ew-prose -- an underscore against a hyphen. That one character left
+	 * eleven converted pages with no styling at all, live, until the
+	 * before-and-after said every paragraph had gone full width.
+	 */
+	if ( ! ew_post_contains( $post, 'ew-prose' )
+		&& ! ew_post_contains( $post, 'eastwood_prose' ) ) { return; }
 
 	$css = ew_prose_css_inline();
 

@@ -110,3 +110,31 @@ change is a new commit with the next version number, even when the
 change is small and the previous one was only minutes ago. The fix, if
 it happens again, is `git reset --soft origin/main` and one new commit —
 never a force push, which would destroy whatever else had arrived.
+
+## 11. A conditional asset gate searches for a string, and the string changes
+
+The prose styling is printed only on pages that need it, and the test was
+whether the page's content holds `ew-prose`. Converting those pages to a
+block replaced that string with `eastwood_prose` — an underscore where
+there was a hyphen — so eleven live pages lost their styling entirely and
+every paragraph ran the full width of the screen.
+
+Cost: eleven pages wrong on the live site, found by the before-and-after
+rather than by looking.
+
+Before converting a page, grep the plugin for every gate that decides
+whether to print CSS or script for it, and check the new markup still
+satisfies each one. A gate that matches on a class name will not match a
+block name.
+
+## 12. A shortcode's body is not run through WordPress's typography
+
+These pages printed through the_content, which curls quotes and turns a
+double hyphen into a dash. The body of a shortcode gets none of that. The
+first conversion silently turned every apostrophe on eleven pages from ’
+into ' — same length, invisible in a screenshot.
+
+Caught only because the check compares the words, not just the geometry.
+When writing moves from a page's own content into a block, the block has
+to apply wptexturize, convert_smilies, wpautop and shortcode_unautop
+itself, in that order, before do_shortcode.
