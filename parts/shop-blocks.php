@@ -503,8 +503,6 @@ function ewStripeCheckout(stripe, opts){
    btn.addEventListener('click', openDetails);
    pay.appendChild(btn);
   }
-  var total = Number(model[fit].price) + printCost();
-  pay.querySelector('.ewsh-go').textContent = W.paybtn + ' \u00b7 ' + money(total);
   pay.querySelector('.ewsh-go').disabled = !size;
  }
 
