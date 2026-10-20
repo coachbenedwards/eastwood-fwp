@@ -119,10 +119,12 @@ function ew_shirt_shortcode( $atts, $content = null ) {
 			'failed'        => 'Could not load the shop just now.',
 			'pay'           => 'Buy it now',
 			'det_title'     => 'Your details',
+			'name_label'    => 'Name',
 			'email_label'   => 'Email',
 			'email_note'    => 'Your receipt and anything about the order goes here.',
-			'email_bad'     => 'We need an email to send your receipt to.',
+			'email_bad'     => 'We need a name and an email to send your receipt to.',
 			'consent'       => 'Tell me when new kit and home tickets go on sale',
+			'crm_hook'      => '',
 			'cont'          => 'Continue',
 			'co_title'      => 'Your order',
 			'loading'       => 'Loading the payment form…',
@@ -172,6 +174,7 @@ function ew_shirt_shortcode( $atts, $content = null ) {
 		'pk'        => function_exists( 'ew_stripe_creds' )
 			? (string) ( ew_stripe_creds()['publishable'] ?? '' ) : '',
 		'rest'      => rest_url( 'eastwood/v1/shirt/checkout' ),
+		'page'      => (int) get_the_ID(),
 	);
 
 	ob_start();
@@ -180,7 +183,10 @@ function ew_shirt_shortcode( $atts, $content = null ) {
  <div class="ewsh-wrap">
   <div class="ewsh-gal"><?php echo ew_shop_shirt_svg(); // phpcs:ignore WordPress.Security.EscapeOutput ?></div>
   <div class="ewsh-info">
-   <?php if ( isset( $_GET['ewsh_paid'] ) ) : // phpcs:ignore WordPress.Security.NonceVerification ?>
+   <?php
+	if ( isset( $_GET['ewsh_paid'] ) ) : // phpcs:ignore WordPress.Security.NonceVerification
+		ew_shirt_mark_paid( sanitize_text_field( wp_unslash( $_GET['ewsh_paid'] ) ), $a['crm_hook'] ); // phpcs:ignore WordPress.Security.NonceVerification
+	?>
    <p class="ewsh-thanks"><?php echo esc_html( $a['thanks'] ); ?></p>
    <?php endif; ?>
    <h1><?php echo esc_html( $a['title'] ); ?></h1>
@@ -204,7 +210,10 @@ function ew_shirt_shortcode( $atts, $content = null ) {
     <p class="ewsh-lab ewsh-sub-lab"><?php echo esc_html( $a['ful_label'] ); ?></p>
     <div class="ewsh-ful" id="ewshFul"></div>
 
-    <label class="ewsh-flab" for="ewshEmail"><?php echo esc_html( $a['email_label'] ); ?></label>
+    <label class="ewsh-flab" for="ewshName"><?php echo esc_html( $a['name_label'] ); ?></label>
+    <input class="ewsh-email" id="ewshName" type="text" autocomplete="name">
+
+    <label class="ewsh-flab ewsh-flab2" for="ewshEmail"><?php echo esc_html( $a['email_label'] ); ?></label>
     <input class="ewsh-email" id="ewshEmail" type="email" autocomplete="email" inputmode="email">
     <p class="ewsh-fnote"><?php echo esc_html( $a['email_note'] ); ?></p>
 
@@ -282,7 +291,7 @@ function ew_shirt_css() {
 		   pixels of difference that were really two larger ones cancelling.
 		   Measured at 390: with this the page is the height it was. */
 		'@media(max-width:767px){.ewsh{padding-left:30px;padding-right:30px}}'
-		. '.ewsh{font-family:"Instrument Sans",system-ui,sans-serif;color:#101010}.ewsh-wrap{display:flex;gap:52px;align-items:flex-start;max-width:1140px;margin:0 auto}.ewsh-gal{flex:0 0 470px;background:#f2f2f2;border-radius:12px;padding:26px 36px 20px}.ewsh-info{flex:1 1 auto;min-width:0}.ewsh-info h1,.ewsh-info h2{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:42px;line-height:1.03;letter-spacing:.5px;text-transform:uppercase;margin:0 0 6px;color:#101010}.ewsh-sub{font-size:14px;color:#777;margin:0 0 22px}.ewsh-price{font-family:Anton,Impact,sans-serif;font-size:38px;margin:0 0 4px;color:#101010}.ewsh-note{font-size:13px;color:#8a8a8a;margin:0 0 26px}.ewsh-lab{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin:0 0 10px}.ewsh-sizes{display:flex;gap:9px;flex-wrap:wrap;margin:0 0 26px}.ewsh-sizes button{min-width:62px;padding:13px 6px;background:#fff;border:1.5px solid #d6d6d6;border-radius:6px;font:inherit;font-size:14px;font-weight:600;cursor:pointer}.ewsh-sizes button.on{border-color:#101010;background:#101010;color:#fff}.ewsh-sizes button[disabled]{color:#c0c0c0;border-style:dashed;cursor:not-allowed;text-decoration:line-through}.ewsh-ful{display:flex;flex-direction:column;gap:10px;margin:0 0 26px}.ewsh-ful label{display:flex;gap:12px;align-items:flex-start;border:1.5px solid #d6d6d6;border-radius:8px;padding:15px 16px;cursor:pointer}.ewsh-ful label.on{border-color:#101010}.ewsh-ful b{display:block;font-size:15px;margin-bottom:3px}.ewsh-ful span span{display:block;font-size:13px;color:#777;line-height:1.45}.ewsh-pay{border:1.5px solid #e2e2e2;border-radius:10px;padding:22px;background:#fafafa}.ewsh-pay p{margin:0;font-size:14px;line-height:1.6;color:#666}.ewsh-pay b{display:block;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#101010;margin-bottom:6px}@media(max-width:900px){.ewsh-wrap{flex-direction:column;gap:26px}.ewsh-gal{flex:1 1 auto;width:100%}} .ewsh-fits{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 18px} .ewsh-fits button{font:700 13px/1 Inter,sans-serif;letter-spacing:.4px;padding:11px 18px; border:1.5px solid #d8d8dc;background:#fff;color:#111;border-radius:4px;cursor:pointer} .ewsh-fits button.on{border-color:#CC0000;background:#CC0000;color:#fff} .ewsh-sizes button[disabled]{opacity:.4;text-decoration:line-through;cursor:not-allowed} .ewsh-sizes button.on{border-color:#CC0000;background:#CC0000;color:#fff}      .ewsh-go{margin:0;width:100%;background:#CC0000;color:#fff;border:0;border-radius:6px;font:700 15px/1 Inter,sans-serif;letter-spacing:.4px;padding:17px 20px;cursor:pointer}      .ewsh-go:not([disabled]):hover{background:#b30000}      .ewsh-go[disabled]{background:#e6e6e8;color:#9b9b9f;cursor:not-allowed}      .ewsh-small{margin:12px 0 0;font-size:13px;color:#777;line-height:1.5}      .ewsh-co{margin:18px 0 0}      .ewsh-mount{background:#fff;border-radius:6px;min-height:40px}      .ewsh-mount:empty{display:none}      .ewsh-msg{margin:10px 0 0;font-size:13px;color:#777}      .ewsh-thanks{border:1.5px solid #CC0000;border-radius:8px;padding:16px 18px;margin:0 0 22px;font-size:15px;color:#101010}      .ewsh-det{margin:22px 0 0;border:1.5px solid #e2e2e2;border-radius:10px;padding:22px;background:#fafafa}      .ewsh-det .ewsh-ful{margin:0 0 18px}      .ewsh-sub-lab{margin-top:18px}      .ewsh-flab{display:block;font-size:13px;font-weight:600;margin:0 0 6px}      .ewsh-email{width:100%;box-sizing:border-box;border:1.5px solid #d6d6d6;border-radius:6px;padding:13px 14px;font:400 15px "Instrument Sans",system-ui,sans-serif;color:#101010;background:#fff}      .ewsh-email:focus{outline:none;border-color:#101010}      .ewsh-fnote{margin:7px 0 0;font-size:12px;color:#777}      .ewsh-check{display:flex;align-items:center;gap:9px;margin:16px 0 20px;font-size:13px;color:#555;cursor:pointer}      .ewsh-cont{margin:0}      .ewsh-err{margin:10px 0 0;font-size:13px;color:#CC0000;font-weight:600}      .ewsh-err:empty{display:none}';
+		. '.ewsh{font-family:"Instrument Sans",system-ui,sans-serif;color:#101010}.ewsh-wrap{display:flex;gap:52px;align-items:flex-start;max-width:1140px;margin:0 auto}.ewsh-gal{flex:0 0 470px;background:#f2f2f2;border-radius:12px;padding:26px 36px 20px}.ewsh-info{flex:1 1 auto;min-width:0}.ewsh-info h1,.ewsh-info h2{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:42px;line-height:1.03;letter-spacing:.5px;text-transform:uppercase;margin:0 0 6px;color:#101010}.ewsh-sub{font-size:14px;color:#777;margin:0 0 22px}.ewsh-price{font-family:Anton,Impact,sans-serif;font-size:38px;margin:0 0 4px;color:#101010}.ewsh-note{font-size:13px;color:#8a8a8a;margin:0 0 26px}.ewsh-lab{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin:0 0 10px}.ewsh-sizes{display:flex;gap:9px;flex-wrap:wrap;margin:0 0 26px}.ewsh-sizes button{min-width:62px;padding:13px 6px;background:#fff;border:1.5px solid #d6d6d6;border-radius:6px;font:inherit;font-size:14px;font-weight:600;cursor:pointer}.ewsh-sizes button.on{border-color:#101010;background:#101010;color:#fff}.ewsh-sizes button[disabled]{color:#c0c0c0;border-style:dashed;cursor:not-allowed;text-decoration:line-through}.ewsh-ful{display:flex;flex-direction:column;gap:10px;margin:0 0 26px}.ewsh-ful label{display:flex;gap:12px;align-items:flex-start;border:1.5px solid #d6d6d6;border-radius:8px;padding:15px 16px;cursor:pointer}.ewsh-ful label.on{border-color:#101010}.ewsh-ful b{display:block;font-size:15px;margin-bottom:3px}.ewsh-ful span span{display:block;font-size:13px;color:#777;line-height:1.45}.ewsh-pay{border:1.5px solid #e2e2e2;border-radius:10px;padding:22px;background:#fafafa}.ewsh-pay p{margin:0;font-size:14px;line-height:1.6;color:#666}.ewsh-pay b{display:block;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#101010;margin-bottom:6px}@media(max-width:900px){.ewsh-wrap{flex-direction:column;gap:26px}.ewsh-gal{flex:1 1 auto;width:100%}} .ewsh-fits{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 18px} .ewsh-fits button{font:700 13px/1 Inter,sans-serif;letter-spacing:.4px;padding:11px 18px; border:1.5px solid #d8d8dc;background:#fff;color:#111;border-radius:4px;cursor:pointer} .ewsh-fits button.on{border-color:#CC0000;background:#CC0000;color:#fff} .ewsh-sizes button[disabled]{opacity:.4;text-decoration:line-through;cursor:not-allowed} .ewsh-sizes button.on{border-color:#CC0000;background:#CC0000;color:#fff}      .ewsh-go{margin:0;width:100%;background:#CC0000;color:#fff;border:0;border-radius:6px;font:700 15px/1 Inter,sans-serif;letter-spacing:.4px;padding:17px 20px;cursor:pointer}      .ewsh-go:not([disabled]):hover{background:#b30000}      .ewsh-go[disabled]{background:#e6e6e8;color:#9b9b9f;cursor:not-allowed}      .ewsh-small{margin:12px 0 0;font-size:13px;color:#777;line-height:1.5}      .ewsh-co{margin:18px 0 0}      .ewsh-mount{background:#fff;border-radius:6px;min-height:40px}      .ewsh-mount:empty{display:none}      .ewsh-msg{margin:10px 0 0;font-size:13px;color:#777}      .ewsh-thanks{border:1.5px solid #CC0000;border-radius:8px;padding:16px 18px;margin:0 0 22px;font-size:15px;color:#101010}      .ewsh-det{margin:22px 0 0;border:1.5px solid #e2e2e2;border-radius:10px;padding:22px;background:#fafafa}      .ewsh-det .ewsh-ful{margin:0 0 18px}      .ewsh-sub-lab{margin-top:18px}      .ewsh-flab{display:block;font-size:13px;font-weight:600;margin:0 0 6px}      .ewsh-flab2{margin-top:14px}      .ewsh-email{width:100%;box-sizing:border-box;border:1.5px solid #d6d6d6;border-radius:6px;padding:13px 14px;font:400 15px "Instrument Sans",system-ui,sans-serif;color:#101010;background:#fff}      .ewsh-email:focus{outline:none;border-color:#101010}      .ewsh-fnote{margin:7px 0 0;font-size:12px;color:#777}      .ewsh-check{display:flex;align-items:center;gap:9px;margin:16px 0 20px;font-size:13px;color:#555;cursor:pointer}      .ewsh-cont{margin:0}      .ewsh-err{margin:10px 0 0;font-size:13px;color:#CC0000;font-weight:600}      .ewsh-err:empty{display:none}';
 }
 
 /**
@@ -428,12 +437,15 @@ function ewStripeCheckout(stripe, opts){
       mount = EL.querySelector('.ewsh-mount'),
       msg = EL.querySelector('.ewsh-msg'),
       err = $('ewshErr'),
+      name = ($('ewshName').value || '').trim(),
       email = ($('ewshEmail').value || '').trim(),
       consent = $('ewshConsent').checked;
 
   if(!size){ return; }
-  if(email.indexOf('@') < 1 || email.indexOf('.', email.indexOf('@')) < 0){
-   err.textContent = W.emailbad; $('ewshEmail').focus(); return;
+  if(!name || email.indexOf('@') < 1 || email.indexOf('.', email.indexOf('@')) < 0){
+   err.textContent = W.emailbad;
+   (name ? $('ewshEmail') : $('ewshName')).focus();
+   return;
   }
   err.textContent = '';
 
@@ -448,7 +460,7 @@ function ewStripeCheckout(stripe, opts){
      server. */
   ewStripeCheckout(stripe, {fetchClientSecret: function(){
    return fetch(W.rest, {method:'POST', headers:{'Content-Type':'application/json'},
-     body: JSON.stringify({sku: m.sku, size: size, post: post, email: email, consent: consent})})
+     body: JSON.stringify({sku: m.sku, size: size, post: post, name: name, email: email, consent: consent, page: W.page})})
     .then(function(r){ return r.json(); })
     .then(function(j){ if(!j.clientSecret) throw new Error(j.message || 'error');
       return j.clientSecret; });
@@ -519,57 +531,77 @@ add_action( 'wp_enqueue_scripts', function () {
  * the same keys as the event tickets.
  */
 
-/* --- Who started buying something ------------------------------------ */
-
-/**
- * Every checkout that gets as far as the email box is written down here,
- * before Stripe is called at all. That is the whole reason the details
- * step exists: somebody who gets cold feet at the card form is still
- * somebody the club can reach.
- *
- * A post type rather than a database table, so there is nothing to create
- * on activation and the list comes with an admin screen already built.
- */
-function ew_lead_register() {
-	register_post_type(
-		'ew_lead',
-		array(
-			'label'           => 'Shop leads',
-			'public'          => false,
-			'show_ui'         => true,
-			'show_in_menu'    => 'edit.php?post_type=page',
-			'supports'        => array( 'title', 'editor' ),
-			'capability_type' => 'page',
-			'map_meta_cap'    => true,
-			'capabilities'    => array( 'create_posts' => 'do_not_allow' ),
-		)
-	);
+/** The shirt block on a page, so the endpoint can read its fields. */
+function ew_shirt_block_on( $post ) {
+	$found = null;
+	$data  = json_decode( (string) get_post_meta( $post->ID, '_elementor_data', true ), true );
+	if ( is_array( $data ) ) {
+		$walk = function ( $nodes ) use ( &$walk, &$found ) {
+			foreach ( (array) $nodes as $n ) {
+				if ( $found ) {
+					return;
+				}
+				$sc = (string) ( $n['settings']['shortcode'] ?? '' );
+				if ( 0 === strpos( ltrim( $sc ), '[eastwood_shirt' ) ) {
+					$found = ew_blocks_parse( $sc );
+					return;
+				}
+				if ( ! empty( $n['elements'] ) ) {
+					$walk( $n['elements'] );
+				}
+			}
+		};
+		$walk( $data );
+	}
+	if ( ! $found && preg_match( '/\[eastwood_shirt[^\]]*\]/', (string) $post->post_content, $m ) ) {
+		$found = ew_blocks_parse( $m[0] . '[/eastwood_shirt]' );
+	}
+	return $found;
 }
-add_action( 'init', 'ew_lead_register' );
+
+/* --- The order, written down before the card is asked for ------------- */
 
 /**
- * Write one down. Returns the post id, or 0 if it could not be saved --
- * a failure here never stops somebody buying a shirt.
+ * A shirt order is the same shape as a ticket booking -- somebody's name
+ * and email, what they are buying, what it costs -- so it is written into
+ * the same Bookings list rather than a second one beside it. One admin
+ * screen, one CSV, and the CRM hears about shirts the way it hears about
+ * tickets.
+ *
+ * Everything here is guarded: if the tickets part is ever not loaded, the
+ * shirt still sells, it just goes unrecorded.
  */
-function ew_lead_record( $email, $consent, $what ) {
-	$email = sanitize_email( (string) $email );
-	if ( ! is_email( $email ) ) {
+function ew_shirt_booking( $post, $what, $name, $email, $lines, $pence, $hook ) {
+	if ( ! function_exists( 'ew_tix_booking_start' ) ) {
 		return 0;
 	}
-	$id = wp_insert_post(
-		array(
-			'post_type'    => 'ew_lead',
-			'post_status'  => 'publish',
-			'post_title'   => $email,
-			'post_content' => (string) $what,
-		),
-		true
-	);
-	if ( is_wp_error( $id ) ) {
-		return 0;
+	return (int) ew_tix_booking_start( $post, $what, $name, $email, $lines, $pence, $hook );
+}
+
+/**
+ * Back from Stripe: check the payment really happened, mark the Booking
+ * paid and tell the CRM. Same two steps the tickets block takes, because
+ * a record stuck on "started" forever is worse than no record.
+ */
+function ew_shirt_mark_paid( $session_id, $hook ) {
+	if ( ! preg_match( '/^cs_[A-Za-z0-9_]+$/', (string) $session_id )
+		|| ! function_exists( 'ew_tix_stripe' ) || ! function_exists( 'ew_tix_booking_for' ) ) {
+		return;
 	}
-	update_post_meta( $id, 'ew_consent', $consent ? 'yes' : 'no' );
-	return (int) $id;
+	$s = ew_tix_stripe( 'GET', 'checkout/sessions/' . rawurlencode( $session_id ) );
+	if ( empty( $s['id'] ) || 'paid' !== ( $s['payment_status'] ?? '' ) ) {
+		return;
+	}
+	$bid = ew_tix_booking_for( $s );
+	if ( ! $bid || 'paid' === get_post_meta( $bid, '_ewt_status', true ) ) {
+		return;
+	}
+	update_post_meta( $bid, '_ewt_status', 'paid' );
+	update_post_meta( $bid, '_ewt_paid', (int) ( $s['amount_total'] ?? 0 ) );
+	update_post_meta( $bid, '_ewt_session', $s['id'] );
+	if ( function_exists( 'ew_tix_crm' ) ) {
+		ew_tix_crm( $hook, $bid, 'paid' );
+	}
 }
 
 add_action( 'rest_api_init', function () {
@@ -585,13 +617,14 @@ add_action( 'rest_api_init', function () {
 			$sku  = sanitize_text_field( (string) $req->get_param( 'sku' ) );
 			$size = sanitize_text_field( (string) $req->get_param( 'size' ) );
 			$post    = (bool) $req->get_param( 'post' );
+			$name    = sanitize_text_field( (string) $req->get_param( 'name' ) );
 			$email   = sanitize_email( (string) $req->get_param( 'email' ) );
 			$consent = (bool) $req->get_param( 'consent' );
 			if ( '' === $sku || '' === $size ) {
 				return new WP_Error( 'ewsh_what', 'Choose a size first.', array( 'status' => 400 ) );
 			}
-			if ( ! is_email( $email ) ) {
-				return new WP_Error( 'ewsh_email', 'We need an email to send your receipt to.', array( 'status' => 400 ) );
+			if ( '' === $name || ! is_email( $email ) ) {
+				return new WP_Error( 'ewsh_email', 'We need a name and an email to send your receipt to.', array( 'status' => 400 ) );
 			}
 
 			// The same endpoint the page reads, called inside this request
@@ -622,11 +655,26 @@ add_action( 'rest_api_init', function () {
 			}
 			$post = $post && $ship > 0;
 
-			ew_lead_record(
+			// Written down before Stripe is called, so a checkout that never
+			// finishes is still somebody the club can reach.
+			$page = get_post( (int) $req->get_param( 'page' ) );
+			$hook = '';
+			if ( $page ) {
+				$block = ew_shirt_block_on( $page );
+				$hook  = (string) ( $block['fields']['crm_hook'] ?? '' );
+			}
+			$booking = $page ? ew_shirt_booking(
+				$page,
+				trim( (string) ( $item['name'] ?? 'Shirt' ) ),
+				$name,
 				$email,
-				$consent,
-				trim( (string) ( $item['name'] ?? 'Shirt' ) . ' · ' . $size . ' · ' . ( $post ? 'posted' : 'collecting' ) )
-			);
+				trim( $size . ' · ' . ( $post ? 'posted' : 'collecting' ) ),
+				$pence + ( $post ? $ship : 0 ),
+				$hook
+			) : 0;
+			if ( $booking && $consent ) {
+				update_post_meta( $booking, '_ewt_consent', 'yes' );
+			}
 
 			$back = wp_get_referer();
 			$back = $back ? strtok( $back, '?' ) : home_url( '/shop/' );
@@ -637,6 +685,7 @@ add_action( 'rest_api_init', function () {
 				'return_url'                       => add_query_arg( 'ewsh_paid', '{CHECKOUT_SESSION_ID}', $back ),
 				'phone_number_collection[enabled]' => 'true',
 				'customer_email'                   => $email,
+				'metadata[booking]'                => (string) $booking,
 				'metadata[sku]'                    => $sku,
 				'metadata[size]'                   => $size,
 				'metadata[delivery]'               => $post ? 'post' : 'collect',
