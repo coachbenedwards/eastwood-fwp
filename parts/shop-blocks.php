@@ -123,6 +123,9 @@ function ew_shirt_shortcode( $atts, $content = null ) {
 			'print_range'   => '1 to 99',
 			'print_warn'    => 'Printed shirts cannot be returned.',
 			'print_bad'     => 'Give a name or a number to print.',
+			'print_who'     => 'Whose name?',
+			'print_mine'    => 'My own name and number',
+			'print_squad'   => '',
 			'share_label'   => 'Share',
 			'ful_label'     => 'How do you want it',
 			'collect_title' => 'Collect at the ground',
@@ -187,6 +190,17 @@ function ew_shirt_shortcode( $atts, $content = null ) {
 		'paybtn'    => $a['pay'],
 		'instock'   => $a['in_stock'],
 		'soldout'   => $a['sold_out'],
+		'squad'     => array_values( array_filter( array_map(
+			function ( $row ) {
+				$bits = array_map( 'trim', explode( '|', $row ) );
+				$num  = (int) preg_replace( '/[^0-9]/', '', (string) ( $bits[0] ?? '' ) );
+				$who  = trim( (string) ( $bits[1] ?? '' ) );
+				return ( $who && $num > 0 && $num < 100 ) ? array( 'n' => (string) $num, 'w' => $who ) : null;
+			},
+			preg_split( '/[;\r\n]+/', (string) $a['print_squad'] )
+		) ) ),
+		'whoLab'    => $a['print_who'],
+		'mineLab'   => $a['print_mine'],
 		'print'     => '' === trim( (string) $a['print_price'] ) ? null : array(
 			'price' => round( (float) $a['print_price'], 2 ),
 			'label' => $a['print_label'],
@@ -249,6 +263,12 @@ function ew_shirt_shortcode( $atts, $content = null ) {
        <span><?php echo esc_html( $a['print_note'] ); ?></span>
       </span>
      </label>
+     <div class="ewsh-pfields ewsh-pwho" id="ewshPWho" hidden>
+      <div class="ewsh-pf">
+       <label class="ewsh-flab" for="ewshPPick"><?php echo esc_html( $a['print_who'] ); ?></label>
+       <select class="ewsh-email" id="ewshPPick"></select>
+      </div>
+     </div>
      <div class="ewsh-pfields" id="ewshPFields" hidden>
       <div class="ewsh-pf">
        <label class="ewsh-flab" for="ewshPName"><?php echo esc_html( $a['print_name'] ); ?></label>
@@ -378,7 +398,7 @@ function ew_shirt_css() {
 		   pixels of difference that were really two larger ones cancelling.
 		   Measured at 390: with this the page is the height it was. */
 		'@media(max-width:767px){.ewsh{padding-left:30px;padding-right:30px}}'
-		. '.ewsh{font-family:"Instrument Sans",system-ui,sans-serif;color:#101010}.ewsh-wrap{display:flex;gap:52px;align-items:flex-start;max-width:1140px;margin:0 auto}.ewsh-gal{flex:0 0 470px;background:#f2f2f2;border-radius:12px;padding:26px 36px 20px}.ewsh-info{flex:1 1 auto;min-width:0}.ewsh-info h1,.ewsh-info h2{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:42px;line-height:1.03;letter-spacing:.5px;text-transform:uppercase;margin:0 0 6px;color:#101010}.ewsh-sub{font-size:14px;color:#777;margin:0 0 22px}.ewsh-price{font-family:Anton,Impact,sans-serif;font-size:38px;margin:0 0 4px;color:#101010}.ewsh-note{font-size:13px;color:#8a8a8a;margin:0 0 26px}.ewsh-lab{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin:0 0 10px}.ewsh-sizes{display:flex;gap:9px;flex-wrap:wrap;margin:0 0 26px}.ewsh-sizes button{min-width:62px;padding:13px 6px;background:#fff;border:1.5px solid #d6d6d6;border-radius:6px;font:inherit;font-size:14px;font-weight:600;cursor:pointer}.ewsh-sizes button.on{border-color:#101010;background:#101010;color:#fff}.ewsh-sizes button[disabled]{color:#c0c0c0;border-style:dashed;cursor:not-allowed;text-decoration:line-through}.ewsh-ful{display:flex;flex-direction:column;gap:10px;margin:0 0 26px}.ewsh-ful label{display:flex;gap:12px;align-items:flex-start;border:1.5px solid #d6d6d6;border-radius:8px;padding:15px 16px;cursor:pointer}.ewsh-ful label.on{border-color:#101010}.ewsh-ful b{display:block;font-size:15px;margin-bottom:3px}.ewsh-ful span span{display:block;font-size:13px;color:#777;line-height:1.45}.ewsh-pay{border:1.5px solid #e2e2e2;border-radius:10px;padding:22px;background:#fafafa}.ewsh-pay p{margin:0;font-size:14px;line-height:1.6;color:#666}.ewsh-pay b{display:block;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#101010;margin-bottom:6px}@media(max-width:900px){.ewsh-wrap{flex-direction:column;gap:26px}.ewsh-gal{flex:1 1 auto;width:100%}} .ewsh-fits{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 18px} .ewsh-fits button{font:700 13px/1 Inter,sans-serif;letter-spacing:.4px;padding:11px 18px; border:1.5px solid #d8d8dc;background:#fff;color:#111;border-radius:4px;cursor:pointer} .ewsh-fits button.on{border-color:#CC0000;background:#CC0000;color:#fff} .ewsh-sizes button[disabled]{opacity:.4;text-decoration:line-through;cursor:not-allowed} .ewsh-sizes button.on{border-color:#CC0000;background:#CC0000;color:#fff}      .ewsh-go{margin:0;width:100%;background:#CC0000;color:#fff;border:0;border-radius:6px;font:700 15px/1 Inter,sans-serif;letter-spacing:.4px;padding:17px 20px;cursor:pointer}      .ewsh-go:not([disabled]):hover{background:#b30000}      .ewsh-go[disabled]{background:#e6e6e8;color:#9b9b9f;cursor:not-allowed}      .ewsh-small{margin:12px 0 0;font-size:13px;color:#777;line-height:1.5}      .ewsh-co{margin:0}      .ewsh-mount{background:#fff;border-radius:6px;min-height:40px}      .ewsh-mount:empty{display:none}      .ewsh-msg{margin:10px 0 0;font-size:13px;color:#777}      .ewsh-thanks{border:1.5px solid #CC0000;border-radius:8px;padding:16px 18px;margin:0 0 22px;font-size:15px;color:#101010}      .ewsh-head{margin:0 0 14px}      .ewsh-head h2{margin:0}      .ewsh-back{margin:7px 0 0;font-size:13px;color:#777}      .ewsh-back button{background:none;border:0;padding:0;font:inherit;color:#777;cursor:pointer;text-decoration:underline}      .ewsh-back button:hover{color:#CC0000}      .ewsh-card{background:#fff;border:1.5px solid #e2e2e2;border-radius:10px;overflow:hidden}      .ewsh-sum{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 18px;border-bottom:1px solid #ececec}      .ewsh-sum p{margin:0;font-size:14px;color:#555}      .ewsh-sum p+p{font-family:Anton,Impact,sans-serif;font-size:24px;color:#101010;white-space:nowrap}      .ewsh-det{margin:0;padding:22px;background:#fafafa}      .ewsh-det .ewsh-ful{margin:0 0 18px}      .ewsh-sub-lab{margin-top:4px}      .ewsh-flab{display:block;font-size:13px;font-weight:600;margin:0 0 6px}      .ewsh-flab2{margin-top:14px}      .ewsh-email{width:100%;box-sizing:border-box;border:1.5px solid #d6d6d6;border-radius:6px;padding:13px 14px;font:400 15px "Instrument Sans",system-ui,sans-serif;color:#101010;background:#fff}      .ewsh-email:focus{outline:none;border-color:#101010}      .ewsh-fnote{margin:7px 0 0;font-size:12px;color:#777}      .ewsh-check{display:flex;align-items:center;gap:9px;margin:16px 0 20px;font-size:13px;color:#555;cursor:pointer}      .ewsh-cont{margin:0}      .ewsh-err{margin:10px 0 0;font-size:13px;color:#CC0000;font-weight:600}      .ewsh-err:empty{display:none}      .ewsh [hidden]{display:none}      .ewsh-stock{margin:0 0 24px;font-size:14px;font-weight:600;color:#1a7f4b}      .ewsh-stock:empty{display:none}      .ewsh-stock.out{color:#8a8a8a}      .ewsh-price{margin-bottom:20px}      .ewsh-rule{height:1px;background:#e2e2e2;margin:0 0 20px}      .ewsh-sizerow{display:flex;justify-content:space-between;align-items:baseline;gap:16px}      .ewsh-chart{font-size:13px;color:#555}      .ewsh-chart:hover{color:#CC0000}      .ewsh-share{display:flex;align-items:center;gap:14px;margin:26px 0 0;padding-top:18px;border-top:1px solid #e2e2e2;color:#555}      .ewsh-share span{font-size:13px;color:#777}      .ewsh-share a{color:#555;display:flex}      .ewsh-share a:hover{color:#CC0000}      .ewsh-order{max-width:460px}      .ewsh-print{border:1.5px solid #e2e2e2;border-radius:8px;background:#fff;padding:16px 18px;margin:0 0 20px}      .ewsh-print.on{border-color:#CC0000}      .ewsh-ptick{display:flex;align-items:flex-start;gap:11px;cursor:pointer}      .ewsh-ptick b{display:block;font-size:15px;margin-bottom:2px}      .ewsh-ptick span span{display:block;font-size:13px;color:#777;line-height:1.45}      .ewsh-pfields{display:flex;gap:12px;margin:16px 0 0}      .ewsh-pf{flex:1 1 auto;min-width:0}      .ewsh-pf-num{flex:0 0 110px}      .ewsh-pname{letter-spacing:.08em;text-transform:uppercase;font-weight:600}      .ewsh-pwarn{margin:14px 0 0;font-size:13px;color:#777}      .ewsh-pay{border:0;padding:0;background:none}      .ewsh-pay .ewsh-go{width:100%;font-size:15px;padding:19px 20px}';
+		. '.ewsh{font-family:"Instrument Sans",system-ui,sans-serif;color:#101010}.ewsh-wrap{display:flex;gap:52px;align-items:flex-start;max-width:1140px;margin:0 auto}.ewsh-gal{flex:0 0 470px;background:#f2f2f2;border-radius:12px;padding:26px 36px 20px}.ewsh-info{flex:1 1 auto;min-width:0}.ewsh-info h1,.ewsh-info h2{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:42px;line-height:1.03;letter-spacing:.5px;text-transform:uppercase;margin:0 0 6px;color:#101010}.ewsh-sub{font-size:14px;color:#777;margin:0 0 22px}.ewsh-price{font-family:Anton,Impact,sans-serif;font-size:38px;margin:0 0 4px;color:#101010}.ewsh-note{font-size:13px;color:#8a8a8a;margin:0 0 26px}.ewsh-lab{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin:0 0 10px}.ewsh-sizes{display:flex;gap:9px;flex-wrap:wrap;margin:0 0 26px}.ewsh-sizes button{min-width:62px;padding:13px 6px;background:#fff;border:1.5px solid #d6d6d6;border-radius:6px;font:inherit;font-size:14px;font-weight:600;cursor:pointer}.ewsh-sizes button.on{border-color:#101010;background:#101010;color:#fff}.ewsh-sizes button[disabled]{color:#c0c0c0;border-style:dashed;cursor:not-allowed;text-decoration:line-through}.ewsh-ful{display:flex;flex-direction:column;gap:10px;margin:0 0 26px}.ewsh-ful label{display:flex;gap:12px;align-items:flex-start;border:1.5px solid #d6d6d6;border-radius:8px;padding:15px 16px;cursor:pointer}.ewsh-ful label.on{border-color:#101010}.ewsh-ful b{display:block;font-size:15px;margin-bottom:3px}.ewsh-ful span span{display:block;font-size:13px;color:#777;line-height:1.45}.ewsh-pay{border:1.5px solid #e2e2e2;border-radius:10px;padding:22px;background:#fafafa}.ewsh-pay p{margin:0;font-size:14px;line-height:1.6;color:#666}.ewsh-pay b{display:block;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#101010;margin-bottom:6px}@media(max-width:900px){.ewsh-wrap{flex-direction:column;gap:26px}.ewsh-gal{flex:1 1 auto;width:100%}} .ewsh-fits{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 18px} .ewsh-fits button{font:700 13px/1 Inter,sans-serif;letter-spacing:.4px;padding:11px 18px; border:1.5px solid #d8d8dc;background:#fff;color:#111;border-radius:4px;cursor:pointer} .ewsh-fits button.on{border-color:#CC0000;background:#CC0000;color:#fff} .ewsh-sizes button[disabled]{opacity:.4;text-decoration:line-through;cursor:not-allowed} .ewsh-sizes button.on{border-color:#CC0000;background:#CC0000;color:#fff}      .ewsh-go{margin:0;width:100%;background:#CC0000;color:#fff;border:0;border-radius:6px;font:700 15px/1 Inter,sans-serif;letter-spacing:.4px;padding:17px 20px;cursor:pointer}      .ewsh-go:not([disabled]):hover{background:#b30000}      .ewsh-go[disabled]{background:#e6e6e8;color:#9b9b9f;cursor:not-allowed}      .ewsh-small{margin:12px 0 0;font-size:13px;color:#777;line-height:1.5}      .ewsh-co{margin:0}      .ewsh-mount{background:#fff;border-radius:6px;min-height:40px}      .ewsh-mount:empty{display:none}      .ewsh-msg{margin:10px 0 0;font-size:13px;color:#777}      .ewsh-thanks{border:1.5px solid #CC0000;border-radius:8px;padding:16px 18px;margin:0 0 22px;font-size:15px;color:#101010}      .ewsh-head{margin:0 0 14px}      .ewsh-head h2{margin:0}      .ewsh-back{margin:7px 0 0;font-size:13px;color:#777}      .ewsh-back button{background:none;border:0;padding:0;font:inherit;color:#777;cursor:pointer;text-decoration:underline}      .ewsh-back button:hover{color:#CC0000}      .ewsh-card{background:#fff;border:1.5px solid #e2e2e2;border-radius:10px;overflow:hidden}      .ewsh-sum{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 18px;border-bottom:1px solid #ececec}      .ewsh-sum p{margin:0;font-size:14px;color:#555}      .ewsh-sum p+p{font-family:Anton,Impact,sans-serif;font-size:24px;color:#101010;white-space:nowrap}      .ewsh-det{margin:0;padding:22px;background:#fafafa}      .ewsh-det .ewsh-ful{margin:0 0 18px}      .ewsh-sub-lab{margin-top:4px}      .ewsh-flab{display:block;font-size:13px;font-weight:600;margin:0 0 6px}      .ewsh-flab2{margin-top:14px}      .ewsh-email{width:100%;box-sizing:border-box;border:1.5px solid #d6d6d6;border-radius:6px;padding:13px 14px;font:400 15px "Instrument Sans",system-ui,sans-serif;color:#101010;background:#fff}      .ewsh-email:focus{outline:none;border-color:#101010}      .ewsh-fnote{margin:7px 0 0;font-size:12px;color:#777}      .ewsh-check{display:flex;align-items:center;gap:9px;margin:16px 0 20px;font-size:13px;color:#555;cursor:pointer}      .ewsh-cont{margin:0}      .ewsh-err{margin:10px 0 0;font-size:13px;color:#CC0000;font-weight:600}      .ewsh-err:empty{display:none}      .ewsh [hidden]{display:none}      .ewsh-stock{margin:0 0 24px;font-size:14px;font-weight:600;color:#1a7f4b}      .ewsh-stock:empty{display:none}      .ewsh-stock.out{color:#8a8a8a}      .ewsh-price{margin-bottom:20px}      .ewsh-rule{height:1px;background:#e2e2e2;margin:0 0 20px}      .ewsh-sizerow{display:flex;justify-content:space-between;align-items:baseline;gap:16px}      .ewsh-chart{font-size:13px;color:#555}      .ewsh-chart:hover{color:#CC0000}      .ewsh-share{display:flex;align-items:center;gap:14px;margin:26px 0 0;padding-top:18px;border-top:1px solid #e2e2e2;color:#555}      .ewsh-share span{font-size:13px;color:#777}      .ewsh-share a{color:#555;display:flex}      .ewsh-share a:hover{color:#CC0000}      .ewsh-order{max-width:460px}      .ewsh-print{border:1.5px solid #e2e2e2;border-radius:8px;background:#fff;padding:16px 18px;margin:0 0 20px}      .ewsh-print.on{border-color:#CC0000}      .ewsh-ptick{display:flex;align-items:flex-start;gap:11px;cursor:pointer}      .ewsh-ptick b{display:block;font-size:15px;margin-bottom:2px}      .ewsh-ptick span span{display:block;font-size:13px;color:#777;line-height:1.45}      .ewsh-pfields{display:flex;gap:12px;margin:16px 0 0}      .ewsh-pf{flex:1 1 auto;min-width:0}      .ewsh-pf-num{flex:0 0 110px}      .ewsh-pname{letter-spacing:.08em;text-transform:uppercase;font-weight:600}      .ewsh-pwho{margin:16px 0 0}      .ewsh-pwho .ewsh-pf{flex:1 1 auto}      select.ewsh-email{padding-right:12px}      .ewsh-pwarn{margin:14px 0 0;font-size:13px;color:#777}      .ewsh-pay{border:0;padding:0;background:none}      .ewsh-pay .ewsh-go{width:100%;font-size:15px;padding:19px 20px}';
 }
 
 /**
@@ -550,9 +570,37 @@ function ewStripeCheckout(stripe, opts){
    $('ewshPCount').textContent = String(P.chars)
      .replace('{n}', printName().length).replace('{max}', P.max);
   }
+
+  /* A squad on the block turns the list on. Picking a player fills the
+     two fields in; they stay editable, because a surname longer than the
+     field allows still has to be fixable by hand. */
+  var squad = W.squad || [], pick = $('ewshPPick'), who = $('ewshPWho');
+  if(squad.length && pick){
+   var first = document.createElement('option');
+   first.value = ''; first.textContent = W.mineLab;
+   pick.appendChild(first);
+   squad.forEach(function(pl, i){
+    var o = document.createElement('option');
+    o.value = String(i);
+    o.textContent = pl.n + ' \u00b7 ' + pl.w;
+    pick.appendChild(o);
+   });
+   pick.addEventListener('change', function(){
+    var pl = squad[Number(pick.value)];
+    if(pl){
+     var last = pl.w.split(' ').pop().toUpperCase().replace(/[^A-Z '-]/g, '');
+     nm.value = last.slice(0, P.max);
+     nu.value = pl.n;
+    } else {
+     nm.value = ''; nu.value = '';
+    }
+    count(); closePay(); drawPay();
+   });
+  }
   box.addEventListener('change', function(){
    printOn = box.checked;
    fields.hidden = !printOn; warn.hidden = !printOn;
+   if(who){ who.hidden = !printOn || !squad.length; }
    wrap.className = 'ewsh-print' + (printOn ? ' on' : '');
    closePay(); drawPay();
    if(printOn){ nm.focus(); }
@@ -562,6 +610,7 @@ function ewStripeCheckout(stripe, opts){
   nm.addEventListener('input', function(){
    var v = nm.value.toUpperCase().replace(/[^A-Z '-]/g, '').slice(0, P.max);
    if(v !== nm.value){ nm.value = v; }
+   if(pick){ pick.value = ''; }
    count(); closePay(); drawPay();
   });
   nu.addEventListener('input', function(){
