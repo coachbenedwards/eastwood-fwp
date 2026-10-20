@@ -125,6 +125,7 @@ function ew_shirt_shortcode( $atts, $content = null ) {
 			'email_bad'     => 'We need a name and an email to send your receipt to.',
 			'consent'       => 'Tell me when new kit and home tickets go on sale',
 			'crm_hook'      => '',
+			'promos'        => '',
 			'cont'          => 'Continue',
 			'co_title'      => 'Your order',
 			'loading'       => 'Loading the payment form…',
@@ -657,11 +658,13 @@ add_action( 'rest_api_init', function () {
 
 			// Written down before Stripe is called, so a checkout that never
 			// finishes is still somebody the club can reach.
-			$page = get_post( (int) $req->get_param( 'page' ) );
-			$hook = '';
+			$page   = get_post( (int) $req->get_param( 'page' ) );
+			$hook   = '';
+			$promos = false;
 			if ( $page ) {
-				$block = ew_shirt_block_on( $page );
-				$hook  = (string) ( $block['fields']['crm_hook'] ?? '' );
+				$block  = ew_shirt_block_on( $page );
+				$hook   = (string) ( $block['fields']['crm_hook'] ?? '' );
+				$promos = in_array( strtolower( (string) ( $block['fields']['promos'] ?? '' ) ), array( 'yes', 'true', '1', 'on' ), true );
 			}
 			$booking = $page ? ew_shirt_booking(
 				$page,
@@ -694,6 +697,14 @@ add_action( 'rest_api_init', function () {
 				'line_items[0][price_data][unit_amount]'        => (string) $pence,
 				'line_items[0][price_data][product_data][name]' => trim( (string) ( $item['name'] ?? 'Shirt' ) . ' · ' . $size ),
 			);
+
+			// Stripe's own discount box, off unless the block asks for it.
+			// A code promising money off, with nowhere to type it, is worse
+			// than no offer; and an empty box invites people to go hunting
+			// for a code they never had.
+			if ( $promos ) {
+				$body['allow_promotion_codes'] = 'true';
+			}
 
 			// Something posted needs somewhere to post it to, and postage goes
 			// on as its own line so the receipt shows it.
