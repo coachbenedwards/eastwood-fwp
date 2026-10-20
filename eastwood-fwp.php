@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.2.6
+ * Version: 3.2.7
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1747,7 +1747,18 @@ function ew_sponsor_dir() {
 function ew_sponsor_url( $slug ) {
 	$ship = plugin_dir_path( __FILE__ ) . 'assets/ew-sponsors/' . $slug . '.png';
 	if ( file_exists( $ship ) ) {
-		return plugins_url( 'assets/ew-sponsors/' . $slug . '.png', __FILE__ );
+		/*
+		 * Stamped with the time the picture was last changed.
+		 *
+		 * These are served with a year of cache. A corrected logo therefore
+		 * reaches nobody who has been to the site before -- which is every
+		 * supporter, and was me, looking at a logo I had already fixed and
+		 * concluding it was still wrong. The stamp changes when the file
+		 * changes, so the correction travels; the year of cache still
+		 * applies to everything that has not.
+		 */
+		return add_query_arg( 'v', (string) filemtime( $ship ),
+			plugins_url( 'assets/ew-sponsors/' . $slug . '.png', __FILE__ ) );
 	}
 	return content_url( '/uploads/ew-sponsors/' . $slug . '.png' );
 }
@@ -3405,7 +3416,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.2.6';
+const EW_FWP_VERSION = '3.2.7';
 
 /*
  * Parts loader.
