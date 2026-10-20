@@ -190,9 +190,15 @@ function ew_hb_icon( $name ) {
 	return isset( $paths[ $name ] ) ? $open . $paths[ $name ] . '</svg>' : '';
 }
 
-/** A file shipped inside the plugin, addressed from parts/. */
+/**
+ * A file shipped inside the plugin, addressed from parts/.
+ *
+ * Goes through ew_asset_url() so the address carries the file time. The
+ * Discover pictures are served from here, and before the stamp a swapped
+ * picture simply never arrived for anyone who had seen the page before.
+ */
 function ew_hb_asset( $rel ) {
-	return plugins_url( 'assets/' . ltrim( $rel, '/' ), dirname( __DIR__ ) . '/eastwood-fwp.php' );
+	return ew_asset_url( 'assets/' . ltrim( $rel, '/' ) );
 }
 
 /**

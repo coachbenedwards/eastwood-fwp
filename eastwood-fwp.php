@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.4.0
+ * Version: 3.4.1
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -23,6 +23,33 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 const EW_TEAM = '2059';
 const EW_COMP = '143';
+
+/**
+ * The address of a file shipped inside the plugin, stamped with the time
+ * that file last changed.
+ *
+ * Plugin assets go out with a year of cache. Without a stamp a replaced
+ * picture never reaches anyone who has already been to the site: the file
+ * changes on the server and every returning browser keeps the old one.
+ * That has now cost two separate afternoons -- the Evolve logo, and then
+ * the Discover cards, where the card on screen and the file on the server
+ * were different pictures and neither of us could see why.
+ *
+ * Every asset address in the plugin comes through here, so the stamp is
+ * not something that has to be remembered per folder. The stamp moves
+ * when the file moves and only then, so the year of cache still does its
+ * job for everything that has not changed.
+ *
+ * @param string $rel Path under the plugin folder, e.g. assets/clubs/1.png.
+ * @return string The URL, carrying a version stamp when the file is there.
+ */
+function ew_asset_url( $rel ) {
+	$rel  = ltrim( (string) $rel, '/' );
+	$url  = plugins_url( $rel, __FILE__ );
+	$file = plugin_dir_path( __FILE__ ) . $rel;
+	$when = file_exists( $file ) ? (int) filemtime( $file ) : 0;
+	return $when ? add_query_arg( 'v', (string) $when, $url ) : $url;
+}
 
 /* ------------------------------------------------------------------ *
  * The writer's credit and where an article came from.
@@ -1864,8 +1891,7 @@ function ew_sponsor_url( $slug ) {
 		 * changes, so the correction travels; the year of cache still
 		 * applies to everything that has not.
 		 */
-		return add_query_arg( 'v', (string) filemtime( $ship ),
-			plugins_url( 'assets/ew-sponsors/' . $slug . '.png', __FILE__ ) );
+		return ew_asset_url( 'assets/ew-sponsors/' . $slug . '.png' );
 	}
 	return content_url( '/uploads/ew-sponsors/' . $slug . '.png' );
 }
@@ -1902,7 +1928,7 @@ function ew_sponsor_tone_url( $slug, $tone = 'light' ) {
 	}
 	$ship = plugin_dir_path( __FILE__ ) . 'assets/ew-sponsors/' . $want . '.png';
 	if ( file_exists( $ship ) ) {
-		return plugins_url( 'assets/ew-sponsors/' . $want . '.png', __FILE__ );
+		return ew_asset_url( 'assets/ew-sponsors/' . $want . '.png' );
 	}
 	return ew_sponsor_wall_url( $slug );
 }
@@ -2421,7 +2447,7 @@ function ew_rewrite_markup( $html ) {
 		function ( $m ) {
 			$ship = plugin_dir_path( __FILE__ ) . 'assets/ew-sponsors/' . $m[1] . '.png';
 			return file_exists( $ship )
-				? esc_url( plugins_url( 'assets/ew-sponsors/' . $m[1] . '.png', __FILE__ ) )
+				? esc_url( ew_asset_url( 'assets/ew-sponsors/' . $m[1] . '.png' ) )
 				: $m[0];
 		},
 		$html
@@ -3523,7 +3549,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.4.0';
+const EW_FWP_VERSION = '3.4.1';
 
 /*
  * Parts loader.
@@ -5568,7 +5594,7 @@ function ew_home_badge( $id ) {
 	if ( ! file_exists( ew_badge_dir() . $id . '.png' ) ) {
 		$ship = plugin_dir_path( __FILE__ ) . 'assets/clubs/' . $id . '.png';
 		if ( file_exists( $ship ) ) {
-			return plugins_url( 'assets/clubs/' . $id . '.png', __FILE__ );
+			return ew_asset_url( 'assets/clubs/' . $id . '.png' );
 		}
 	}
 
