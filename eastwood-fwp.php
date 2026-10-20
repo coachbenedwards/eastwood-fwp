@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.3.1
+ * Version: 3.3.2
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -282,9 +282,21 @@ function ew_fwp_settings_page() {
 		'<tr><th scope="row">Location ID</th><td><input type="text" name="ew_sq_location_id" size="30" value="%s" autocomplete="off"></td></tr>',
 		esc_attr( $sq_loc )
 	);
+	/*
+	 * Whether a token is stored used to be visible only as the placeholder
+	 * of the password box, which vanishes the moment anyone clicks into it
+	 * and never shows up when the screen is read any other way. The result
+	 * was a page that could not answer the one question it is there to
+	 * answer. It now says so in the open, like the key above it does.
+	 */
 	printf(
-		'<tr><th scope="row">Access token</th><td><input type="password" name="ew_sq_token" size="50" autocomplete="off" placeholder="%s"><p class="description">%s</p></td></tr>',
-		esc_attr( '' !== $sq_tok ? 'set (' . strlen( $sq_tok ) . ' characters) -- paste a new one to replace it' : 'paste token here' ),
+		'<tr><th scope="row">Access token</th><td><p>%s</p>'
+			. '<input type="password" name="ew_sq_token" size="50" autocomplete="off" placeholder="%s">'
+			. '<p class="description">%s</p></td></tr>',
+		wp_kses_post( '' !== $sq_tok
+			? 'Access token: <strong>set (' . (int) strlen( $sq_tok ) . ' characters)</strong>'
+			: '<strong>No access token saved.</strong> Card payments cannot be taken until one is.' ),
+		esc_attr( '' !== $sq_tok ? 'paste a new one to replace it' : 'paste token here' ),
 		esc_html( 'Left blank, the token already saved is kept.' )
 	);
 	printf(
@@ -3416,7 +3428,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.3.1';
+const EW_FWP_VERSION = '3.3.2';
 
 /*
  * Parts loader.
