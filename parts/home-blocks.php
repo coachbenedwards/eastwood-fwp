@@ -1088,10 +1088,19 @@ function ew_hb_discover_sc( $atts, $content = '' ) {
 			$file = dirname( __DIR__ ) . '/assets/discover/' . $name . '.jpg';
 			$img  = file_exists( $file ) ? ew_hb_asset( 'discover/' . $name . '.jpg' ) : '';
 		}
-		// The field used to hold a line of prose. Anything that is not a
-		// path to a picture is ignored rather than printed somewhere it
-		// was never designed to go.
-		if ( '' !== $img && ! preg_match( '#^(https?:)?/.*\.(jpe?g|png|webp|avif|gif)$#i', $img ) ) {
+		/*
+		 * The field used to hold a line of prose. Anything that is not a
+		 * path to a picture is ignored rather than printed somewhere it
+		 * was never designed to go.
+		 *
+		 * The test runs against the address with any query string taken
+		 * off. Plugin pictures now carry a ?v= file stamp, and this test
+		 * wanted the extension at the very end, so the moment the stamp
+		 * arrived every Discover card silently lost its picture -- no
+		 * error, just six empty cards.
+		 */
+		$probe = preg_replace( '/[?#].*$/', '', $img );
+		if ( '' !== $img && ! preg_match( '#^(https?:)?/.*\.(jpe?g|png|webp|avif|gif)$#i', $probe ) ) {
 			$img = '';
 		}
 		$cards[] = array( $parts[0], $url, $img );
