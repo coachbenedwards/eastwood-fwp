@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.3.2
+ * Version: 3.4.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -197,6 +197,68 @@ function ew_badge_download( $names ) {
 	return null;
 }
 
+/**
+ * Which Square environment the site is using.
+ */
+function ew_sq_env() {
+	return 'live' === get_option( 'ew_sq_env', 'sandbox' ) ? 'live' : 'sandbox';
+}
+
+/**
+ * The Square credentials for one environment, or for the one in use.
+ *
+ * The shop reads this rather than reaching for the options itself, so
+ * that the Mode radio is the single thing deciding which Square account
+ * a payment goes to.
+ *
+ * @param string|null $env 'live', 'sandbox', or null for whichever is on.
+ * @return array env, app_id, location_id, token.
+ */
+function ew_sq_creds( $env = null ) {
+	$env = in_array( $env, array( 'live', 'sandbox' ), true ) ? $env : ew_sq_env();
+	return array(
+		'env'         => $env,
+		'app_id'      => (string) get_option( 'ew_sq_app_id_' . $env, '' ),
+		'location_id' => (string) get_option( 'ew_sq_location_id_' . $env, '' ),
+		'token'       => (string) get_option( 'ew_sq_token_' . $env, '' ),
+	);
+}
+
+/**
+ * Move the old single set of Square values into the slot for whichever
+ * mode was switched on at the time.
+ *
+ * There used to be one set of three options with a mode flag sitting
+ * beside them, which meant live values could be saved while the flag
+ * said sandbox -- a pair that can never work together, and nothing on
+ * the screen to show it. Each environment now keeps its own set and
+ * neither can overwrite the other.
+ *
+ * Nothing is deleted until the copy has been read back.
+ */
+function ew_sq_migrate_legacy() {
+	$env = ew_sq_env();
+	foreach ( array( 'app_id', 'location_id', 'token' ) as $field ) {
+		$old = (string) get_option( 'ew_sq_' . $field, '' );
+		$new = 'ew_sq_' . $field . '_' . $env;
+		if ( '' === $old || '' !== (string) get_option( $new, '' ) ) {
+			continue;
+		}
+		update_option( $new, $old, false );
+		if ( (string) get_option( $new, '' ) === $old ) {
+			delete_option( 'ew_sq_' . $field );
+		}
+	}
+}
+
+add_action( 'admin_init', function () {
+	if ( '1' === (string) get_option( 'ew_sq_creds_migrated', '' ) ) {
+		return;
+	}
+	ew_sq_migrate_legacy();
+	update_option( 'ew_sq_creds_migrated', '1', false );
+} );
+
 function ew_fwp_settings_page() {
 	if ( ! current_user_can( 'manage_options' ) ) {
 		return;
@@ -247,16 +309,31 @@ function ew_fwp_settings_page() {
 
 	/* ------------------------------------------------------------------
 	 * Square. The shop plugin takes the card payment, and that needs
-	 * three values from the Square dashboard. They are pasted here, the
-	 * same way the other keys are, so none of them reaches the
-	 * repository. The token is write-once: the screen never shows it
-	 * back, only whether one is set and how long it is.
+	 * three values from the Square dashboard.
+	 *
+	 * Both environments are held at once -- a sandbox set and a live set --
+	 * and Mode decides which one the site uses. Testing against sandbox and
+	 * then going back to live is a radio button rather than a retype, and
+	 * the mismatch that comes of pasting one environment over the other
+	 * cannot happen, because neither set can overwrite the other.
 	 * ------------------------------------------------------------------ */
 
 	if ( isset( $_POST['ew_sq_save'] ) && check_admin_referer( 'ew_sq_save' ) ) {
-		foreach ( array( 'ew_sq_app_id', 'ew_sq_location_id', 'ew_sq_token' ) as $field ) {
-			if ( isset( $_POST[ $field ] ) && '' !== trim( (string) wp_unslash( $_POST[ $field ] ) ) ) {
-				update_option( $field, sanitize_text_field( wp_unslash( $_POST[ $field ] ) ), false );
+		foreach ( array( 'sandbox', 'live' ) as $post_env ) {
+			foreach ( array( 'app_id', 'location_id' ) as $field ) {
+				$name = 'ew_sq_' . $field . '_' . $post_env;
+				if ( isset( $_POST[ $name ] ) ) {
+					update_option( $name, sanitize_text_field( wp_unslash( $_POST[ $name ] ) ), false );
+				}
+			}
+			/*
+			 * A blank token box means keep what is stored. Both environments
+			 * are on the one form, so without this, saving after pasting a
+			 * sandbox token would wipe the live one.
+			 */
+			$tname = 'ew_sq_token_' . $post_env;
+			if ( isset( $_POST[ $tname ] ) && '' !== trim( (string) wp_unslash( $_POST[ $tname ] ) ) ) {
+				update_option( $tname, sanitize_text_field( wp_unslash( $_POST[ $tname ] ) ), false );
 			}
 		}
 		if ( isset( $_POST['ew_sq_env'] ) ) {
@@ -265,46 +342,64 @@ function ew_fwp_settings_page() {
 		echo '<div class="notice notice-success"><p>Saved.</p></div>';
 	}
 
-	$sq_app = (string) get_option( 'ew_sq_app_id', '' );
-	$sq_loc = (string) get_option( 'ew_sq_location_id', '' );
-	$sq_tok = (string) get_option( 'ew_sq_token', '' );
-	$sq_env = 'live' === get_option( 'ew_sq_env', 'sandbox' ) ? 'live' : 'sandbox';
+	$sq_env = ew_sq_env();
 
 	echo '<h2>Square</h2>';
-	echo '<p>Card payments in the club shop. These three come from the Square dashboard, under Developer, and are stored on this site only.</p>';
-	echo '<form method="post"><table class="form-table"><tbody>';
+	echo '<p>Card payments in the club shop. Both sets are kept here and Mode at the bottom'
+		. ' decides which one the site uses, so switching to sandbox to test and back again'
+		. ' never means typing a key in twice.</p>';
+	echo '<form method="post">';
 	wp_nonce_field( 'ew_sq_save' );
+
+	foreach ( array( 'live' => 'Live', 'sandbox' => 'Sandbox' ) as $row_env => $row_label ) {
+		$creds = ew_sq_creds( $row_env );
+		printf(
+			'<h3 style="margin-bottom:0">%s%s</h3>',
+			esc_html( $row_label ),
+			$row_env === $sq_env
+				? ' <span style="font-weight:400;color:#1d6b32">&mdash; in use</span>'
+				: ' <span style="font-weight:400;color:#646970">&mdash; stored, not in use</span>'
+		);
+		echo '<table class="form-table"><tbody>';
+		printf(
+			'<tr><th scope="row">Application ID</th><td><input type="text" name="ew_sq_app_id_%s" size="50" value="%s" autocomplete="off"></td></tr>',
+			esc_attr( $row_env ),
+			esc_attr( $creds['app_id'] )
+		);
+		printf(
+			'<tr><th scope="row">Location ID</th><td><input type="text" name="ew_sq_location_id_%s" size="30" value="%s" autocomplete="off"></td></tr>',
+			esc_attr( $row_env ),
+			esc_attr( $creds['location_id'] )
+		);
+		/*
+		 * Whether a token is stored used to show only as the placeholder of
+		 * the password box, which vanishes the moment anyone clicks into it.
+		 * The screen could not answer the one question it exists to answer,
+		 * so it now says so in the open, like the key above it does.
+		 */
+		printf(
+			'<tr><th scope="row">Access token</th><td><p>%s</p>'
+				. '<input type="password" name="ew_sq_token_%s" size="50" autocomplete="off" placeholder="%s">'
+				. '<p class="description">%s</p></td></tr>',
+			wp_kses_post( '' !== $creds['token']
+				? 'Access token: <strong>set (' . (int) strlen( $creds['token'] ) . ' characters)</strong>'
+				: '<strong>No access token saved.</strong>' ),
+			esc_attr( $row_env ),
+			esc_attr( '' !== $creds['token'] ? 'paste a new one to replace it' : 'paste token here' ),
+			esc_html( 'Left blank, the token already saved is kept.' )
+		);
+		echo '</tbody></table>';
+	}
+
 	printf(
-		'<tr><th scope="row">Application ID</th><td><input type="text" name="ew_sq_app_id" size="50" value="%s" autocomplete="off"></td></tr>',
-		esc_attr( $sq_app )
-	);
-	printf(
-		'<tr><th scope="row">Location ID</th><td><input type="text" name="ew_sq_location_id" size="30" value="%s" autocomplete="off"></td></tr>',
-		esc_attr( $sq_loc )
-	);
-	/*
-	 * Whether a token is stored used to be visible only as the placeholder
-	 * of the password box, which vanishes the moment anyone clicks into it
-	 * and never shows up when the screen is read any other way. The result
-	 * was a page that could not answer the one question it is there to
-	 * answer. It now says so in the open, like the key above it does.
-	 */
-	printf(
-		'<tr><th scope="row">Access token</th><td><p>%s</p>'
-			. '<input type="password" name="ew_sq_token" size="50" autocomplete="off" placeholder="%s">'
-			. '<p class="description">%s</p></td></tr>',
-		wp_kses_post( '' !== $sq_tok
-			? 'Access token: <strong>set (' . (int) strlen( $sq_tok ) . ' characters)</strong>'
-			: '<strong>No access token saved.</strong> Card payments cannot be taken until one is.' ),
-		esc_attr( '' !== $sq_tok ? 'paste a new one to replace it' : 'paste token here' ),
-		esc_html( 'Left blank, the token already saved is kept.' )
-	);
-	printf(
-		'<tr><th scope="row">Mode</th><td><label><input type="radio" name="ew_sq_env" value="sandbox"%s> Sandbox</label> &nbsp; <label><input type="radio" name="ew_sq_env" value="live"%s> Live</label></td></tr>',
+		'<table class="form-table"><tbody><tr><th scope="row">Mode</th><td>'
+			. '<label><input type="radio" name="ew_sq_env" value="sandbox"%s> Sandbox</label> &nbsp; '
+			. '<label><input type="radio" name="ew_sq_env" value="live"%s> Live</label>'
+			. '<p class="description">%s</p></td></tr></tbody></table>',
 		'sandbox' === $sq_env ? ' checked' : '',
-		'live' === $sq_env ? ' checked' : ''
+		'live' === $sq_env ? ' checked' : '',
+		esc_html( 'Switches which set above the site uses. Nothing is retyped and nothing is lost.' )
 	);
-	echo '</tbody></table>';
 	submit_button( 'Save Square settings', 'primary', 'ew_sq_save', false );
 	echo '</form>';
 
@@ -3428,7 +3523,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.3.2';
+const EW_FWP_VERSION = '3.4.0';
 
 /*
  * Parts loader.
