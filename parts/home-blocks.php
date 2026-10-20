@@ -974,6 +974,10 @@ function ew_hb_upcoming_sc( $atts, $content = '' ) {
 			'all_url' => '/matches/',
 			'cta'     => 'Buy tickets',
 			'cta_url' => '/tickets/',
+			// What a tab says when it holds no fixtures. A field like every
+			// other word on the block, so it is changed in the builder and
+			// never by editing this file.
+			'empty'   => 'Fixtures to be confirmed',
 		),
 		$atts,
 		'eastwood_home_upcoming'
@@ -1017,10 +1021,7 @@ function ew_hb_upcoming_sc( $atts, $content = '' ) {
 		<?php foreach ( $teams as $i => $team ) : ?>
 		<div data-pv-panel="t<?php echo (int) $i; ?>"<?php echo $i === $open ? '' : ' hidden'; ?>>
 			<?php if ( ! $team['matches'] ) : ?>
-			<p class="ewp-empty is-light"><?php
-				echo esc_html( $team['id']
-					? 'No fixtures published for this team yet.'
-					: $team['label'] . ' fixtures are not on the feed yet.' ); ?></p>
+			<p class="ewp-none is-light"><?php echo esc_html( $atts['empty'] ); ?></p>
 			<?php else : ?>
 			<ul class="ewp-upcomingGrid">
 				<?php
@@ -1901,7 +1902,7 @@ function ew_hb_news_sc( $atts ) {
 			'title'     => 'Eastwood News',
 			'icon'      => '',
 			'tabs'      => 'Latest | Men’s First Team | Women’s First Team | Club | Academy',
-			'empty'     => 'Nothing here yet.',
+			'empty'     => 'No stories yet',
 			'count'     => '6',
 			'link'      => '/news/',
 			'link_text' => 'View all news',
@@ -1976,7 +1977,7 @@ function ew_hb_news_sc( $atts ) {
 		<div class="ewp-newsPanel" role="tabpanel" data-panel="<?php echo esc_attr( $panel['slug'] ); ?>"<?php
 			echo 0 === $i ? '' : ' hidden'; ?>>
 			<?php if ( empty( $panel['posts'] ) ) : ?>
-			<p class="ewp-newsEmpty"><?php echo esc_html( $atts['empty'] ); ?></p>
+			<p class="ewp-none"><?php echo esc_html( $atts['empty'] ); ?></p>
 			<?php else : ?>
 			<div class="ewp-newsGrid">
 				<?php foreach ( $panel['posts'] as $post_item ) : ?>
@@ -3045,7 +3046,13 @@ a.ewp-comingCard:hover{background:#b00000}
  transition:color .2s cubic-bezier(.4,0,.2,1),background-color .2s cubic-bezier(.4,0,.2,1)}
 .ewp-newsTab:hover{color:#CC0000}
 .ewp-newsTab.is-on{background:#CC0000;color:#fff}
-.ewp-newsEmpty{font-size:15px;color:#5c5c5c;margin:0 0 8px}
+/* An empty block says so in display type with room around it, the way
+   Eastwood Looks already did. The small grey sentence it replaces read
+   like something had broken rather than something not written yet. */
+.ewp-none{margin:0;padding:64px 0;text-align:center;
+ font-family:Anton,"Instrument Sans",sans-serif;font-size:20px;line-height:20px;
+ letter-spacing:.03em;text-transform:uppercase;color:#8a8a8a}
+.ewp-none.is-light{color:rgba(255,255,255,.72)}
 /* Three across the 1248 column with 16px between: 405 each, the card the
    reference draws. The photograph is the card; the words sit on it. */
 .ewp-newsGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
