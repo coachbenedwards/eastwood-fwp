@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.2.4
+ * Version: 3.2.5
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1693,7 +1693,7 @@ function ew_sponsor_roster() {
 		// seven days and nobody connects the two events.
 		'podcut'               => array( 'PodCut',                     'Shirt Sponsor', 'https://podcut.com',                                    $base . '1781094797_large.jpg', 'ours' ),
 		'kam-servicing'        => array( 'Kam Servicing',              'Stand Sponsor', 'https://kamservicing.com/',                             $base . '1719140087_large.jpg', 'ours' ),
-		'evolve-scaffolding-v2' => array( 'Evolve Scaffolding',         'Sponsor',       '',                                                      $base . '1723676265_large.jpg', 'ours' ),
+		'evolve-scaffolding'   => array( 'Evolve Scaffolding',         'Sponsor',       '',                                                      $base . '1723676265_large.jpg', 'ours' ),
 	);
 }
 
@@ -2209,7 +2209,7 @@ function ew_sponsor_slot_map() {
 		// the sponsors row. The rest of the row, and the partners row
 		// under it, belong to companies who are no longer with the club;
 		// ew_sponsor_retired() takes those links off the page.
-		'c0cb65d0-c099-11f0-9384-3df27b8e225c.webp' => 'evolve-scaffolding-v2',
+		'c0cb65d0-c099-11f0-9384-3df27b8e225c.webp' => 'evolve-scaffolding',
 		'71416870-7c3c-11f1-8494-d5247a06fcb1.webp' => 'short-stitch',
 		'683e54b0-00fc-11f1-8913-b7f1aeca7b09.webp' => 'swift-sports-massage',
 		'5d6eec60-cead-11f0-a647-af2eccb11ff2.webp' => 'stadia-signs',
@@ -3401,7 +3401,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.2.4';
+const EW_FWP_VERSION = '3.2.5';
 
 /*
  * Parts loader.
