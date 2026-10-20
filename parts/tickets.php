@@ -8,7 +8,9 @@
  * [/eastwood_tickets]
  *
  * One ticket type per line: name | price in pounds | small tag | what is
- * included, separated by semicolons. A blank price shows the "to be
+ * included, separated by semicolons | places it uses (blank = 1; a table
+ * of ten is 10). cap="160" on the block limits the places sold in total,
+ * counted from paid Stripe bookings for this page. A blank price shows the "to be
  * confirmed" wording and the ticket cannot be added until a price is set.
  *
  * Every word the block shows is a field or a line on the block, so a person
@@ -54,9 +56,44 @@ function ew_tix_lines( $content ) {
 			'pence' => $price,
 			'tag'   => (string) ( $b[2] ?? '' ),
 			'inc'   => array_values( array_filter( array_map( 'trim', explode( ';', (string) ( $b[3] ?? '' ) ) ) ) ),
+			'seats' => max( 1, (int) ( $b[4] ?? 1 ) ),
 		);
 	}
 	return $out;
+}
+
+/** Places already paid for on this page, from Stripe (kept two minutes). */
+function ew_tix_sold( $page_id ) {
+	$key  = 'ewt_sold_' . (int) $page_id;
+	$sold = get_transient( $key );
+	if ( false !== $sold ) {
+		return (int) $sold;
+	}
+	$sk = ew_tix_sk();
+	if ( '' === $sk ) {
+		return 0;
+	}
+	$sold  = 0;
+	$after = '';
+	for ( $n = 0; $n < 20; $n++ ) {
+		$url = 'https://api.stripe.com/v1/checkout/sessions?limit=100&status=complete' . ( $after ? '&starting_after=' . rawurlencode( $after ) : '' );
+		$res = wp_remote_get( $url, array( 'timeout' => 15, 'headers' => array( 'Authorization' => 'Bearer ' . $sk ) ) );
+		if ( is_wp_error( $res ) ) {
+			return $sold;
+		}
+		$j = json_decode( (string) wp_remote_retrieve_body( $res ), true );
+		foreach ( (array) ( $j['data'] ?? array() ) as $cs ) {
+			if ( (string) ( $cs['metadata']['page'] ?? '' ) === (string) (int) $page_id && 'paid' === ( $cs['payment_status'] ?? '' ) ) {
+				$sold += (int) ( $cs['metadata']['seats'] ?? 0 );
+			}
+			$after = (string) $cs['id'];
+		}
+		if ( empty( $j['has_more'] ) ) {
+			break;
+		}
+	}
+	set_transient( $key, $sold, 2 * MINUTE_IN_SECONDS );
+	return $sold;
 }
 
 function ew_tix_money( $pence ) {
@@ -78,6 +115,8 @@ function ew_tix_shortcode( $atts, $content = null ) {
 		'loading'  => 'Loading the payment form…',
 		'off'      => 'Online booking opens soon.',
 		'thanks'   => 'You are in. Your receipt is on its way to your email.',
+		'cap'      => '',
+		'soldout'  => 'Sold out',
 	), $atts, 'eastwood_tickets' );
 
 	$tix = ew_tix_lines( $content );
@@ -87,6 +126,11 @@ function ew_tix_shortcode( $atts, $content = null ) {
 
 	$page = get_the_ID();
 	$paid = isset( $_GET['ewt_paid'] ); // phpcs:ignore WordPress.Security.NonceVerification
+	if ( $paid ) {
+		delete_transient( 'ewt_sold_' . (int) $page );
+	}
+	$cap  = (int) $a['cap'];
+	$left = $cap > 0 ? max( 0, $cap - ew_tix_sold( $page ) ) : PHP_INT_MAX;
 
 	$h  = '<section class="ewt" id="tickets" data-page="' . (int) $page . '" data-rest="' . esc_url( rest_url( 'eastwood/v1/tickets/checkout' ) ) . '"';
 	$h .= ' data-pk="' . esc_attr( ew_tix_pk() ) . '" data-off="' . esc_attr( $a['off'] ) . '" data-loading="' . esc_attr( $a['loading'] ) . '">';
@@ -102,8 +146,9 @@ function ew_tix_shortcode( $atts, $content = null ) {
 	}
 	$h .= '<div class="ewt-grid ewt-n' . min( 4, count( $tix ) ) . '">';
 	foreach ( $tix as $i => $t ) {
-		$on = $t['pence'] > 0;
-		$h .= '<div class="ewt-card' . ( $on ? '' : ' ewt-off' ) . '" data-i="' . (int) $i . '" data-p="' . (int) $t['pence'] . '" data-n="' . esc_attr( $t['name'] ) . '">';
+		$on  = $t['pence'] > 0;
+		$out = $on && $left < $t['seats'];
+		$h .= '<div class="ewt-card' . ( $on && ! $out ? '' : ' ewt-off' ) . '" data-i="' . (int) $i . '" data-p="' . (int) $t['pence'] . '" data-n="' . esc_attr( $t['name'] ) . '">';
 		$h .= '<p class="ewt-tag">' . esc_html( $t['tag'] ) . '</p>';
 		$h .= '<h3 class="ewt-name">' . esc_html( $t['name'] ) . '</h3>';
 		$h .= '<p class="ewt-price">' . esc_html( $on ? ew_tix_money( $t['pence'] ) : $a['tbc'] ) . ( $on ? '<small>' . esc_html( $a['each'] ) . '</small>' : '' ) . '</p>';
@@ -114,7 +159,9 @@ function ew_tix_shortcode( $atts, $content = null ) {
 			}
 			$h .= '</ul>';
 		}
-		if ( $on ) {
+		if ( $out ) {
+			$h .= '<div class="ewt-qty ewt-soon">' . esc_html( $a['soldout'] ) . '</div>';
+		} elseif ( $on ) {
 			$h .= '<div class="ewt-qty"><button type="button" data-d="-1" aria-label="One fewer">−</button><span>0</span><button type="button" data-d="1" aria-label="One more">+</button></div>';
 		} else {
 			$h .= '<div class="ewt-qty ewt-soon">' . esc_html( $a['soon'] ) . '</div>';
@@ -191,6 +238,7 @@ add_action( 'rest_api_init', function () {
 				'metadata[event]'                 => $event,
 			);
 			$count = 0;
+			$seats = 0;
 			$k     = 0;
 			foreach ( (array) $req->get_param( 'items' ) as $i => $qty ) {
 				$i   = (int) $i;
@@ -199,6 +247,7 @@ add_action( 'rest_api_init', function () {
 					continue;
 				}
 				$count += $qty;
+				$seats += $qty * $tix[ $i ]['seats'];
 				$body[ "line_items[$k][quantity]" ]                          = (string) $qty;
 				$body[ "line_items[$k][price_data][currency]" ]              = 'gbp';
 				$body[ "line_items[$k][price_data][unit_amount]" ]           = (string) $tix[ $i ]['pence'];
@@ -208,6 +257,15 @@ add_action( 'rest_api_init', function () {
 			if ( ! $count || $count > 100 ) {
 				return new WP_Error( 'ewt_qty', 'Choose between 1 and 100 tickets.', array( 'status' => 400 ) );
 			}
+			$cap = (int) ( $block['fields']['cap'] ?? 0 );
+			if ( $cap > 0 ) {
+				delete_transient( 'ewt_sold_' . (int) $post->ID );
+				$left = max( 0, $cap - ew_tix_sold( $post->ID ) );
+				if ( $seats > $left ) {
+					return new WP_Error( 'ewt_full', sprintf( 'Only %d places left. Take some tickets out and try again.', $left ), array( 'status' => 409 ) );
+				}
+			}
+			$body['metadata[seats]'] = (string) $seats;
 
 			$res = wp_remote_post( 'https://api.stripe.com/v1/checkout/sessions', array(
 				'timeout' => 20,
