@@ -2562,9 +2562,13 @@ function ew_hb_css() {
  text-decoration:none;border-radius:3px;transition:background .15s}
 .ewp-cardCta:hover{background:#b00000}
 /* The team pills, as Forest run them on the red band. */
-.ewp-pills{display:flex;flex-wrap:wrap;gap:2px;margin:0 auto 22px;padding:3px;
- background:rgba(255,255,255,.14);border-radius:4px;width:fit-content;max-width:100%}
+.ewp-pills{display:flex;flex-wrap:nowrap;gap:2px;margin:0 auto 22px;padding:3px;
+ background:rgba(255,255,255,.14);border-radius:4px;width:fit-content;max-width:100%;
+ overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;
+ -webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+.ewp-pills::-webkit-scrollbar{display:none}
 .ewp-pills button{appearance:none;border:0;background:none;cursor:pointer;border-radius:3px;
+ flex:0 0 auto;white-space:nowrap;
  padding:9px 17px;font-family:Anton,"Instrument Sans",sans-serif;font-size:14px;
  letter-spacing:.07em;text-transform:uppercase;color:rgba(255,255,255,.72);
  transition:background .15s,color .15s}
@@ -2583,8 +2587,12 @@ function ew_hb_css() {
    on the left of the column. The one you are on is white on #CC0000;
    the rest are near-black on nothing. 36px under the heading and 24
    over the row, which is their rhythm. */
-.ewp-shopTabs{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-start;margin:36px 0 24px}
-.ewp-shopTab{min-width:128px;height:32px;padding:8px 16px;border:0;border-radius:2px;
+.ewp-shopTabs{display:flex;flex-wrap:nowrap;gap:4px;justify-content:flex-start;margin:36px 0 24px;
+ overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;
+ -webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+.ewp-shopTabs::-webkit-scrollbar{display:none}
+.ewp-shopTab{flex:0 0 auto;white-space:nowrap;
+ min-width:128px;height:32px;padding:8px 16px;border:0;border-radius:2px;
  background:none;color:#101010;cursor:pointer;
  font-family:Anton,"Instrument Sans",sans-serif;font-weight:700;font-size:16px;line-height:16px}
 .ewp-shopTab.is-on{background:#CC0000;color:#fff}
@@ -2901,9 +2909,13 @@ function ew_hb_css() {
 .ewp-newsIcon{font-family:"Instrument Sans",system-ui,sans-serif;font-size:48px;line-height:56px}
 /* 4px of padding, 4px between tabs, 2px corners: the rail on the
    reference, to the pixel. */
-.ewp-newsTabs{display:flex;flex-wrap:wrap;gap:4px;padding:4px;background:#fff;border-radius:2px;
- width:fit-content;max-width:100%;margin:0 0 24px}
+.ewp-newsTabs{display:flex;flex-wrap:nowrap;gap:4px;padding:4px;background:#fff;border-radius:2px;
+ width:fit-content;max-width:100%;margin:0 0 24px;
+ overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;
+ -webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+.ewp-newsTabs::-webkit-scrollbar{display:none}
 .ewp-newsTab{appearance:none;border:0;cursor:pointer;background:none;border-radius:2px;
+ flex:0 0 auto;white-space:nowrap;
  padding:8px 16px;font-family:Anton,"Instrument Sans",sans-serif;font-size:16px;line-height:16px;
  font-weight:400;color:#101010;text-transform:uppercase;
  transition:color .2s cubic-bezier(.4,0,.2,1),background-color .2s cubic-bezier(.4,0,.2,1)}
@@ -2972,6 +2984,12 @@ function ew_hb_css() {
 }
 @media(max-width:560px){
  .ewp-table th.ewp-opt,.ewp-table td.ewp-opt{display:none}
+}
+/* Below the md breakpoint on the reference, a row of tiles is one
+   full-width column with 16px between, not two squeezed across. */
+@media(max-width:767px){
+ .ewp-tileGrid{grid-template-columns:1fr;gap:16px}
+ .ewp-tileGrid li{max-width:none}
 }';
 }
 
