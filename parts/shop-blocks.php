@@ -114,8 +114,7 @@ function ew_shirt_shortcode( $atts, $content = null ) {
 			'collect_note'  => '',
 			'post_title'    => 'Post it to me',
 			'post_note'     => 'Royal Mail. {price} added at checkout.',
-			'prompt'        => 'Choose a size.',
-			'pay_note'      => '',
+			'pay_note'      => 'Payments are handled by Stripe. Your card details never touch this site.',
 			'empty'         => 'Not on sale yet.',
 			'failed'        => 'Could not load the shop just now.',
 			'collected'     => 'collected at the ground',
@@ -157,7 +156,6 @@ function ew_shirt_shortcode( $atts, $content = null ) {
 		'fits'      => $fits,
 		'collect'   => array( $a['collect_title'], $a['collect_note'] ),
 		'post'      => array( $a['post_title'], $a['post_note'] ),
-		'prompt'    => $a['prompt'],
 		'pay'       => $a['pay_note'],
 		'empty'     => $a['empty'],
 		'failed'    => $a['failed'],
@@ -366,8 +364,8 @@ function ewStripeCheckout(stripe, opts){
  function drawPay(){
   var m = model[fit], pay = $('ewshPay'), sum = $('ewshSum');
   closePay();
-  if(!size){ sum.textContent = ''; pay.innerHTML = '<p></p>';
-   pay.firstChild.textContent = W.prompt; return; }
+  if(!size){ sum.textContent = ''; pay.innerHTML = ''; pay.hidden = true; return; }
+  pay.hidden = false;
   var total = Number(m.price) + (post ? Number(m.postage) : 0);
   sum.innerHTML = '';
   var b = document.createElement('b'); b.textContent = money(total);
