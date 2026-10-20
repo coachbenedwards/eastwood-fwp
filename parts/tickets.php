@@ -197,6 +197,18 @@ function ew_tix_shortcode( $atts, $content = null ) {
 		'bonus_head'  => '',
 		'bonus'       => '',
 		'icons'       => '',
+		'name_label'  => 'Name',
+		'email_label' => 'Email · your tickets are sent here',
+		'continue'    => 'Continue to payment',
+		'need'        => 'Please add your name and email.',
+		'crm_hook'    => '',
+		'upsell'        => '',
+		'upsell_title'  => '',
+		'upsell_sub'    => '',
+		'upsell_button' => 'Add',
+		'upsell_note'   => '',
+		'upsell_skip'   => '',
+		'upsell_done'   => 'Added to your booking.',
 	), $atts, 'eastwood_tickets' );
 
 	$tix = ew_tix_lines( $content );
@@ -213,9 +225,10 @@ function ew_tix_shortcode( $atts, $content = null ) {
 	$left = $cap > 0 ? max( 0, $cap - ew_tix_sold( $page ) ) : PHP_INT_MAX;
 
 	$h  = '<section class="ewt" id="tickets" data-page="' . (int) $page . '" data-rest="' . esc_url( rest_url( 'eastwood/v1/tickets/checkout' ) ) . '"';
-	$h .= ' data-pk="' . esc_attr( ew_tix_pk() ) . '" data-off="' . esc_attr( $a['off'] ) . '" data-loading="' . esc_attr( $a['loading'] ) . '">';
+	$h .= ' data-pk="' . esc_attr( ew_tix_pk() ) . '" data-off="' . esc_attr( $a['off'] ) . '" data-loading="' . esc_attr( $a['loading'] ) . '" data-need="' . esc_attr( $a['need'] ) . '" data-done="' . esc_attr( $a['upsell_done'] ) . '">';
 	if ( $paid ) {
-		$h .= '<p class="ewt-thanks">' . esc_html( $a['thanks'] ) . '</p>';
+		$after = function_exists( 'ew_tix_after_pay' ) ? ew_tix_after_pay( $page, $a, sanitize_text_field( wp_unslash( $_GET['ewt_paid'] ) ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
+		$h    .= '' !== $after ? $after : '<p class="ewt-thanks">' . esc_html( $a['thanks'] ) . '</p>';
 	}
 	if ( '' !== $a['kicker'] ) {
 		$h .= '<p class="ewt-kick">' . esc_html( $a['kicker'] ) . '</p>';
@@ -268,7 +281,11 @@ function ew_tix_shortcode( $atts, $content = null ) {
 	if ( '' !== $a['note'] ) {
 		$h .= '<p class="ewt-note">' . esc_html( $a['note'] ) . '</p>';
 	}
-	$h .= '<div class="ewt-co" hidden><h3 class="ewt-co-title">' . esc_html( $a['co_title'] ) . '</h3><div class="ewt-lines"></div><div class="ewt-mount"></div><p class="ewt-msg"></p></div>';
+	$h .= '<div class="ewt-co" hidden><h3 class="ewt-co-title">' . esc_html( $a['co_title'] ) . '</h3><div class="ewt-lines"></div>';
+	$h .= '<form class="ewt-who" novalidate><label><span>' . esc_html( $a['name_label'] ) . '</span><input type="text" name="name" autocomplete="name" required></label>';
+	$h .= '<label><span>' . esc_html( $a['email_label'] ) . '</span><input type="email" name="email" autocomplete="email" required></label>';
+	$h .= '<button type="submit" class="ewt-go">' . esc_html( $a['continue'] ) . '</button></form>';
+	$h .= '<div class="ewt-mount"></div><p class="ewt-msg"></p></div>';
 	$h .= '<div class="ewt-bar"><div class="ewt-bar-in"><span class="ewt-bar-lines"></span><span class="ewt-bar-tot">£0</span><button type="button" class="ewt-go">' . esc_html( $a['checkout'] ) . '</button></div></div>';
 	$h .= '</section>';
 	return $h;
@@ -324,6 +341,11 @@ add_action( 'rest_api_init', function () {
 			}
 			$tix   = ew_tix_lines( $block['lines'] );
 			$event = (string) ( $block['fields']['event'] ?? get_the_title( $post ) );
+			$name  = trim( sanitize_text_field( (string) $req->get_param( 'name' ) ) );
+			$email = sanitize_email( (string) $req->get_param( 'email' ) );
+			if ( '' === $name || ! is_email( $email ) ) {
+				return new WP_Error( 'ewt_who', (string) ( $block['fields']['need'] ?? 'Please add your name and email.' ), array( 'status' => 400 ) );
+			}
 
 			$body  = array(
 				'ui_mode'                         => 'embedded_page',
@@ -336,6 +358,8 @@ add_action( 'rest_api_init', function () {
 			$count = 0;
 			$seats = 0;
 			$k     = 0;
+			$total = 0;
+			$said  = array();
 			foreach ( (array) $req->get_param( 'items' ) as $i => $qty ) {
 				$i   = (int) $i;
 				$qty = max( 0, min( 50, (int) $qty ) );
@@ -344,6 +368,8 @@ add_action( 'rest_api_init', function () {
 				}
 				$count += $qty;
 				$seats += $qty * $tix[ $i ]['seats'];
+				$total += $qty * $tix[ $i ]['pence'];
+				$said[] = $qty . ' × ' . $tix[ $i ]['name'];
 				$body[ "line_items[$k][quantity]" ]                          = (string) $qty;
 				$body[ "line_items[$k][price_data][currency]" ]              = 'gbp';
 				$body[ "line_items[$k][price_data][unit_amount]" ]           = (string) $tix[ $i ]['pence'];
@@ -362,6 +388,25 @@ add_action( 'rest_api_init', function () {
 				}
 			}
 			$body['metadata[seats]'] = (string) $seats;
+
+			// The booker is saved before the card form opens.
+			$hook = (string) ( $block['fields']['crm_hook'] ?? '' );
+			$bid  = function_exists( 'ew_tix_booking_start' ) ? ew_tix_booking_start( $post, $event, $name, $email, implode( ', ', $said ), $total, $hook ) : 0;
+			$cus  = function_exists( 'ew_tix_stripe' ) ? ew_tix_stripe( 'POST', 'customers', array(
+				'name'              => $name,
+				'email'             => $email,
+				'metadata[booking]' => (string) $bid,
+			) ) : array();
+			if ( ! empty( $cus['id'] ) ) {
+				$body['customer']                                = $cus['id'];
+				$body['payment_intent_data[setup_future_usage]'] = 'off_session';
+				if ( $bid ) {
+					update_post_meta( $bid, '_ewt_customer', $cus['id'] );
+				}
+			} else {
+				$body['customer_email'] = $email;
+			}
+			$body['metadata[booking]'] = (string) $bid;
 
 			$res = wp_remote_post( 'https://api.stripe.com/v1/checkout/sessions', array(
 				'timeout' => 20,
@@ -439,6 +484,25 @@ function ew_tix_css() {
 .ewt-lines{margin-bottom:20px}
 .ewt-lines div{display:flex;justify-content:space-between;border-top:1px solid var(--ewt-line);padding:10px 0;font-size:16px}
 .ewt-lines div.ewt-t{font-family:Anton,Impact,sans-serif;font-size:26px;color:var(--ewt-cream)}
+.ewt-who{display:grid;gap:14px;max-width:520px;margin:0 0 20px}
+.ewt-who[hidden]{display:none}
+.ewt-who label span{display:block;font-size:13px;color:var(--ewt-mut);margin-bottom:6px}
+.ewt-who input{width:100%;background:#0f0c0a;border:1px solid var(--ewt-line);color:var(--ewt-txt);padding:14px;font:inherit;font-size:16px;border-radius:0}
+.ewt-who input:focus{outline:none;border-color:rgba(232,213,176,.7)}
+.ewt-who .ewt-go{justify-self:start;margin-top:4px}
+.ewt-after{max-width:640px;margin:0 auto 48px;text-align:center}
+.ewt-up{border:1px solid var(--ewt-line);background:var(--ewt-card);padding:28px;text-align:left}
+.ewt .ewt-up-sub{color:var(--ewt-mut);font-size:16px;margin-bottom:18px}
+.ewt-up-opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+.ewt-up-o{background:none;border:1px solid var(--ewt-line);color:var(--ewt-txt);padding:16px 10px;text-align:center;cursor:pointer;font:inherit}
+.ewt-up-o.ewt-sel{border-color:rgba(232,213,176,.8);background:rgba(232,213,176,.07)}
+.ewt-up-o b{display:block;font-family:Anton,Impact,sans-serif;font-weight:400;font-size:30px;color:var(--ewt-cream);line-height:1}
+.ewt-up-o small{display:block;font-size:13px;color:var(--ewt-mut);margin-top:6px}
+.ewt-up .ewt-up-buy{width:100%}
+.ewt-up .ewt-up-buy:disabled{opacity:.6;cursor:wait}
+.ewt .ewt-up-note{font-size:13px;color:var(--ewt-mut);text-align:center;margin-top:10px}
+.ewt .ewt-up-msg{font-size:14px;color:var(--ewt-mut);text-align:center;margin-top:8px}
+.ewt-up-skip{display:block;margin:12px auto 0;background:none;border:0;color:var(--ewt-mut);text-decoration:underline;font:inherit;font-size:14px;cursor:pointer}
 .ewt-mount{background:#fff;border-radius:6px;min-height:40px}
 .ewt-mount:empty{display:none}
 .ewt .ewt-msg{color:var(--ewt-mut);font-size:15px;margin-top:12px}
@@ -477,18 +541,45 @@ function ewStripeCheckout(stripe, opts){
       if(checkout){checkout.destroy();checkout=null;mount.innerHTML='';co.hidden=true;}
     }
     root.addEventListener('click',function(e){var b=e.target.closest('.ewt-qty button');if(!b)return;var i=b.closest('.ewt-card').dataset.i;q[i]=Math.max(0,Math.min(50,(q[i]||0)+(+b.dataset.d)));render();});
+    var who=root.querySelector('.ewt-who');
     bar.querySelector('.ewt-go').addEventListener('click',function(){
       co.hidden=false; co.scrollIntoView({behavior:'smooth',block:'start'});
-      if(!root.dataset.pk||!window.Stripe){msg.textContent=root.dataset.off;return;}
+      if(!root.dataset.pk||!window.Stripe){msg.textContent=root.dataset.off;who.hidden=true;return;}
+      if(checkout)return;
+      who.hidden=false; msg.textContent='';
+      bar.classList.remove('ewt-on');
+      var f=who.querySelector('input[name=name]'); if(f&&!f.value)setTimeout(function(){f.focus({preventScroll:true});},400);
+    });
+    who.addEventListener('submit',function(e){
+      e.preventDefault();
+      var name=who.querySelector('[name=name]').value.trim(), email=who.querySelector('[name=email]').value.trim();
+      if(!name||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){msg.textContent=root.dataset.need;return;}
       if(checkout)return;
       msg.textContent=root.dataset.loading;
       var stripe=window.Stripe(root.dataset.pk);
       ewStripeCheckout(stripe,{fetchClientSecret:function(){
-        return fetch(root.dataset.rest,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:+root.dataset.page,items:q})})
+        return fetch(root.dataset.rest,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:+root.dataset.page,items:q,name:name,email:email})})
           .then(function(r){return r.json();}).then(function(j){if(!j.clientSecret)throw new Error(j.message||'error');return j.clientSecret;});
-      }}).then(function(c){checkout=c;msg.textContent='';c.mount(mount);bar.classList.remove('ewt-on');})
+      }}).then(function(c){checkout=c;msg.textContent='';who.hidden=true;c.mount(mount);})
         .catch(function(err){msg.textContent=(err&&err.message)||root.dataset.off;});
     });
+    var up=root.querySelector('.ewt-up');
+    if(up){
+      var buy=up.querySelector('.ewt-up-buy'), umsg=up.querySelector('.ewt-up-msg'), opts=up.querySelectorAll('.ewt-up-o');
+      function pick(){var s=up.querySelector('.ewt-up-o.ewt-sel');buy.textContent=buy.dataset.word+' '+(s?s.dataset.label:'');}
+      opts.forEach(function(o){o.addEventListener('click',function(){opts.forEach(function(x){x.classList.remove('ewt-sel');});o.classList.add('ewt-sel');pick();});});
+      pick();
+      buy.addEventListener('click',function(){
+        var s=up.querySelector('.ewt-up-o.ewt-sel'); if(!s||buy.disabled)return;
+        buy.disabled=true; umsg.textContent=root.dataset.loading;
+        fetch(up.dataset.rest,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session:up.dataset.session,option:+s.dataset.o})})
+          .then(function(r){return r.json();}).then(function(j){
+            if(!j.ok)throw new Error(j.message||'');
+            up.innerHTML='<p class="ewt-thanks">'+root.dataset.done.replace(/</g,'&lt;')+' '+String(j.label).replace(/</g,'&lt;')+' · '+j.price+'</p>';
+          }).catch(function(err){buy.disabled=false;umsg.textContent=(err&&err.message)||root.dataset.off;});
+      });
+      var skip=up.querySelector('.ewt-up-skip'); if(skip)skip.addEventListener('click',function(){up.remove();});
+    }
     render();
   });
 })();
