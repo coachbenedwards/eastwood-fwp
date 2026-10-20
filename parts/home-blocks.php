@@ -1431,6 +1431,87 @@ function ew_hb_shop_sc( $atts, $content = '' ) {
 add_shortcode( 'eastwood_home_shop', 'ew_hb_shop_sc' );
 
 /* ------------------------------------------------------------------
+ * [eastwood_home_coming heading="Coming Up" more="Stream info"]
+ * Wed 22 Oct | 19:00 | Live | Press conference | One line about it | /url
+ * [/eastwood_home_coming]
+ *
+ * What is on next, under the Eastwood TV rows and on the same red band.
+ * The reference runs this as a stack of red cards: the day and time small
+ * above, the name of the thing big and bold, a sentence under it and a
+ * link at the foot.
+ *
+ * Every word is a field on the block, including the badge and the link
+ * text, so the team can put up a press conference or a stream night in
+ * the builder without anybody touching code.
+ *
+ * With no lines typed in it the whole section is left out rather than
+ * drawn empty: a Coming Up heading over nothing reads as a fault, and a
+ * supporter is better told nothing than told to come back for something
+ * that was never scheduled.
+ * ------------------------------------------------------------------ */
+function ew_hb_coming_sc( $atts = array(), $content = '' ) {
+	$atts = shortcode_atts(
+		array(
+			'heading' => 'Coming Up',
+			'more'    => 'More info',
+		),
+		$atts,
+		'eastwood_home_coming'
+	);
+
+	$items = array();
+	foreach ( ew_hb_lines( $content ) as $line ) {
+		$cells = array_map( 'trim', explode( '|', $line ) );
+		$cells = array_pad( $cells, 6, '' );
+		if ( '' === $cells[3] ) {
+			continue;
+		}
+		$items[] = $cells;
+	}
+
+	if ( ! $items ) {
+		return '';
+	}
+
+	ob_start();
+	?>
+<section class="ewp ewp-coming">
+	<div class="ewp-wrap">
+		<h2 class="ewp-comingH"><?php echo esc_html( $atts['heading'] ); ?></h2>
+		<ul class="ewp-comingList">
+			<?php foreach ( $items as $it ) : ?>
+			<li>
+				<?php $tag = '' !== $it[5] ? 'a' : 'div'; ?>
+				<<?php echo $tag; ?> class="ewp-comingCard"<?php
+					if ( '' !== $it[5] ) {
+						echo ' href="' . esc_url( $it[5] ) . '"';
+					} ?>>
+					<p class="ewp-comingWhen">
+						<?php if ( '' !== $it[0] ) : ?><b><?php echo esc_html( $it[0] ); ?></b><?php endif; ?>
+						<?php if ( '' !== $it[1] ) : ?><span><?php echo esc_html( $it[1] ); ?></span><?php endif; ?>
+						<?php if ( '' !== $it[2] ) : ?><i><?php echo esc_html( $it[2] ); ?></i><?php endif; ?>
+					</p>
+					<h3 class="ewp-comingTitle"><?php echo esc_html( $it[3] ); ?></h3>
+					<?php if ( '' !== $it[4] ) : ?>
+					<p class="ewp-comingText"><?php echo esc_html( $it[4] ); ?></p>
+					<?php endif; ?>
+					<?php if ( '' !== $it[5] && '' !== $atts['more'] ) : ?>
+					<p class="ewp-comingMore"><?php echo esc_html( $atts['more'] ); ?>
+						<span aria-hidden="true">&rarr;</span></p>
+					<?php endif; ?>
+				</<?php echo $tag; ?>>
+			</li>
+			<?php endforeach; ?>
+		</ul>
+	</div>
+</section>
+	<?php
+	return ob_get_clean();
+}
+add_shortcode( 'eastwood_home_coming', 'ew_hb_coming_sc' );
+
+
+/* ------------------------------------------------------------------
  * [eastwood_home_player kicker="Shop by player" ask="..." cta="Shop %s"
  *                       all="View all players" all_url="/teams/"
  *                       shop_url="/shop/" shirt="https://.../back.png"]
@@ -2874,6 +2955,31 @@ function ew_hb_css() {
 .ewp-tv.is-shorts .ewp-stripNav{top:179px}
 .ewp-tv .ewp-stripNav.is-prev{left:max(16px,calc(50vw - 640px))}
 .ewp-tv .ewp-stripNav.is-next{right:max(16px,calc(50vw - 640px))}
+/* Coming Up, under the Eastwood TV rows on the same red band. Measured
+   off the reference: the day and time 12 on 12, the name of the thing 24
+   on 24 and bold, the sentence 16 on 24, all white on a red card. */
+.ewp-coming{position:relative;background:#990000;padding:0 0 32px;
+ width:100vw;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw)}
+.ewp-comingH{margin:0 0 24px;padding:0 max(16px,calc(50vw - 624px));color:#fff;text-align:left;
+ font-family:Anton,"Instrument Sans",sans-serif;font-size:40px;line-height:40px;
+ font-weight:400;text-transform:uppercase}
+.ewp-comingList{display:flex;flex-direction:column;gap:16px;list-style:none;margin:0;
+ padding:0 max(16px,calc(50vw - 624px))}
+.ewp-comingCard{display:block;background:#CC0000;border-radius:8px;padding:22px 24px;
+ color:#fff;text-decoration:none;transition:background .15s}
+a.ewp-comingCard:hover{background:#b00000}
+.ewp-comingWhen{display:flex;align-items:center;gap:10px;margin:0 0 10px;
+ font-family:"Instrument Sans",system-ui,sans-serif;font-size:12px;line-height:12px;color:#fff}
+.ewp-comingWhen b{font-weight:400}
+.ewp-comingWhen span{font-weight:700}
+.ewp-comingWhen i{font-style:normal;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+ background:#fff;color:#CC0000;border-radius:2px;padding:3px 7px;font-size:11px;line-height:11px}
+.ewp-comingTitle{margin:0;font-family:Anton,"Instrument Sans",sans-serif;font-size:24px;
+ line-height:24px;font-weight:400;text-transform:uppercase;color:#fff}
+.ewp-comingText{margin:10px 0 0;font-family:"Instrument Sans",system-ui,sans-serif;
+ font-size:16px;line-height:24px;color:rgba(255,255,255,.86)}
+.ewp-comingMore{margin:12px 0 0;font-family:Anton,"Instrument Sans",sans-serif;font-size:14px;
+ line-height:14px;letter-spacing:.09em;text-transform:uppercase;color:#fff}
 .ewp-tvAll{margin:24px 0 0;text-align:center}
 .ewp-tvAll a{font-family:Anton,"Instrument Sans",sans-serif;font-size:14px;letter-spacing:.1em;
  text-transform:uppercase;color:#fff;text-decoration:none;
@@ -2881,6 +2987,9 @@ function ew_hb_css() {
 @media(max-width:820px){
  .ewp-tvMark{font-size:30px;line-height:30px;margin-bottom:24px}
  .ewp-tvHead{font-size:22px;line-height:22px;margin-bottom:24px}
+ .ewp-comingH{font-size:22px;line-height:22px;margin-bottom:24px}
+ .ewp-comingCard{padding:18px 18px}
+ .ewp-comingTitle{font-size:20px;line-height:22px}
  .ewp-tv .ewp-stripNav{display:none}
  .ewp-tv.is-shorts .ewp-tvSlide{flex:0 0 160px;max-width:160px}
  .ewp-tv.is-shorts .ewp-tvCard{width:160px;height:284px}
