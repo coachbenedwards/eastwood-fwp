@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.5.0
+ * Version: 3.5.1
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -3549,7 +3549,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.5.0';
+const EW_FWP_VERSION = '3.5.1';
 
 /*
  * Parts loader.
@@ -5565,14 +5565,35 @@ function ew_fwp_fetch( $endpoint, $args = array(), $raw = false ) {
 function ew_fwp_fix_names( $node ) {
 	if ( is_array( $node ) ) {
 		foreach ( $node as $k => $v ) {
-			if ( 'name' === $k && is_string( $v ) && 'eastwood cfc' === strtolower( trim( $v ) ) ) {
-				$node[ $k ] = 'Eastwood FC';
+			if ( 'name' === $k && is_string( $v ) ) {
+				$node[ $k ] = ew_fix_club_name( $v );
 			} else {
 				$node[ $k ] = ew_fwp_fix_names( $v );
 			}
 		}
 	}
 	return $node;
+}
+
+/**
+ * Our own name, however a league chose to write it.
+ *
+ * This matched the exact words "Eastwood CFC" and nothing else, which was
+ * enough while the first team was the only side on a feed. The other
+ * sides are on FA Full-Time under "Eastwood CFC Development" and
+ * "Eastwood CFC U19 Red", and those went straight through untouched.
+ *
+ * The prefix is replaced and whatever follows is kept, so a new side
+ * needs no code. Only our own name is touched: "Eastwood & Kimberley
+ * F.C." play in the same division as the Development side and are a
+ * different club, so they keep their name.
+ */
+function ew_fix_club_name( $name ) {
+	$name = trim( (string) $name );
+	if ( 0 === stripos( $name, 'eastwood cfc' ) ) {
+		return trim( 'Eastwood FC' . substr( $name, strlen( 'Eastwood CFC' ) ) );
+	}
+	return $name;
 }
 
 /**
