@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.2.7
+ * Version: 3.2.8
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -3416,7 +3416,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.2.7';
+const EW_FWP_VERSION = '3.2.8';
 
 /*
  * Parts loader.
@@ -4559,6 +4559,61 @@ function ew_topbar_anchor( $html, $label ) {
 	}
 	return substr( $html, $open, ( $at + strlen( $needle ) ) - $open );
 }
+
+/**
+ * The top bar, corrected in the page itself.
+ *
+ * The rewrite pass below cannot reach this bar. Its own readout says the
+ * word is not in what it is handed, on a page that plainly carries it,
+ * and three releases spent on better string matching changed nothing --
+ * the markup simply is not in that buffer. The bar is hard-coded in the
+ * theme header, so the other way to fix it is to redeploy the theme,
+ * which is a slower channel and leaves the same problem for the next
+ * wording change.
+ *
+ * So it is done where the bar definitely exists. The observer catches
+ * the nav the moment it is parsed, which is before the browser paints
+ * it, and stops as soon as it has done its work. Everything it does is
+ * safe to run twice, so nothing here fights the pass below if that ever
+ * starts seeing the header again.
+ *
+ * When the theme is next rebuilt, this belongs in header.php and can go.
+ */
+function ew_topbar_script() {
+	$venue  = esc_url( home_url( '/thevenue/' ) );
+	$events = esc_url( home_url( '/events/' ) );
+
+	return '<script id="ew-topbar">(function(){'
+		. 'var obs=null,done=false;'
+		. 'function words(a){var p=a.querySelector("p");return p?p.textContent.trim():"";}'
+		. 'function fix(){'
+		. 'if(done){return;}'
+		. 'var links=document.querySelectorAll("header a");'
+		. 'if(!links.length){return;}'
+		. 'var venue=null,spon=null,i,t;'
+		. 'for(i=0;i<links.length;i++){t=words(links[i]);'
+		. 'if(t==="The Venue"||t==="Venue Hire"){venue=links[i];}'
+		. 'if(t==="Sponsorship"){spon=links[i];}}'
+		. 'if(!venue||!spon){return;}'
+		. 'var p=venue.querySelector("p");if(p){p.textContent="Venue Hire";}'
+		. 'venue.setAttribute("href",' . wp_json_encode( $venue ) . ');'
+		. 'venue.setAttribute("title","Venue Hire");'
+		. 'if(spon.nextSibling!==venue){spon.parentNode.insertBefore(venue,spon.nextSibling);}'
+		. 'if(!document.getElementById("ew-nav-events")){'
+		. 'var ev=venue.cloneNode(true);ev.id="ew-nav-events";'
+		. 'var ep=ev.querySelector("p");if(ep){ep.textContent="Events";}'
+		. 'ev.setAttribute("href",' . wp_json_encode( $events ) . ');'
+		. 'ev.setAttribute("title","Events");'
+		. 'var u=ev.querySelector("use");if(u){u.setAttribute("href","#ew-events");}'
+		. 'venue.parentNode.insertBefore(ev,venue.nextSibling);}'
+		. 'done=true;if(obs){obs.disconnect();}}'
+		. 'obs=new MutationObserver(fix);'
+		. 'obs.observe(document.documentElement,{childList:true,subtree:true});'
+		. 'document.addEventListener("DOMContentLoaded",fix);'
+		. 'setTimeout(function(){if(obs){obs.disconnect();}},8000);'
+		. '}());</script>';
+}
+add_action( 'wp_head', function () { echo ew_topbar_script(); }, 1 );
 
 function ew_rewrite_topbar( $html ) {
 	$log = array();
