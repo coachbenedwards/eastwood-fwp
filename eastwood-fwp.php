@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.7.0
+ * Version: 3.7.1
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -3577,7 +3577,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.7.0';
+const EW_FWP_VERSION = '3.7.1';
 
 /*
  * Parts loader.
@@ -6604,22 +6604,26 @@ function ew_footer_add_history( $html ) {
 }
 
 /**
- * The second company, named under the first in the footer.
+ * Both companies at the foot of the site, and the address once.
  *
  * The club is two entities: Eastwood Community Football Club CIC, which
  * runs the football, and Eastwood FC Ventures Ltd, which runs the
- * commercial side. Only the CIC was named at the foot of the site, so
- * anyone buying a shirt or hiring the room had no way of telling who
- * they were dealing with.
+ * commercial side. Only the CIC was named, so anyone buying a shirt or
+ * hiring the room had no way of telling who they were dealing with.
  *
- * Both are read off Companies House rather than written from memory,
- * because a company number and a registered office on a website are a
- * statement of fact and the wrong one is worse than none. Ventures is
- * 17358254, incorporated 23 July 2026, registered at the ground.
+ * They share a building, so the address is printed once rather than
+ * twice under two company names, which only reads as a mistake.
  *
- * The line is spliced into the theme footer rather than edited into the
- * theme, the same way the Club History link is, so a theme update
- * cannot quietly take it away again.
+ * The copyright names the club rather than either company. Both own
+ * different things -- match reports and squad pages are the CIC\'s, the
+ * badge and the documentary are Ventures\' -- so any single-entity
+ * notice would be wrong about half the site. A notice does not decide
+ * ownership in any case; the contracts do.
+ *
+ * Numbers are from Companies House, not memory: 09196902 and 17358254.
+ *
+ * Spliced into the theme footer the same way the Club History link is,
+ * so a theme update cannot quietly take it away again.
  */
 function ew_footer_add_ventures( $html ) {
 	if ( false !== strpos( $html, '17358254' ) ) {
@@ -6627,22 +6631,29 @@ function ew_footer_add_ventures( $html ) {
 	}
 
 	$needle = 'Company no. 09196902';
-	$pos    = strpos( $html, $needle );
-	if ( false === $pos ) {
+	$at     = strpos( $html, $needle );
+	if ( false === $at ) {
 		return $html;
 	}
 
-	// The end of the paragraph the CIC line sits in.
-	$close = strpos( $html, '</p>', $pos );
+	// The whole paragraph the CIC line sits in, which is replaced rather
+	// than added to -- the address belongs to both and is said once.
+	$open = strrpos( substr( $html, 0, $at ), '<p' );
+	if ( false === $open ) {
+		return $html;
+	}
+	$close = strpos( $html, '</p>', $at );
 	if ( false === $close ) {
 		return $html;
 	}
 	$close += strlen( '</p>' );
 
-	$line = '<p>Eastwood FC Ventures Ltd &middot; Company no. 17358254 &middot; '
-		. 'Eastwood Football Club, Chewton Street, Eastwood NG16 3HB</p>';
+	$lines = '<p>Eastwood Community Football Club CIC (09196902)'
+		. ' &middot; Eastwood FC Ventures Ltd (17358254)</p>'
+		. '<p>Coronation Park, Chewton Street, Eastwood NG16 3HB'
+		. ' &middot; &copy; Eastwood Football Club</p>';
 
-	return substr_replace( $html, $line, $close, 0 );
+	return substr_replace( $html, $lines, $open, $close - $open );
 }
 
 function ew_sponsorship_content() {
