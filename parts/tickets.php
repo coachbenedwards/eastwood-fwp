@@ -200,7 +200,7 @@ function ew_tix_shortcode( $atts, $content = null ) {
 		'name_label'  => 'Name',
 		'email_label' => 'Email · your tickets are sent here',
 		'continue'    => 'Continue to payment',
-		'need'        => 'Please add your name and email.',
+		'need'        => 'Please add your email.',
 		'crm_hook'    => '',
 		'upsell'        => '',
 		'upsell_title'  => '',
@@ -282,8 +282,7 @@ function ew_tix_shortcode( $atts, $content = null ) {
 		$h .= '<p class="ewt-note">' . esc_html( $a['note'] ) . '</p>';
 	}
 	$h .= '<div class="ewt-co" hidden><h3 class="ewt-co-title">' . esc_html( $a['co_title'] ) . '</h3><div class="ewt-lines"></div>';
-	$h .= '<form class="ewt-who" novalidate><label><span>' . esc_html( $a['name_label'] ) . '</span><input type="text" name="name" autocomplete="name" required></label>';
-	$h .= '<label><span>' . esc_html( $a['email_label'] ) . '</span><input type="email" name="email" autocomplete="email" required></label>';
+	$h .= '<form class="ewt-who" novalidate><label><span>' . esc_html( $a['email_label'] ) . '</span><input type="email" name="email" autocomplete="email" required></label>';
 	$h .= '<button type="submit" class="ewt-go">' . esc_html( $a['continue'] ) . '</button></form>';
 	$h .= '<div class="ewt-mount"></div><p class="ewt-msg"></p></div>';
 	$h .= '<div class="ewt-bar"><div class="ewt-bar-in"><span class="ewt-bar-lines"></span><span class="ewt-bar-tot">£0</span><button type="button" class="ewt-go">' . esc_html( $a['checkout'] ) . '</button></div></div>';
@@ -343,8 +342,8 @@ add_action( 'rest_api_init', function () {
 			$event = (string) ( $block['fields']['event'] ?? get_the_title( $post ) );
 			$name  = trim( sanitize_text_field( (string) $req->get_param( 'name' ) ) );
 			$email = sanitize_email( (string) $req->get_param( 'email' ) );
-			if ( '' === $name || ! is_email( $email ) ) {
-				return new WP_Error( 'ewt_who', (string) ( $block['fields']['need'] ?? 'Please add your name and email.' ), array( 'status' => 400 ) );
+			if ( ! is_email( $email ) ) {
+				return new WP_Error( 'ewt_who', (string) ( $block['fields']['need'] ?? 'Please add your email.' ), array( 'status' => 400 ) );
 			}
 
 			$body  = array(
@@ -551,12 +550,12 @@ function ewStripeCheckout(stripe, opts){
       if(checkout)return;
       who.hidden=false; msg.textContent='';
       bar.classList.remove('ewt-on');
-      var f=who.querySelector('input[name=name]'); if(f&&!f.value)setTimeout(function(){f.focus({preventScroll:true});},400);
+      var f=who.querySelector('input[name=email]'); if(f&&!f.value)setTimeout(function(){f.focus({preventScroll:true});},400);
     });
     who.addEventListener('submit',function(e){
       e.preventDefault();
-      var name=who.querySelector('[name=name]').value.trim(), email=who.querySelector('[name=email]').value.trim();
-      if(!name||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){msg.textContent=root.dataset.need;return;}
+      var name='', email=who.querySelector('[name=email]').value.trim();
+      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){msg.textContent=root.dataset.need;return;}
       if(checkout)return;
       msg.textContent=root.dataset.loading;
       var stripe=window.Stripe(root.dataset.pk);

@@ -171,7 +171,7 @@ function ew_tix_booking_start( $post, $event, $name, $email, $lines, $total, $ho
 	$id = wp_insert_post( array(
 		'post_type'   => 'ewt_booking',
 		'post_status' => 'publish',
-		'post_title'  => $name,
+		'post_title'  => '' !== (string) $name ? $name : $email,
 	) );
 	if ( ! $id || is_wp_error( $id ) ) {
 		return 0;
@@ -260,6 +260,12 @@ function ew_tix_after_pay( $page_id, $a, $session_id ) {
 		update_post_meta( $bid, '_ewt_status', 'paid' );
 		update_post_meta( $bid, '_ewt_paid', (int) ( $s['amount_total'] ?? 0 ) );
 		update_post_meta( $bid, '_ewt_session', $s['id'] );
+		// Only the email is asked for, so the name comes from the card.
+		$who = trim( (string) ( $s['customer_details']['name'] ?? '' ) );
+		if ( '' !== $who ) {
+			update_post_meta( $bid, '_ewt_name', $who );
+			wp_update_post( array( 'ID' => $bid, 'post_title' => $who ) );
+		}
 		ew_tix_crm( $a['crm_hook'], $bid, 'paid' );
 	}
 
