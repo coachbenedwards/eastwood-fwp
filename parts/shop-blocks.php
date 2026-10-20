@@ -751,6 +751,9 @@ add_action( 'rest_api_init', function () {
 				$msg = (string) ( $j['error']['message'] ?? 'Stripe refused the order.' );
 				return new WP_Error( 'ewsh_stripe', $msg, array( 'status' => 400 ) );
 			}
+			if ( (int) $booking && ! empty( $j['id'] ) ) {
+				update_post_meta( (int) $booking, '_ewt_open_session', (string) $j['id'] );
+			}
 			return array( 'clientSecret' => $j['client_secret'] );
 		},
 	) );

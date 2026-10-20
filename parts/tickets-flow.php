@@ -188,9 +188,35 @@ function ew_tix_booking_start( $post, $event, $name, $email, $lines, $total, $ho
 	) as $k => $v ) {
 		update_post_meta( $id, '_ewt_' . $k, $v );
 	}
+	update_post_meta( $id, '_ewt_hook', (string) $hook );
 	ew_tix_crm( $hook, $id, 'started' );
+	wp_schedule_single_event( time() + HOUR_IN_SECONDS, 'ew_tix_remind', array( (int) $id ) );
 	return (int) $id;
 }
+
+/**
+ * An hour after someone starts checkout: if they still have not paid, tell
+ * the CRM "reminder" so it can send the nudge email. Stripe is asked first,
+ * so someone who paid but closed the tab before coming back is not nudged.
+ */
+add_action( 'ew_tix_remind', function ( $id ) {
+	$id = (int) $id;
+	if ( 'ewt_booking' !== get_post_type( $id ) || 'started' !== get_post_meta( $id, '_ewt_status', true ) ) {
+		return;
+	}
+	$sid = (string) get_post_meta( $id, '_ewt_open_session', true );
+	if ( '' !== $sid && '' !== ew_tix_sk() ) {
+		$s = ew_tix_stripe( 'GET', 'checkout/sessions/' . rawurlencode( $sid ) );
+		if ( empty( $s['id'] ) ) {
+			return; // Stripe could not be asked; better no nudge than a wrong one.
+		}
+		if ( 'paid' === ( $s['payment_status'] ?? '' ) ) {
+			return;
+		}
+	}
+	update_post_meta( $id, '_ewt_reminded', time() );
+	ew_tix_crm( (string) get_post_meta( $id, '_ewt_hook', true ), $id, 'reminder' );
+} );
 
 /** Find the Booking a Stripe session belongs to. */
 function ew_tix_booking_for( $session ) {

@@ -424,6 +424,9 @@ add_action( 'rest_api_init', function () {
 				$msg = (string) ( $j['error']['message'] ?? 'Stripe refused the booking.' );
 				return new WP_Error( 'ewt_stripe', $msg, array( 'status' => 400 ) );
 			}
+			if ( $bid && ! empty( $j['id'] ) ) {
+				update_post_meta( $bid, '_ewt_open_session', (string) $j['id'] );
+			}
 			return array( 'clientSecret' => $j['client_secret'] );
 		},
 	) );
