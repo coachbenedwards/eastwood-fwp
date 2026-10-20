@@ -589,7 +589,7 @@ function ewStripeCheckout(stripe, opts){
     pick.appendChild(o);
    });
    pick.addEventListener('change', function(){
-    var pl = squad[Number(pick.value)];
+    var pl = '' === pick.value ? null : squad[Number(pick.value)];
     if(pl){
      var last = pl.w.split(' ').pop().toUpperCase().replace(/[^A-Z '-]/g, '');
      nm.value = last.slice(0, P.max);
