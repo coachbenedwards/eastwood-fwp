@@ -10,7 +10,13 @@
  * One ticket type per line: name | price in pounds | small tag | what is
  * included, separated by semicolons | places it uses (blank = 1; a table
  * of ten is 10). cap="160" on the block limits the places sold in total,
- * counted from paid Stripe bookings for this page. A blank price shows the "to be
+ * counted from paid Stripe bookings for this page.
+ *
+ * One card can be the featured one: feature="3" picks the third line, then
+ * banner="Drinks on us" runs across its top, stamp="10" with
+ * stamp_small="Seats" draws the round stamp, and bonus_head="On the house"
+ * with bonus="10 pints; 2 bottles of wine" draws the drinks panel (a line
+ * mentioning wine gets the bottle, anything else the pint glass). A blank price shows the "to be
  * confirmed" wording and the ticket cannot be added until a price is set.
  *
  * Every word the block shows is a field or a line on the block, so a person
@@ -117,6 +123,12 @@ function ew_tix_shortcode( $atts, $content = null ) {
 		'thanks'   => 'You are in. Your receipt is on its way to your email.',
 		'cap'      => '',
 		'soldout'  => 'Sold out',
+		'feature'     => '',
+		'banner'      => '',
+		'stamp'       => '',
+		'stamp_small' => '',
+		'bonus_head'  => '',
+		'bonus'       => '',
 	), $atts, 'eastwood_tickets' );
 
 	$tix = ew_tix_lines( $content );
@@ -147,11 +159,32 @@ function ew_tix_shortcode( $atts, $content = null ) {
 	$h .= '<div class="ewt-grid ewt-n' . min( 4, count( $tix ) ) . '">';
 	foreach ( $tix as $i => $t ) {
 		$on  = $t['pence'] > 0;
-		$out = $on && $left < $t['seats'];
-		$h .= '<div class="ewt-card' . ( $on && ! $out ? '' : ' ewt-off' ) . '" data-i="' . (int) $i . '" data-p="' . (int) $t['pence'] . '" data-n="' . esc_attr( $t['name'] ) . '">';
+		$out  = $on && $left < $t['seats'];
+		$feat = (int) $a['feature'] === $i + 1;
+		$h .= '<div class="ewt-card' . ( $on && ! $out ? '' : ' ewt-off' ) . ( $feat ? ' ewt-feat' : '' ) . ( $feat && '' !== $a['banner'] ? ' ewt-has-banner' : '' ) . '" data-i="' . (int) $i . '" data-p="' . (int) $t['pence'] . '" data-n="' . esc_attr( $t['name'] ) . '">';
+		if ( $feat && '' !== $a['banner'] ) {
+			$h .= '<p class="ewt-banner">' . esc_html( $a['banner'] ) . '</p>';
+		}
+		if ( $feat && '' !== $a['stamp'] ) {
+			$h .= '<p class="ewt-stamp">' . ( '' !== $a['stamp_small'] ? '<small>' . esc_html( $a['stamp_small'] ) . '</small>' : '' ) . '<b>' . esc_html( $a['stamp'] ) . '</b></p>';
+		}
 		$h .= '<p class="ewt-tag">' . esc_html( $t['tag'] ) . '</p>';
 		$h .= '<h3 class="ewt-name">' . esc_html( $t['name'] ) . '</h3>';
-		$h .= '<p class="ewt-price">' . esc_html( $on ? ew_tix_money( $t['pence'] ) : $a['tbc'] ) . ( $on ? '<small>' . esc_html( $a['each'] ) . '</small>' : '' ) . '</p>';
+		$h .= '<p class="ewt-price">' . esc_html( $on ? ew_tix_money( $t['pence'] ) : $a['tbc'] ) . ( $on && '' !== $a['each'] ? '<small>' . esc_html( $a['each'] ) . '</small>' : '' ) . '</p>';
+		if ( $feat && '' !== trim( $a['bonus'] ) ) {
+			$h .= '<div class="ewt-bonus">';
+			if ( '' !== $a['bonus_head'] ) {
+				$h .= '<p class="ewt-bonus-head">' . esc_html( $a['bonus_head'] ) . '</p>';
+			}
+			$h .= '<div class="ewt-drinks">';
+			foreach ( array_filter( array_map( 'trim', explode( ';', $a['bonus'] ) ) ) as $d ) {
+				$num  = preg_match( '/^(\d+)\s*(.*)$/', $d, $m ) ? $m[1] : '';
+				$word = $num ? $m[2] : $d;
+				$icon = false !== stripos( $d, 'wine' ) ? 'M10 2h4v4.5c0 1 2 2.2 2 4.5V21a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V11c0-2.3 2-3.5 2-4.5zM8 13h8' : 'M6 4h10l-1.2 16H7.2zM6.3 8h9.4M16 9h2a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-2.6';
+				$h   .= '<div class="ewt-drink"><svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><path d="' . $icon . '"/></svg><div>' . ( $num ? '<strong>' . esc_html( $num ) . '</strong>' : '' ) . '<em>' . esc_html( $word ) . '</em></div></div>';
+			}
+			$h .= '</div></div>';
+		}
 		if ( $t['inc'] ) {
 			$h .= '<ul class="ewt-inc">';
 			foreach ( $t['inc'] as $li ) {
@@ -301,6 +334,20 @@ function ew_tix_css() {
 .ewt-grid.ewt-n4{grid-template-columns:repeat(4,1fr)}
 .ewt-card{background:var(--ewt-card);border:1px solid var(--ewt-line);display:flex;flex-direction:column;padding:28px;text-align:left}
 .ewt-card.ewt-sel{border-color:rgba(232,213,176,.7)}
+.ewt-card{position:relative}
+.ewt-card.ewt-feat{border-color:rgba(232,213,176,.75);background:linear-gradient(180deg,#2c231b,#231c16);transform:translateY(-14px);box-shadow:0 18px 40px rgba(0,0,0,.45)}
+.ewt .ewt-banner{position:absolute;top:-1px;left:-1px;right:-1px;background:var(--ewt-cream);color:#1b140f;text-align:center;font-family:Anton,Impact,sans-serif;letter-spacing:.14em;text-transform:uppercase;font-size:14px;padding:8px;margin:0}
+.ewt-card.ewt-has-banner .ewt-tag{margin-top:30px}
+.ewt .ewt-stamp{position:absolute;top:58px;right:22px;width:88px;height:88px;border:1.5px solid var(--ewt-cream);border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--ewt-cream);transform:rotate(-10deg);margin:0}
+.ewt-stamp small{font-size:10px;letter-spacing:.14em;text-transform:uppercase}
+.ewt-stamp b{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:30px;line-height:1}
+.ewt-bonus{border:1px solid rgba(232,213,176,.55);background:rgba(232,213,176,.06);padding:16px 18px;margin-bottom:22px}
+.ewt .ewt-bonus-head{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--ewt-cream);margin-bottom:12px}
+.ewt-drinks{display:flex;gap:22px;flex-wrap:wrap}
+.ewt-drink{display:flex;align-items:center;gap:10px;color:var(--ewt-cream)}
+.ewt-drink svg{stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ewt-drink strong{display:block;font-family:Anton,Impact,sans-serif;font-weight:400;font-size:28px;line-height:1}
+.ewt-drink em{font-style:normal;font-size:13px;color:var(--ewt-txt);display:block;line-height:1.2}
 .ewt .ewt-tag{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ewt-mut);min-height:18px}
 .ewt .ewt-name{font-family:Anton,Impact,sans-serif;font-weight:400;text-transform:uppercase;color:var(--ewt-cream);font-size:30px;line-height:1.05;margin:8px 0 6px;background:none;padding:0}
 .ewt .ewt-price{font-family:Anton,Impact,sans-serif;font-size:46px;color:var(--ewt-cream);line-height:1;margin:6px 0 16px}
@@ -330,7 +377,7 @@ function ew_tix_css() {
 .ewt-bar-tot{font-family:Anton,Impact,sans-serif;font-size:30px;color:var(--ewt-cream)}
 .ewt-go{background:var(--ewt-cream);color:#1b140f;border:0;font-family:Anton,Impact,sans-serif;text-transform:uppercase;letter-spacing:.06em;font-size:18px;padding:15px 34px;cursor:pointer}
 .ewt-go:hover{background:#f3e6c8}
-@media(max-width:900px){.ewt-grid,.ewt-grid.ewt-n2,.ewt-grid.ewt-n4{grid-template-columns:1fr}.ewt-bar-lines{display:none}.ewt-bar-in{justify-content:space-between}}
+@media(max-width:900px){.ewt-card.ewt-feat{transform:none;margin-top:10px}.ewt-grid,.ewt-grid.ewt-n2,.ewt-grid.ewt-n4{grid-template-columns:1fr}.ewt-bar-lines{display:none}.ewt-bar-in{justify-content:space-between}}
 CSS;
 }
 
