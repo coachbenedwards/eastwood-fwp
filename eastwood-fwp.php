@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.3.0
+ * Version: 3.3.1
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -3416,7 +3416,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.3.0';
+const EW_FWP_VERSION = '3.3.1';
 
 /*
  * Parts loader.
@@ -5369,7 +5369,20 @@ add_action( 'wp_enqueue_scripts', 'ew_history_assets', 22 );
  * should render for a crawler that runs no JavaScript.
  */
 function ew_fwp_fetch( $endpoint, $args = array(), $raw = false ) {
-	$args = array_merge( array( 'team' => EW_TEAM ), $args );
+	/*
+	 * The match endpoint is addressed by match id alone. Sending team as
+	 * well comes back empty, and because every read went through here the
+	 * team was bolted on invisibly -- which turned 29 of the 41 match
+	 * links on the fixtures page into "Page not found", every result among
+	 * them. The browser-side proxy already strips team for this endpoint
+	 * and has done from the start; that is why the same id answered there
+	 * and 404ed here. The rule now lives on both sides of the fence.
+	 */
+	if ( 'match' === $endpoint ) {
+		unset( $args['team'] );
+	} else {
+		$args = array_merge( array( 'team' => EW_TEAM ), $args );
+	}
 	$url  = add_query_arg( $args, 'https://api.footballwebpages.co.uk/v2/' . $endpoint . '.json' );
 	$key  = 'ewhome_' . md5( $url );
 
@@ -5853,6 +5866,18 @@ function ew_match_data( $id ) {
 	if ( ! $id ) {
 		return array();
 	}
+	/*
+	 * A cup tie the feed does not carry at all is added by hand in
+	 * ew_fixture_adds(), and its link is printed on the homepage and the
+	 * fixtures page exactly like a feed game. Without this it was the one
+	 * fixture on the site whose own page said "Page not found".
+	 */
+	foreach ( ew_fixture_adds() as $add ) {
+		if ( (int) ( $add['id'] ?? 0 ) === $id ) {
+			return (array) $add;
+		}
+	}
+
 	$d = ew_fwp_fetch( 'match', array( 'match' => $id ) );
 	unset( $d['team'] );
 	return (array) ( $d['match'] ?? array() );
