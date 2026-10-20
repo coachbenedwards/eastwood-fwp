@@ -213,6 +213,52 @@ function ew_ft_parse( $html, $src ) {
 }
 
 /**
+ * Fetch one division page, and remember how it went.
+ *
+ * The outcome is kept beside the page because "nothing read" on the
+ * Fixtures screen is useless on its own: a page that was refused and a
+ * page that came back fine but whose markup moved look identical from
+ * the outside, and they need completely different fixes.
+ *
+ * A browser user agent is sent. Full-Time is an ordinary public website
+ * rather than a feed, and the default WordPress agent is the kind of
+ * thing a site refuses out of hand.
+ */
+function ew_ft_get( $src ) {
+	$cache = 'ew_ft_' . md5( ew_ft_url( $src ) );
+	$got   = get_transient( $cache );
+	if ( is_array( $got ) ) {
+		return $got;
+	}
+
+	$res = wp_remote_get( ew_ft_url( $src ), array(
+		'timeout'    => 20,
+		'user-agent' => 'Mozilla/5.0 (compatible; EastwoodFC/1.0; +https://eastwoodfc.com)',
+		'headers'    => array(
+			'Accept'          => 'text/html,application/xhtml+xml',
+			'Accept-Language' => 'en-GB,en;q=0.9',
+		),
+	) );
+
+	$got = array( 'html' => '', 'http' => 0, 'error' => '', 'bytes' => 0 );
+	if ( is_wp_error( $res ) ) {
+		$got['error'] = $res->get_error_message();
+	} else {
+		$got['http']  = (int) wp_remote_retrieve_response_code( $res );
+		$body         = (string) wp_remote_retrieve_body( $res );
+		$got['bytes'] = strlen( $body );
+		if ( 200 === $got['http'] ) {
+			$got['html'] = $body;
+		}
+	}
+
+	// A page that did not come back is retried soon; one that did is left
+	// alone for a while, the same shape as the other reader.
+	set_transient( $cache, $got, '' === $got['html'] ? 5 * MINUTE_IN_SECONDS : 30 * MINUTE_IN_SECONDS );
+	return $got;
+}
+
+/**
  * One side's fixtures, cached, corrected, ready to render.
  *
  * The cache holds the page as it arrived and the corrections go on
@@ -231,21 +277,8 @@ function ew_ft_matches( $key, $raw = false ) {
 	}
 	$src = $sources[ $key ];
 
-	$cache = 'ew_ft_' . md5( ew_ft_url( $src ) );
-	$html  = get_transient( $cache );
-
-	if ( false === $html ) {
-		$res = wp_remote_get( ew_ft_url( $src ), array(
-			'timeout' => 15,
-			'headers' => array( 'Accept' => 'text/html' ),
-		) );
-		$html = ( ! is_wp_error( $res ) && 200 === (int) wp_remote_retrieve_response_code( $res ) )
-			? wp_remote_retrieve_body( $res )
-			: '';
-		// A page that did not come back is retried soon; one that did is
-		// left alone for a while, the same shape as the other reader.
-		set_transient( $cache, $html, '' === $html ? 5 * MINUTE_IN_SECONDS : 30 * MINUTE_IN_SECONDS );
-	}
+	$got  = ew_ft_get( $src );
+	$html = $got['html'];
 
 	$matches = ew_ft_parse( $html, $src );
 	return $raw ? $matches : ew_fwp_corrections( $matches );
@@ -272,11 +305,30 @@ function ew_ft_report() {
 				break;
 			}
 		}
+		$got  = ew_ft_get( $src );
+		$rows = 0;
+		if ( '' !== $got['html'] ) {
+			$rows = substr_count( $got['html'], 'home-team' );
+		}
+
+		if ( '' !== $got['error'] ) {
+			$why = 'could not reach Full-Time: ' . $got['error'];
+		} elseif ( 200 !== $got['http'] ) {
+			$why = 'Full-Time answered ' . $got['http'];
+		} elseif ( ! $rows ) {
+			$why = 'page read (' . $got['bytes'] . ' bytes) but no fixture rows in it';
+		} elseif ( ! count( $matches ) ) {
+			$why = $rows . ' rows read, none of them ours — check the team name';
+		} else {
+			$why = '';
+		}
+
 		$out[ $key ] = array(
 			'label' => $src['label'],
 			'comp'  => $src['comp'],
 			'found' => count( $matches ),
 			'next'  => $next,
+			'why'   => $why,
 		);
 	}
 	return $out;
