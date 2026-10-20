@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.5.1
+ * Version: 3.6.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1169,6 +1169,34 @@ function ew_fixtures_admin_page() {
 	$clashes = ew_fixture_clashes();
 	$live    = ew_fixture_fixes();
 	$all     = ew_fixtures_league_list();
+
+	/*
+	 * The sides that come from FA Full-Time rather than Football Web
+	 * Pages. Full-Time publishes no feed, so their pages are read as
+	 * they stand -- which works until the FA changes the markup, and
+	 * the only sign of that would otherwise be a tab quietly going
+	 * empty. It says here what the last read actually found.
+	 */
+	if ( function_exists( 'ew_ft_report' ) ) {
+		echo '<h2>Other sides, from FA Full-Time</h2>';
+		echo '<table class="widefat striped" style="max-width:900px"><thead><tr>'
+			. '<th>Side</th><th>League</th><th>Fixtures read</th><th>Next up</th>'
+			. '</tr></thead><tbody>';
+		foreach ( ew_ft_report() as $row ) {
+			printf(
+				'<tr><td><strong>%s</strong></td><td>%s</td><td>%s</td><td>%s</td></tr>',
+				esc_html( $row['label'] ),
+				esc_html( $row['comp'] ),
+				$row['found']
+					? esc_html( (string) $row['found'] )
+					: '<span style="color:#b32d2e">nothing read</span>',
+				esc_html( '' !== $row['next'] ? $row['next'] : 'no fixture to come' )
+			);
+		}
+		echo '</tbody></table>';
+		echo '<p class="description">These read FA Full-Time directly. A side showing'
+			. ' <em>nothing read</em> means the page did not come back or its shape changed.</p>';
+	}
 
 	// The feed as it arrived, not as the site shows it. The boxes hold
 	// what we say; behind each box is what the league says, and the two
@@ -3549,7 +3577,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.5.1';
+const EW_FWP_VERSION = '3.6.0';
 
 /*
  * Parts loader.
