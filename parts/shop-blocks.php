@@ -109,6 +109,12 @@ function ew_shirt_shortcode( $atts, $content = null ) {
 			'brand'         => '',
 			'fit_label'     => 'Fit',
 			'size_label'    => 'Size',
+			'chart_label'   => 'Size chart',
+			'chart_url'     => '',
+			'in_stock'      => 'In stock',
+			'sold_out'      => 'Sold out',
+			'how_note'      => 'Collect free at the ground, or we post it for {price}.',
+			'share_label'   => 'Share',
 			'ful_label'     => 'How do you want it',
 			'collect_title' => 'Collect at the ground',
 			'collect_note'  => '',
@@ -170,6 +176,10 @@ function ew_shirt_shortcode( $atts, $content = null ) {
 		'empty'     => $a['empty'],
 		'failed'    => $a['failed'],
 		'paybtn'    => $a['pay'],
+		'instock'   => $a['in_stock'],
+		'soldout'   => $a['sold_out'],
+		'hownote'   => $a['how_note'],
+		'sizelab'   => $a['size_label'],
 		'emailbad'  => $a['email_bad'],
 		'title'     => $a['title'],
 		'backpick'  => $a['back_pick'],
@@ -204,24 +214,40 @@ function ew_shirt_shortcode( $atts, $content = null ) {
     <p class="ewsh-sub"><?php echo esc_html( $a['brand'] ); ?></p>
     <p class="ewsh-price" id="ewshPrice"></p>
     <p class="ewsh-note" id="ewshNote"></p>
+    <div class="ewsh-rule"></div>
+    <p class="ewsh-stock" id="ewshStock"></p>
     <p class="ewsh-lab"><?php echo esc_html( $a['fit_label'] ); ?></p>
     <div class="ewsh-fits" id="ewshFits"></div>
-    <p class="ewsh-lab"><?php echo esc_html( $a['size_label'] ); ?></p>
+    <div class="ewsh-sizerow">
+     <p class="ewsh-lab" id="ewshSizeLab"><?php echo esc_html( $a['size_label'] ); ?></p>
+     <?php if ( '' !== $a['chart_url'] ) : ?>
+     <a class="ewsh-chart" href="<?php echo esc_url( $a['chart_url'] ); ?>"><?php echo esc_html( $a['chart_label'] ); ?></a>
+     <?php endif; ?>
+    </div>
     <div class="ewsh-sizes" id="ewshSizes"></div>
     <div class="ewsh-pay" id="ewshPay"></div>
+    <p class="ewsh-how" id="ewshHow"></p>
+    <div class="ewsh-share">
+     <span><?php echo esc_html( $a['share_label'] ); ?></span>
+     <a href="https://www.facebook.com/sharer/sharer.php?u=<?php echo rawurlencode( get_permalink() ); ?>" rel="noopener" target="_blank" aria-label="Share on Facebook"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 8h3V5h-3a4 4 0 0 0-4 4v2H8v3h2v6h3v-6h2.5l.5-3H13V9a1 1 0 0 1 1-1z"/></svg></a>
+     <a href="https://x.com/intent/post?url=<?php echo rawurlencode( get_permalink() ); ?>" rel="noopener" target="_blank" aria-label="Share on X"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+     <a href="mailto:?body=<?php echo rawurlencode( get_permalink() ); ?>" aria-label="Share by email"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></a>
+    </div>
    </div>
 
    <?php /* Once a size is chosen the shirt and the buttons give way to
             this: the same heading on both later steps, a way back, and
             one line saying what they are buying and what it costs. */ ?>
-   <div class="ewsh-head" hidden>
-    <h2><?php echo esc_html( $a['order_title'] ); ?></h2>
-    <p class="ewsh-back">&lsaquo; <button type="button" id="ewshBack"></button></p>
-   </div>
-   <div class="ewsh-sum" hidden>
-    <p id="ewshSumWhat"></p>
-    <p id="ewshSumCost"></p>
-   </div>
+   <div class="ewsh-order" hidden>
+    <div class="ewsh-head">
+     <h2><?php echo esc_html( $a['order_title'] ); ?></h2>
+     <p class="ewsh-back">&lsaquo; <button type="button" id="ewshBack"></button></p>
+    </div>
+    <div class="ewsh-card">
+     <div class="ewsh-sum">
+      <p id="ewshSumWhat"></p>
+      <p id="ewshSumCost"></p>
+     </div>
 
    <?php /* Step two. Collect or post, and the email, before anybody is
             asked for a card -- so the email is ours whether or not they
@@ -250,6 +276,8 @@ function ew_shirt_shortcode( $atts, $content = null ) {
    <div class="ewsh-co" hidden>
     <div class="ewsh-mount"></div>
     <p class="ewsh-msg"></p>
+   </div>
+    </div>
    </div>
   </div>
  </div>
@@ -311,7 +339,7 @@ function ew_shirt_css() {
 		   pixels of difference that were really two larger ones cancelling.
 		   Measured at 390: with this the page is the height it was. */
 		'@media(max-width:767px){.ewsh{padding-left:30px;padding-right:30px}}'
-		. '.ewsh{font-family:"Instrument Sans",system-ui,sans-serif;color:#101010}.ewsh-wrap{display:flex;gap:52px;align-items:flex-start;max-width:1140px;margin:0 auto}.ewsh-gal{flex:0 0 470px;background:#f2f2f2;border-radius:12px;padding:26px 36px 20px}.ewsh-info{flex:1 1 auto;min-width:0}.ewsh-info h1,.ewsh-info h2{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:42px;line-height:1.03;letter-spacing:.5px;text-transform:uppercase;margin:0 0 6px;color:#101010}.ewsh-sub{font-size:14px;color:#777;margin:0 0 22px}.ewsh-price{font-family:Anton,Impact,sans-serif;font-size:38px;margin:0 0 4px;color:#101010}.ewsh-note{font-size:13px;color:#8a8a8a;margin:0 0 26px}.ewsh-lab{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin:0 0 10px}.ewsh-sizes{display:flex;gap:9px;flex-wrap:wrap;margin:0 0 26px}.ewsh-sizes button{min-width:62px;padding:13px 6px;background:#fff;border:1.5px solid #d6d6d6;border-radius:6px;font:inherit;font-size:14px;font-weight:600;cursor:pointer}.ewsh-sizes button.on{border-color:#101010;background:#101010;color:#fff}.ewsh-sizes button[disabled]{color:#c0c0c0;border-style:dashed;cursor:not-allowed;text-decoration:line-through}.ewsh-ful{display:flex;flex-direction:column;gap:10px;margin:0 0 26px}.ewsh-ful label{display:flex;gap:12px;align-items:flex-start;border:1.5px solid #d6d6d6;border-radius:8px;padding:15px 16px;cursor:pointer}.ewsh-ful label.on{border-color:#101010}.ewsh-ful b{display:block;font-size:15px;margin-bottom:3px}.ewsh-ful span span{display:block;font-size:13px;color:#777;line-height:1.45}.ewsh-pay{border:1.5px solid #e2e2e2;border-radius:10px;padding:22px;background:#fafafa}.ewsh-pay p{margin:0;font-size:14px;line-height:1.6;color:#666}.ewsh-pay b{display:block;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#101010;margin-bottom:6px}@media(max-width:900px){.ewsh-wrap{flex-direction:column;gap:26px}.ewsh-gal{flex:1 1 auto;width:100%}} .ewsh-fits{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 18px} .ewsh-fits button{font:700 13px/1 Inter,sans-serif;letter-spacing:.4px;padding:11px 18px; border:1.5px solid #d8d8dc;background:#fff;color:#111;border-radius:4px;cursor:pointer} .ewsh-fits button.on{border-color:#CC0000;background:#CC0000;color:#fff} .ewsh-sizes button[disabled]{opacity:.4;text-decoration:line-through;cursor:not-allowed} .ewsh-sizes button.on{border-color:#CC0000;background:#CC0000;color:#fff}      .ewsh-go{margin:0;width:100%;background:#CC0000;color:#fff;border:0;border-radius:6px;font:700 15px/1 Inter,sans-serif;letter-spacing:.4px;padding:17px 20px;cursor:pointer}      .ewsh-go:not([disabled]):hover{background:#b30000}      .ewsh-go[disabled]{background:#e6e6e8;color:#9b9b9f;cursor:not-allowed}      .ewsh-small{margin:12px 0 0;font-size:13px;color:#777;line-height:1.5}      .ewsh-co{margin:18px 0 0}      .ewsh-mount{background:#fff;border-radius:6px;min-height:40px}      .ewsh-mount:empty{display:none}      .ewsh-msg{margin:10px 0 0;font-size:13px;color:#777}      .ewsh-thanks{border:1.5px solid #CC0000;border-radius:8px;padding:16px 18px;margin:0 0 22px;font-size:15px;color:#101010}      .ewsh-head{margin:0 0 14px}      .ewsh-head h2{margin:0}      .ewsh-back{margin:7px 0 0;font-size:13px;color:#777}      .ewsh-back button{background:none;border:0;padding:0;font:inherit;color:#777;cursor:pointer;text-decoration:underline}      .ewsh-back button:hover{color:#CC0000}      .ewsh-sum{display:flex;justify-content:space-between;align-items:center;gap:16px;background:#fff;border:1.5px solid #e2e2e2;border-radius:10px;padding:14px 18px;margin:0 0 18px}      .ewsh-sum p{margin:0;font-size:14px;color:#555}      .ewsh-sum p+p{font-family:Anton,Impact,sans-serif;font-size:24px;color:#101010;white-space:nowrap}      .ewsh-det{margin:0;border:1.5px solid #e2e2e2;border-radius:10px;padding:22px;background:#fafafa}      .ewsh-det .ewsh-ful{margin:0 0 18px}      .ewsh-sub-lab{margin-top:18px}      .ewsh-flab{display:block;font-size:13px;font-weight:600;margin:0 0 6px}      .ewsh-flab2{margin-top:14px}      .ewsh-email{width:100%;box-sizing:border-box;border:1.5px solid #d6d6d6;border-radius:6px;padding:13px 14px;font:400 15px "Instrument Sans",system-ui,sans-serif;color:#101010;background:#fff}      .ewsh-email:focus{outline:none;border-color:#101010}      .ewsh-fnote{margin:7px 0 0;font-size:12px;color:#777}      .ewsh-check{display:flex;align-items:center;gap:9px;margin:16px 0 20px;font-size:13px;color:#555;cursor:pointer}      .ewsh-cont{margin:0}      .ewsh-err{margin:10px 0 0;font-size:13px;color:#CC0000;font-weight:600}      .ewsh-err:empty{display:none}      .ewsh [hidden]{display:none}      .ewsh-pay{border:0;padding:0;background:none}      .ewsh-pay .ewsh-go{width:auto;min-width:200px;font-size:14px;padding:14px 28px}';
+		. '.ewsh{font-family:"Instrument Sans",system-ui,sans-serif;color:#101010}.ewsh-wrap{display:flex;gap:52px;align-items:flex-start;max-width:1140px;margin:0 auto}.ewsh-gal{flex:0 0 470px;background:#f2f2f2;border-radius:12px;padding:26px 36px 20px}.ewsh-info{flex:1 1 auto;min-width:0}.ewsh-info h1,.ewsh-info h2{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:42px;line-height:1.03;letter-spacing:.5px;text-transform:uppercase;margin:0 0 6px;color:#101010}.ewsh-sub{font-size:14px;color:#777;margin:0 0 22px}.ewsh-price{font-family:Anton,Impact,sans-serif;font-size:38px;margin:0 0 4px;color:#101010}.ewsh-note{font-size:13px;color:#8a8a8a;margin:0 0 26px}.ewsh-lab{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin:0 0 10px}.ewsh-sizes{display:flex;gap:9px;flex-wrap:wrap;margin:0 0 26px}.ewsh-sizes button{min-width:62px;padding:13px 6px;background:#fff;border:1.5px solid #d6d6d6;border-radius:6px;font:inherit;font-size:14px;font-weight:600;cursor:pointer}.ewsh-sizes button.on{border-color:#101010;background:#101010;color:#fff}.ewsh-sizes button[disabled]{color:#c0c0c0;border-style:dashed;cursor:not-allowed;text-decoration:line-through}.ewsh-ful{display:flex;flex-direction:column;gap:10px;margin:0 0 26px}.ewsh-ful label{display:flex;gap:12px;align-items:flex-start;border:1.5px solid #d6d6d6;border-radius:8px;padding:15px 16px;cursor:pointer}.ewsh-ful label.on{border-color:#101010}.ewsh-ful b{display:block;font-size:15px;margin-bottom:3px}.ewsh-ful span span{display:block;font-size:13px;color:#777;line-height:1.45}.ewsh-pay{border:1.5px solid #e2e2e2;border-radius:10px;padding:22px;background:#fafafa}.ewsh-pay p{margin:0;font-size:14px;line-height:1.6;color:#666}.ewsh-pay b{display:block;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#101010;margin-bottom:6px}@media(max-width:900px){.ewsh-wrap{flex-direction:column;gap:26px}.ewsh-gal{flex:1 1 auto;width:100%}} .ewsh-fits{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 18px} .ewsh-fits button{font:700 13px/1 Inter,sans-serif;letter-spacing:.4px;padding:11px 18px; border:1.5px solid #d8d8dc;background:#fff;color:#111;border-radius:4px;cursor:pointer} .ewsh-fits button.on{border-color:#CC0000;background:#CC0000;color:#fff} .ewsh-sizes button[disabled]{opacity:.4;text-decoration:line-through;cursor:not-allowed} .ewsh-sizes button.on{border-color:#CC0000;background:#CC0000;color:#fff}      .ewsh-go{margin:0;width:100%;background:#CC0000;color:#fff;border:0;border-radius:6px;font:700 15px/1 Inter,sans-serif;letter-spacing:.4px;padding:17px 20px;cursor:pointer}      .ewsh-go:not([disabled]):hover{background:#b30000}      .ewsh-go[disabled]{background:#e6e6e8;color:#9b9b9f;cursor:not-allowed}      .ewsh-small{margin:12px 0 0;font-size:13px;color:#777;line-height:1.5}      .ewsh-co{margin:0}      .ewsh-mount{background:#fff;border-radius:6px;min-height:40px}      .ewsh-mount:empty{display:none}      .ewsh-msg{margin:10px 0 0;font-size:13px;color:#777}      .ewsh-thanks{border:1.5px solid #CC0000;border-radius:8px;padding:16px 18px;margin:0 0 22px;font-size:15px;color:#101010}      .ewsh-head{margin:0 0 14px}      .ewsh-head h2{margin:0}      .ewsh-back{margin:7px 0 0;font-size:13px;color:#777}      .ewsh-back button{background:none;border:0;padding:0;font:inherit;color:#777;cursor:pointer;text-decoration:underline}      .ewsh-back button:hover{color:#CC0000}      .ewsh-card{background:#fff;border:1.5px solid #e2e2e2;border-radius:10px;overflow:hidden}      .ewsh-sum{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 18px;border-bottom:1px solid #ececec}      .ewsh-sum p{margin:0;font-size:14px;color:#555}      .ewsh-sum p+p{font-family:Anton,Impact,sans-serif;font-size:24px;color:#101010;white-space:nowrap}      .ewsh-det{margin:0;padding:22px;background:#fafafa}      .ewsh-det .ewsh-ful{margin:0 0 18px}      .ewsh-sub-lab{margin-top:18px}      .ewsh-flab{display:block;font-size:13px;font-weight:600;margin:0 0 6px}      .ewsh-flab2{margin-top:14px}      .ewsh-email{width:100%;box-sizing:border-box;border:1.5px solid #d6d6d6;border-radius:6px;padding:13px 14px;font:400 15px "Instrument Sans",system-ui,sans-serif;color:#101010;background:#fff}      .ewsh-email:focus{outline:none;border-color:#101010}      .ewsh-fnote{margin:7px 0 0;font-size:12px;color:#777}      .ewsh-check{display:flex;align-items:center;gap:9px;margin:16px 0 20px;font-size:13px;color:#555;cursor:pointer}      .ewsh-cont{margin:0}      .ewsh-err{margin:10px 0 0;font-size:13px;color:#CC0000;font-weight:600}      .ewsh-err:empty{display:none}      .ewsh [hidden]{display:none}      .ewsh-stock{margin:0 0 24px;font-size:14px;font-weight:600;color:#1a7f4b}      .ewsh-stock:empty{display:none}      .ewsh-stock.out{color:#8a8a8a}      .ewsh-price{margin-bottom:20px}      .ewsh-rule{height:1px;background:#e2e2e2;margin:0 0 20px}      .ewsh-sizerow{display:flex;justify-content:space-between;align-items:baseline;gap:16px}      .ewsh-chart{font-size:13px;color:#555}      .ewsh-chart:hover{color:#CC0000}      .ewsh-how{display:flex;gap:10px;margin:16px 0 0;font-size:13px;color:#777;line-height:1.5}      .ewsh-how:empty{display:none}      .ewsh-share{display:flex;align-items:center;gap:14px;margin:26px 0 0;padding-top:18px;border-top:1px solid #e2e2e2;color:#555}      .ewsh-share span{font-size:13px;color:#777}      .ewsh-share a{color:#555;display:flex}      .ewsh-share a:hover{color:#CC0000}      .ewsh-order{max-width:460px}      .ewsh-pay{border:0;padding:0;background:none}      .ewsh-pay .ewsh-go{width:100%;font-size:15px;padding:19px 20px}';
 }
 
 /**
@@ -384,6 +412,10 @@ function ewStripeCheckout(stripe, opts){
    w.appendChild(b);
   });
   $('ewshPrice').textContent = money(model[fit].price);
+  var any = model[fit].sizes.some(function(x){ return x.stock; });
+  var st = $('ewshStock');
+  st.textContent = any ? W.instock : W.soldout;
+  st.className = 'ewsh-stock' + (any ? '' : ' out');
  }
 
  function drawSizes(){
@@ -396,6 +428,8 @@ function ewStripeCheckout(stripe, opts){
    b.addEventListener('click', function(){ size = s.size; drawSizes(); drawPay(); });
    w.appendChild(b);
   });
+  var lab = $('ewshSizeLab'), pick = size ? size.slice(fit.length + 1) : '';
+  lab.textContent = pick ? (W.sizelab + ' \u00b7 ' + pick) : W.sizelab;
  }
 
  function drawFul(){
@@ -427,6 +461,7 @@ function ewStripeCheckout(stripe, opts){
    pay.appendChild(btn);
   }
   pay.querySelector('.ewsh-go').disabled = !size;
+  $('ewshHow').textContent = String(W.hownote || '').replace('{price}', money(model[fit].postage));
  }
 
  /* One step on screen at a time. The shirt, the price and the size
@@ -435,11 +470,10 @@ function ewStripeCheckout(stripe, opts){
  function step(s){
   stage = s;
   var later = (s !== 'pick');
-  EL.querySelector('.ewsh-pick').hidden = later;
-  EL.querySelector('.ewsh-head').hidden = !later;
-  EL.querySelector('.ewsh-sum').hidden  = !later;
-  EL.querySelector('.ewsh-det').hidden  = (s !== 'details');
-  EL.querySelector('.ewsh-co').hidden   = (s !== 'pay');
+  EL.querySelector('.ewsh-pick').hidden  = later;
+  EL.querySelector('.ewsh-order').hidden = !later;
+  EL.querySelector('.ewsh-det').hidden   = (s !== 'details');
+  EL.querySelector('.ewsh-co').hidden    = (s !== 'pay');
   if(later){ drawSum(); }
   $('ewshBack').textContent = (s === 'pay') ? W.backdet : W.backpick;
   EL.scrollIntoView({behavior:'smooth', block:'start'});
