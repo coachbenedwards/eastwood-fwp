@@ -118,10 +118,15 @@ function ew_shirt_shortcode( $atts, $content = null ) {
 			'failed'        => 'Could not load the shop just now.',
 			'pay'           => 'Pay by card',
 			'det_title'     => 'Your details',
-			'name_label'    => 'Name',
+			'order_title'   => 'Your order',
+			'back_pick'     => 'Back to the shirt',
+			'back_det'      => 'Back to your details',
+			'sum_collect'   => 'collecting',
+			'sum_post'      => 'posted',
+			'sum_to'        => 'receipt to {email}',
 			'email_label'   => 'Email',
 			'email_note'    => 'Your receipt and anything about the order goes here.',
-			'email_bad'     => 'We need a name and an email to send your receipt to.',
+			'email_bad'     => 'We need an email to send your receipt to.',
 			'consent'       => 'Tell me when new kit and home tickets go on sale',
 			'crm_hook'      => '',
 			'promos'        => '',
@@ -163,11 +168,16 @@ function ew_shirt_shortcode( $atts, $content = null ) {
 		'fits'      => $fits,
 		'collect'   => array( $a['collect_title'], $a['collect_note'] ),
 		'post'      => array( $a['post_title'], $a['post_note'] ),
-		'pay'       => $a['pay_note'],
 		'empty'     => $a['empty'],
 		'failed'    => $a['failed'],
 		'paybtn'    => $a['pay'],
 		'emailbad'  => $a['email_bad'],
+		'title'     => $a['title'],
+		'backpick'  => $a['back_pick'],
+		'backdet'   => $a['back_det'],
+		'sumcol'    => $a['sum_collect'],
+		'sumpost'   => $a['sum_post'],
+		'sumto'     => $a['sum_to'],
 		'loading'   => $a['loading'],
 		'off'       => $a['off'],
 		// The publishable key is public by design; the secret never
@@ -190,15 +200,29 @@ function ew_shirt_shortcode( $atts, $content = null ) {
 	?>
    <p class="ewsh-thanks"><?php echo esc_html( $a['thanks'] ); ?></p>
    <?php endif; ?>
-   <h1><?php echo esc_html( $a['title'] ); ?></h1>
-   <p class="ewsh-sub"><?php echo esc_html( $a['brand'] ); ?></p>
-   <p class="ewsh-price" id="ewshPrice"></p>
-   <p class="ewsh-note" id="ewshNote"></p>
-   <p class="ewsh-lab"><?php echo esc_html( $a['fit_label'] ); ?></p>
-   <div class="ewsh-fits" id="ewshFits"></div>
-   <p class="ewsh-lab"><?php echo esc_html( $a['size_label'] ); ?></p>
-   <div class="ewsh-sizes" id="ewshSizes"></div>
-   <div class="ewsh-pay" id="ewshPay"></div>
+   <div class="ewsh-pick">
+    <h1><?php echo esc_html( $a['title'] ); ?></h1>
+    <p class="ewsh-sub"><?php echo esc_html( $a['brand'] ); ?></p>
+    <p class="ewsh-price" id="ewshPrice"></p>
+    <p class="ewsh-note" id="ewshNote"></p>
+    <p class="ewsh-lab"><?php echo esc_html( $a['fit_label'] ); ?></p>
+    <div class="ewsh-fits" id="ewshFits"></div>
+    <p class="ewsh-lab"><?php echo esc_html( $a['size_label'] ); ?></p>
+    <div class="ewsh-sizes" id="ewshSizes"></div>
+    <div class="ewsh-pay" id="ewshPay"></div>
+   </div>
+
+   <?php /* Once a size is chosen the shirt and the buttons give way to
+            this: the same heading on both later steps, a way back, and
+            one line saying what they are buying and what it costs. */ ?>
+   <div class="ewsh-head" hidden>
+    <h2><?php echo esc_html( $a['order_title'] ); ?></h2>
+    <p class="ewsh-back">&lsaquo; <button type="button" id="ewshBack"></button></p>
+   </div>
+   <div class="ewsh-sum" hidden>
+    <p id="ewshSumWhat"></p>
+    <p id="ewshSumCost"></p>
+   </div>
 
    <?php /* Step two. Collect or post, and the email, before anybody is
             asked for a card -- so the email is ours whether or not they
@@ -211,10 +235,7 @@ function ew_shirt_shortcode( $atts, $content = null ) {
     <p class="ewsh-lab ewsh-sub-lab"><?php echo esc_html( $a['ful_label'] ); ?></p>
     <div class="ewsh-ful" id="ewshFul"></div>
 
-    <label class="ewsh-flab" for="ewshName"><?php echo esc_html( $a['name_label'] ); ?></label>
-    <input class="ewsh-email" id="ewshName" type="text" autocomplete="name">
-
-    <label class="ewsh-flab ewsh-flab2" for="ewshEmail"><?php echo esc_html( $a['email_label'] ); ?></label>
+    <label class="ewsh-flab" for="ewshEmail"><?php echo esc_html( $a['email_label'] ); ?></label>
     <input class="ewsh-email" id="ewshEmail" type="email" autocomplete="email" inputmode="email">
     <p class="ewsh-fnote"><?php echo esc_html( $a['email_note'] ); ?></p>
 
@@ -292,7 +313,7 @@ function ew_shirt_css() {
 		   pixels of difference that were really two larger ones cancelling.
 		   Measured at 390: with this the page is the height it was. */
 		'@media(max-width:767px){.ewsh{padding-left:30px;padding-right:30px}}'
-		. '.ewsh{font-family:"Instrument Sans",system-ui,sans-serif;color:#101010}.ewsh-wrap{display:flex;gap:52px;align-items:flex-start;max-width:1140px;margin:0 auto}.ewsh-gal{flex:0 0 470px;background:#f2f2f2;border-radius:12px;padding:26px 36px 20px}.ewsh-info{flex:1 1 auto;min-width:0}.ewsh-info h1,.ewsh-info h2{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:42px;line-height:1.03;letter-spacing:.5px;text-transform:uppercase;margin:0 0 6px;color:#101010}.ewsh-sub{font-size:14px;color:#777;margin:0 0 22px}.ewsh-price{font-family:Anton,Impact,sans-serif;font-size:38px;margin:0 0 4px;color:#101010}.ewsh-note{font-size:13px;color:#8a8a8a;margin:0 0 26px}.ewsh-lab{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin:0 0 10px}.ewsh-sizes{display:flex;gap:9px;flex-wrap:wrap;margin:0 0 26px}.ewsh-sizes button{min-width:62px;padding:13px 6px;background:#fff;border:1.5px solid #d6d6d6;border-radius:6px;font:inherit;font-size:14px;font-weight:600;cursor:pointer}.ewsh-sizes button.on{border-color:#101010;background:#101010;color:#fff}.ewsh-sizes button[disabled]{color:#c0c0c0;border-style:dashed;cursor:not-allowed;text-decoration:line-through}.ewsh-ful{display:flex;flex-direction:column;gap:10px;margin:0 0 26px}.ewsh-ful label{display:flex;gap:12px;align-items:flex-start;border:1.5px solid #d6d6d6;border-radius:8px;padding:15px 16px;cursor:pointer}.ewsh-ful label.on{border-color:#101010}.ewsh-ful b{display:block;font-size:15px;margin-bottom:3px}.ewsh-ful span span{display:block;font-size:13px;color:#777;line-height:1.45}.ewsh-pay{border:1.5px solid #e2e2e2;border-radius:10px;padding:22px;background:#fafafa}.ewsh-pay p{margin:0;font-size:14px;line-height:1.6;color:#666}.ewsh-pay b{display:block;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#101010;margin-bottom:6px}@media(max-width:900px){.ewsh-wrap{flex-direction:column;gap:26px}.ewsh-gal{flex:1 1 auto;width:100%}} .ewsh-fits{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 18px} .ewsh-fits button{font:700 13px/1 Inter,sans-serif;letter-spacing:.4px;padding:11px 18px; border:1.5px solid #d8d8dc;background:#fff;color:#111;border-radius:4px;cursor:pointer} .ewsh-fits button.on{border-color:#CC0000;background:#CC0000;color:#fff} .ewsh-sizes button[disabled]{opacity:.4;text-decoration:line-through;cursor:not-allowed} .ewsh-sizes button.on{border-color:#CC0000;background:#CC0000;color:#fff}      .ewsh-go{margin:0;width:100%;background:#CC0000;color:#fff;border:0;border-radius:6px;font:700 15px/1 Inter,sans-serif;letter-spacing:.4px;padding:17px 20px;cursor:pointer}      .ewsh-go:not([disabled]):hover{background:#b30000}      .ewsh-go[disabled]{background:#e6e6e8;color:#9b9b9f;cursor:not-allowed}      .ewsh-small{margin:12px 0 0;font-size:13px;color:#777;line-height:1.5}      .ewsh-co{margin:18px 0 0}      .ewsh-mount{background:#fff;border-radius:6px;min-height:40px}      .ewsh-mount:empty{display:none}      .ewsh-msg{margin:10px 0 0;font-size:13px;color:#777}      .ewsh-thanks{border:1.5px solid #CC0000;border-radius:8px;padding:16px 18px;margin:0 0 22px;font-size:15px;color:#101010}      .ewsh-det{margin:22px 0 0;border:1.5px solid #e2e2e2;border-radius:10px;padding:22px;background:#fafafa}      .ewsh-det .ewsh-ful{margin:0 0 18px}      .ewsh-sub-lab{margin-top:18px}      .ewsh-flab{display:block;font-size:13px;font-weight:600;margin:0 0 6px}      .ewsh-flab2{margin-top:14px}      .ewsh-email{width:100%;box-sizing:border-box;border:1.5px solid #d6d6d6;border-radius:6px;padding:13px 14px;font:400 15px "Instrument Sans",system-ui,sans-serif;color:#101010;background:#fff}      .ewsh-email:focus{outline:none;border-color:#101010}      .ewsh-fnote{margin:7px 0 0;font-size:12px;color:#777}      .ewsh-check{display:flex;align-items:center;gap:9px;margin:16px 0 20px;font-size:13px;color:#555;cursor:pointer}      .ewsh-cont{margin:0}      .ewsh-err{margin:10px 0 0;font-size:13px;color:#CC0000;font-weight:600}      .ewsh-err:empty{display:none}      .ewsh-pay{border:0;padding:0;background:none}      .ewsh-pay .ewsh-go{width:auto;min-width:200px;font-size:14px;padding:14px 28px}';
+		. '.ewsh{font-family:"Instrument Sans",system-ui,sans-serif;color:#101010}.ewsh-wrap{display:flex;gap:52px;align-items:flex-start;max-width:1140px;margin:0 auto}.ewsh-gal{flex:0 0 470px;background:#f2f2f2;border-radius:12px;padding:26px 36px 20px}.ewsh-info{flex:1 1 auto;min-width:0}.ewsh-info h1,.ewsh-info h2{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:42px;line-height:1.03;letter-spacing:.5px;text-transform:uppercase;margin:0 0 6px;color:#101010}.ewsh-sub{font-size:14px;color:#777;margin:0 0 22px}.ewsh-price{font-family:Anton,Impact,sans-serif;font-size:38px;margin:0 0 4px;color:#101010}.ewsh-note{font-size:13px;color:#8a8a8a;margin:0 0 26px}.ewsh-lab{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin:0 0 10px}.ewsh-sizes{display:flex;gap:9px;flex-wrap:wrap;margin:0 0 26px}.ewsh-sizes button{min-width:62px;padding:13px 6px;background:#fff;border:1.5px solid #d6d6d6;border-radius:6px;font:inherit;font-size:14px;font-weight:600;cursor:pointer}.ewsh-sizes button.on{border-color:#101010;background:#101010;color:#fff}.ewsh-sizes button[disabled]{color:#c0c0c0;border-style:dashed;cursor:not-allowed;text-decoration:line-through}.ewsh-ful{display:flex;flex-direction:column;gap:10px;margin:0 0 26px}.ewsh-ful label{display:flex;gap:12px;align-items:flex-start;border:1.5px solid #d6d6d6;border-radius:8px;padding:15px 16px;cursor:pointer}.ewsh-ful label.on{border-color:#101010}.ewsh-ful b{display:block;font-size:15px;margin-bottom:3px}.ewsh-ful span span{display:block;font-size:13px;color:#777;line-height:1.45}.ewsh-pay{border:1.5px solid #e2e2e2;border-radius:10px;padding:22px;background:#fafafa}.ewsh-pay p{margin:0;font-size:14px;line-height:1.6;color:#666}.ewsh-pay b{display:block;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#101010;margin-bottom:6px}@media(max-width:900px){.ewsh-wrap{flex-direction:column;gap:26px}.ewsh-gal{flex:1 1 auto;width:100%}} .ewsh-fits{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 18px} .ewsh-fits button{font:700 13px/1 Inter,sans-serif;letter-spacing:.4px;padding:11px 18px; border:1.5px solid #d8d8dc;background:#fff;color:#111;border-radius:4px;cursor:pointer} .ewsh-fits button.on{border-color:#CC0000;background:#CC0000;color:#fff} .ewsh-sizes button[disabled]{opacity:.4;text-decoration:line-through;cursor:not-allowed} .ewsh-sizes button.on{border-color:#CC0000;background:#CC0000;color:#fff}      .ewsh-go{margin:0;width:100%;background:#CC0000;color:#fff;border:0;border-radius:6px;font:700 15px/1 Inter,sans-serif;letter-spacing:.4px;padding:17px 20px;cursor:pointer}      .ewsh-go:not([disabled]):hover{background:#b30000}      .ewsh-go[disabled]{background:#e6e6e8;color:#9b9b9f;cursor:not-allowed}      .ewsh-small{margin:12px 0 0;font-size:13px;color:#777;line-height:1.5}      .ewsh-co{margin:18px 0 0}      .ewsh-mount{background:#fff;border-radius:6px;min-height:40px}      .ewsh-mount:empty{display:none}      .ewsh-msg{margin:10px 0 0;font-size:13px;color:#777}      .ewsh-thanks{border:1.5px solid #CC0000;border-radius:8px;padding:16px 18px;margin:0 0 22px;font-size:15px;color:#101010}      .ewsh-head{margin:0 0 14px}      .ewsh-head h2{margin:0}      .ewsh-back{margin:7px 0 0;font-size:13px;color:#777}      .ewsh-back button{background:none;border:0;padding:0;font:inherit;color:#777;cursor:pointer;text-decoration:underline}      .ewsh-back button:hover{color:#CC0000}      .ewsh-sum{display:flex;justify-content:space-between;align-items:center;gap:16px;background:#fff;border:1.5px solid #e2e2e2;border-radius:10px;padding:14px 18px;margin:0 0 18px}      .ewsh-sum p{margin:0;font-size:14px;color:#555}      .ewsh-sum p+p{font-family:Anton,Impact,sans-serif;font-size:24px;color:#101010;white-space:nowrap}      .ewsh-det{margin:0;border:1.5px solid #e2e2e2;border-radius:10px;padding:22px;background:#fafafa}      .ewsh-det .ewsh-ful{margin:0 0 18px}      .ewsh-sub-lab{margin-top:18px}      .ewsh-flab{display:block;font-size:13px;font-weight:600;margin:0 0 6px}      .ewsh-flab2{margin-top:14px}      .ewsh-email{width:100%;box-sizing:border-box;border:1.5px solid #d6d6d6;border-radius:6px;padding:13px 14px;font:400 15px "Instrument Sans",system-ui,sans-serif;color:#101010;background:#fff}      .ewsh-email:focus{outline:none;border-color:#101010}      .ewsh-fnote{margin:7px 0 0;font-size:12px;color:#777}      .ewsh-check{display:flex;align-items:center;gap:9px;margin:16px 0 20px;font-size:13px;color:#555;cursor:pointer}      .ewsh-cont{margin:0}      .ewsh-err{margin:10px 0 0;font-size:13px;color:#CC0000;font-weight:600}      .ewsh-err:empty{display:none}      .ewsh-pay{border:0;padding:0;background:none}      .ewsh-pay .ewsh-go{width:auto;min-width:200px;font-size:14px;padding:14px 28px}';
 }
 
 /**
@@ -415,14 +436,33 @@ function ewStripeCheckout(stripe, opts){
     panel for whichever step they are on. */
  function step(s){
   stage = s;
-  EL.querySelector('.ewsh-pay').hidden = (s !== 'pick');
-  EL.querySelector('.ewsh-det').hidden = (s !== 'details');
-  EL.querySelector('.ewsh-co').hidden  = (s !== 'pay');
+  var later = (s !== 'pick');
+  EL.querySelector('.ewsh-pick').hidden = later;
+  EL.querySelector('.ewsh-head').hidden = !later;
+  EL.querySelector('.ewsh-sum').hidden  = !later;
+  EL.querySelector('.ewsh-det').hidden  = (s !== 'details');
+  EL.querySelector('.ewsh-co').hidden   = (s !== 'pay');
+  if(later){ drawSum(); }
+  $('ewshBack').textContent = (s === 'pay') ? W.backdet : W.backpick;
+  EL.scrollIntoView({behavior:'smooth', block:'start'});
+ }
+
+ /* What they are buying, in one line, standing in for the chooser. */
+ function drawSum(){
+  var m = model[fit],
+      what = (size || '').toUpperCase() + ', ' + (post ? W.sumpost : W.sumcol),
+      cost = Number(m.price) + (post ? Number(m.postage) : 0);
+  if(stage === 'pay'){
+   what += ' \u00b7 ' + String(W.sumto).replace('{email}', ($('ewshEmail').value || '').trim());
+  } else {
+   what = W.title + ' \u00b7 ' + what;
+  }
+  $('ewshSumWhat').textContent = what;
+  $('ewshSumCost').textContent = money(cost);
  }
 
  function openDetails(){
   step('details');
-  EL.querySelector('.ewsh-det').scrollIntoView({behavior:'smooth', block:'nearest'});
   var e = $('ewshEmail'); if(e) e.focus();
  }
 
@@ -444,20 +484,18 @@ function ewStripeCheckout(stripe, opts){
       mount = EL.querySelector('.ewsh-mount'),
       msg = EL.querySelector('.ewsh-msg'),
       err = $('ewshErr'),
-      name = ($('ewshName').value || '').trim(),
       email = ($('ewshEmail').value || '').trim(),
       consent = $('ewshConsent').checked;
 
   if(!size){ return; }
-  if(!name || email.indexOf('@') < 1 || email.indexOf('.', email.indexOf('@')) < 0){
+  if(email.indexOf('@') < 1 || email.indexOf('.', email.indexOf('@')) < 0){
    err.textContent = W.emailbad;
-   (name ? $('ewshEmail') : $('ewshName')).focus();
+   $('ewshEmail').focus();
    return;
   }
   err.textContent = '';
 
   step('pay');
-  co.scrollIntoView({behavior:'smooth', block:'nearest'});
   if(!W.pk || !window.Stripe){ msg.textContent = W.off; return; }
   if(checkout) return;
   msg.textContent = W.loading;
@@ -467,7 +505,7 @@ function ewStripeCheckout(stripe, opts){
      server. */
   ewStripeCheckout(stripe, {fetchClientSecret: function(){
    return fetch(W.rest, {method:'POST', headers:{'Content-Type':'application/json'},
-     body: JSON.stringify({sku: m.sku, size: size, post: post, name: name, email: email, consent: consent, page: W.page})})
+     body: JSON.stringify({sku: m.sku, size: size, post: post, email: email, consent: consent, page: W.page})})
     .then(function(r){ return r.json(); })
     .then(function(j){ if(!j.clientSecret) throw new Error(j.message || 'error');
       return j.clientSecret; });
@@ -476,7 +514,10 @@ function ewStripeCheckout(stripe, opts){
  }
 
  EL.addEventListener('click', function(e){
-  if(e.target.closest('.ewsh-cont')) startPay();
+  if(e.target.closest('.ewsh-cont')){ startPay(); return; }
+  if(e.target.closest('#ewshBack')){
+   if(stage === 'pay'){ closePay(); } else { step('pick'); }
+  }
  });
 
  load();
@@ -606,6 +647,11 @@ function ew_shirt_mark_paid( $session_id, $hook ) {
 	update_post_meta( $bid, '_ewt_status', 'paid' );
 	update_post_meta( $bid, '_ewt_paid', (int) ( $s['amount_total'] ?? 0 ) );
 	update_post_meta( $bid, '_ewt_session', $s['id'] );
+	$who = trim( (string) ( $s['customer_details']['name'] ?? '' ) );
+	if ( '' !== $who ) {
+		update_post_meta( $bid, '_ewt_name', $who );
+		wp_update_post( array( 'ID' => $bid, 'post_title' => $who ) );
+	}
 	if ( function_exists( 'ew_tix_crm' ) ) {
 		ew_tix_crm( $hook, $bid, 'paid' );
 	}
@@ -624,14 +670,13 @@ add_action( 'rest_api_init', function () {
 			$sku  = sanitize_text_field( (string) $req->get_param( 'sku' ) );
 			$size = sanitize_text_field( (string) $req->get_param( 'size' ) );
 			$post    = (bool) $req->get_param( 'post' );
-			$name    = sanitize_text_field( (string) $req->get_param( 'name' ) );
 			$email   = sanitize_email( (string) $req->get_param( 'email' ) );
 			$consent = (bool) $req->get_param( 'consent' );
 			if ( '' === $sku || '' === $size ) {
 				return new WP_Error( 'ewsh_what', 'Choose a size first.', array( 'status' => 400 ) );
 			}
-			if ( '' === $name || ! is_email( $email ) ) {
-				return new WP_Error( 'ewsh_email', 'We need a name and an email to send your receipt to.', array( 'status' => 400 ) );
+			if ( ! is_email( $email ) ) {
+				return new WP_Error( 'ewsh_email', 'We need an email to send your receipt to.', array( 'status' => 400 ) );
 			}
 
 			// The same endpoint the page reads, called inside this request
@@ -681,7 +726,7 @@ add_action( 'rest_api_init', function () {
 			$booking = $page ? ew_shirt_booking(
 				$page,
 				trim( (string) ( $item['name'] ?? 'Shirt' ) ),
-				$name,
+				'',
 				$email,
 				trim( $size . ' · ' . ( $post ? 'posted' : 'collecting' ) ),
 				$pence + ( $post ? $ship : 0 ),
