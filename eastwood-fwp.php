@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.2.1
+ * Version: 3.2.2
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -322,6 +322,21 @@ function ew_fwp_settings_page() {
 	wp_nonce_field( 'ew_yt_refresh' );
 	submit_button( 'Read the channel again now', 'secondary', 'ew_yt_refresh', false );
 	echo '</form>';
+
+	// What the header pass did on the last page it ran on. A rename that
+	// silently does nothing looks exactly like a rename nobody asked for.
+	$nav_log = (array) get_option( 'ew_topbar_log', array() );
+	echo '<h2>Header bar</h2>';
+	if ( empty( $nav_log ) ) {
+		echo '<p>The header pass has not run since this was added. Load a page on the site, then come back.</p>';
+	} else {
+		echo '<table class="widefat striped" style="max-width:640px"><tbody>';
+		foreach ( $nav_log as $what => $did ) {
+			echo '<tr><td><code>' . esc_html( (string) $what ) . '</code></td><td>'
+				. esc_html( (string) $did ) . '</td></tr>';
+		}
+		echo '</tbody></table>';
+	}
 
 	$teams = ew_badge_candidates( $key );
 
@@ -3386,7 +3401,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.2.1';
+const EW_FWP_VERSION = '3.2.2';
 
 /*
  * Parts loader.
@@ -4531,23 +4546,50 @@ function ew_topbar_anchor( $html, $label ) {
 }
 
 function ew_rewrite_topbar( $html ) {
+	$log = array();
+
+	/*
+	 * The word first, on the page itself.
+	 *
+	 * This used to find the whole anchor, change the word inside that
+	 * copy and put the copy back. Matchday changed and The Venue did not,
+	 * on identical markup, and the reason is that the whole operation was
+	 * gated on finding an anchor a thousand characters long: when that
+	 * lookup came back empty the item was skipped silently and so was
+	 * everything downstream of it -- the order of the bar and the item
+	 * that gets added next to it. The word is a short, exact string that
+	 * is demonstrably on the page, so it is replaced on the page. The
+	 * anchor is still wanted for the link, but only the link now depends
+	 * on finding it, and a miss there costs one href rather than the lot.
+	 */
 	foreach ( ew_topbar_changes() as $was => $now ) {
 		list( $label, $link ) = $now;
 
-		$anchor = ew_topbar_anchor( $html, $was );
-		if ( '' === $anchor ) {
+		$from = '<p class="z-10">' . $was . '</p>';
+		$to   = '<p class="z-10">' . esc_html( $label ) . '</p>';
+
+		if ( false !== strpos( $html, $to ) ) {
+			$log[ $was ] = 'already';
+		} elseif ( false !== strpos( $html, $from ) ) {
+			$html        = str_replace( $from, $to, $html );
+			$log[ $was ] = 'renamed';
+		} else {
+			$log[ $was ] = 'label not on page';
 			continue;
 		}
 
-		$fixed = str_replace(
-			'<p class="z-10">' . $was . '</p>',
-			'<p class="z-10">' . esc_html( $label ) . '</p>',
-			$anchor
-		);
-		if ( '' !== $link ) {
-			$fixed = preg_replace( '#\shref="[^"]*"#',
-				' href="' . esc_url( home_url( $link ) ) . '"', $fixed, 1 );
+		if ( '' === $link ) {
+			continue;
 		}
+
+		$anchor = ew_topbar_anchor( $html, $label );
+		if ( '' === $anchor ) {
+			$log[ $was ] .= ', anchor missed';
+			continue;
+		}
+
+		$fixed = preg_replace( '#\shref="[^"]*"#',
+			' href="' . esc_url( home_url( $link ) ) . '"', $anchor, 1 );
 		// The title attribute still announced the old word on hover and to
 		// a screen reader, the same trap Safeguarding had in the footer.
 		if ( preg_match( '#\stitle="([^"]*)"#', $fixed, $t )
@@ -4576,6 +4618,7 @@ function ew_rewrite_topbar( $html ) {
 		$html = str_replace( $a, '<!--ew-swap-->', $html );
 		$html = str_replace( $b, $a, $html );
 		$html = str_replace( '<!--ew-swap-->', $b, $html );
+		$log[ $pair[0] . ' before ' . $pair[1] ] = 'swapped';
 	}
 
 	/*
@@ -4608,7 +4651,13 @@ function ew_rewrite_topbar( $html ) {
 				' title="' . esc_attr( $label ) . '"', $new, 1 );
 		}
 		$html = str_replace( $source, $source . $new, $html );
+		$log[ $label ] = 'added after ' . $after;
 	}
+
+	// What the pass actually did, readable on the settings screen. The
+	// last failure here cost a day of looking at the right code and
+	// wondering why the page disagreed with it.
+	update_option( 'ew_topbar_log', $log, false );
 
 	return $html;
 }
