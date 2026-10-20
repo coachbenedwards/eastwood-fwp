@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.4.2
+ * Version: 3.4.3
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -3549,7 +3549,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.4.2';
+const EW_FWP_VERSION = '3.4.3';
 
 /*
  * Parts loader.
@@ -4731,14 +4731,19 @@ function ew_topbar_script() {
 		. 'var p=venue.querySelector("p");if(p){p.textContent="Venue Hire";}'
 		. 'venue.setAttribute("href",' . wp_json_encode( $venue ) . ');'
 		. 'venue.setAttribute("title","Venue Hire");'
-		. 'if(spon.nextSibling!==venue){spon.parentNode.insertBefore(venue,spon.nextSibling);}'
-		. 'if(!document.getElementById("ew-nav-events")){'
-		. 'var ev=venue.cloneNode(true);ev.id="ew-nav-events";'
+		// Sponsorship, then Events, then Venue Hire. The Events link is a
+		// copy of the Venue one, so it has to be made before either is put
+		// in place, and both moves are checked each pass so a re-render of
+		// the header cannot leave the two the wrong way round.
+		. 'var ev=document.getElementById("ew-nav-events");'
+		. 'if(!ev){'
+		. 'ev=venue.cloneNode(true);ev.id="ew-nav-events";'
 		. 'var ep=ev.querySelector("p");if(ep){ep.textContent="Events";}'
 		. 'ev.setAttribute("href",' . wp_json_encode( $events ) . ');'
 		. 'ev.setAttribute("title","Events");'
-		. 'var u=ev.querySelector("use");if(u){u.setAttribute("href","#ew-events");}'
-		. 'venue.parentNode.insertBefore(ev,venue.nextSibling);}'
+		. 'var u=ev.querySelector("use");if(u){u.setAttribute("href","#ew-events");}}'
+		. 'if(spon.nextSibling!==ev){spon.parentNode.insertBefore(ev,spon.nextSibling);}'
+		. 'if(ev.nextSibling!==venue){ev.parentNode.insertBefore(venue,ev.nextSibling);}'
 		. 'done=true;if(obs){obs.disconnect();}}'
 		. 'obs=new MutationObserver(fix);'
 		. 'obs.observe(document.documentElement,{childList:true,subtree:true});'
