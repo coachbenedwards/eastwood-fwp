@@ -138,7 +138,6 @@ function ew_shirt_shortcode( $atts, $content = null ) {
 			'back_det'      => 'Back to your details',
 			'sum_collect'   => 'collecting',
 			'sum_post'      => 'posted',
-			'sum_to'        => 'receipt to {email}',
 			'email_label'   => 'Email',
 			'email_note'    => 'Your receipt and anything about the order goes here.',
 			'email_bad'     => 'We need an email to send your receipt to.',
@@ -202,7 +201,6 @@ function ew_shirt_shortcode( $atts, $content = null ) {
 		'backdet'   => $a['back_det'],
 		'sumcol'    => $a['sum_collect'],
 		'sumpost'   => $a['sum_post'],
-		'sumto'     => $a['sum_to'],
 		'loading'   => $a['loading'],
 		'off'       => $a['off'],
 		// The publishable key is public by design; the secret never
@@ -526,20 +524,23 @@ function ewStripeCheckout(stripe, opts){
  }
 
  /* What they are buying, in one line, standing in for the chooser. */
+ /* On the details step this is the whole order, because nothing else on
+    screen says it. On the card step Stripe is right underneath listing
+    the shirt, the size and the price, so all that is left to say is the
+    one thing Stripe does not: whether it is collected or posted. */
  function drawSum(){
-  var m = model[fit],
-      what = (size || '').toUpperCase() + ', ' + (post ? W.sumpost : W.sumcol),
-      cost = Number(m.price) + (post ? Number(m.postage) : 0) + printCost();
-  if(printOn){
-   what += ' \u00b7 ' + [printName(), printNum()].filter(Boolean).join(' ');
-  }
+  var m = model[fit], what, cost = '';
   if(stage === 'pay'){
-   what += ' \u00b7 ' + String(W.sumto).replace('{email}', ($('ewshEmail').value || '').trim());
+   what = post ? W.post[0] : W.collect[0];
   } else {
-   what = W.title + ' \u00b7 ' + what;
+   what = W.title + ' \u00b7 ' + (size || '').toUpperCase() + ', ' + (post ? W.sumpost : W.sumcol);
+   if(printOn){
+    what += ' \u00b7 ' + [printName(), printNum()].filter(Boolean).join(' ');
+   }
+   cost = money(Number(m.price) + (post ? Number(m.postage) : 0) + printCost());
   }
   $('ewshSumWhat').textContent = what;
-  $('ewshSumCost').textContent = money(cost);
+  $('ewshSumCost').textContent = cost;
  }
 
  function wirePrint(){
