@@ -126,6 +126,7 @@ function ew_shirt_shortcode( $atts, $content = null ) {
 			'consent'       => 'Tell me when new kit and home tickets go on sale',
 			'crm_hook'      => '',
 			'promos'        => '',
+			'hide_pay'      => '',
 			'cont'          => 'Continue',
 			'co_title'      => 'Your order',
 			'loading'       => 'Loading the payment form…',
@@ -665,6 +666,12 @@ add_action( 'rest_api_init', function () {
 				$block  = ew_shirt_block_on( $page );
 				$hook   = (string) ( $block['fields']['crm_hook'] ?? '' );
 				$promos = in_array( strtolower( (string) ( $block['fields']['promos'] ?? '' ) ), array( 'yes', 'true', '1', 'on' ), true );
+				$hide   = array_values( array_filter( array_map(
+					function ( $v ) {
+						return preg_replace( '/[^a-z_]/', '', strtolower( trim( $v ) ) );
+					},
+					explode( ',', (string) ( $block['fields']['hide_pay'] ?? '' ) )
+				) ) );
 			}
 			$booking = $page ? ew_shirt_booking(
 				$page,
@@ -697,6 +704,18 @@ add_action( 'rest_api_init', function () {
 				'line_items[0][price_data][unit_amount]'        => (string) $pence,
 				'line_items[0][price_data][product_data][name]' => trim( (string) ( $item['name'] ?? 'Shirt' ) . ' · ' . $size ),
 			);
+
+			// Ways to pay this block does not want offered. Buy now, pay
+			// later on a £35 shirt is the case in point: the credit is
+			// Klarna's to give, but the club's name is on the page offering
+			// it. Set per product, because what is wrong for a shirt may be
+			// right for a £500 hospitality table.
+			//
+			// Apple Pay, Google Pay and Link cannot be excluded this way and
+			// are not meant to be -- they are cards, not credit.
+			foreach ( $hide as $k => $method ) {
+				$body[ "excluded_payment_method_types[$k]" ] = $method;
+			}
 
 			// Stripe's own discount box, off unless the block asks for it.
 			// A code promising money off, with nowhere to type it, is worse
