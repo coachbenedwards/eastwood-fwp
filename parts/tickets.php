@@ -487,12 +487,12 @@ function ew_tix_css() {
 .ewt-lines{margin-bottom:20px}
 .ewt-lines div{display:flex;justify-content:space-between;border-top:1px solid var(--ewt-line);padding:10px 0;font-size:16px}
 .ewt-lines div.ewt-t{font-family:Anton,Impact,sans-serif;font-size:26px;color:var(--ewt-cream)}
-.ewt-who{display:grid;gap:14px;max-width:520px;margin:0 0 20px}
+.ewt-who{display:grid;gap:14px;max-width:520px;margin:0 0 20px auto}
 .ewt-who[hidden]{display:none}
 .ewt-who label span{display:block;font-size:13px;color:var(--ewt-mut);margin-bottom:6px}
 .ewt-who input{width:100%;background:#0f0c0a;border:1px solid var(--ewt-line);color:var(--ewt-txt);padding:14px;font:inherit;font-size:16px;border-radius:0}
 .ewt-who input:focus{outline:none;border-color:rgba(232,213,176,.7)}
-.ewt-who .ewt-go{justify-self:start;margin-top:4px}
+.ewt-who .ewt-go{justify-self:end;margin-top:4px}
 .ewt-after{max-width:640px;margin:0 auto 48px;text-align:center}
 .ewt-up{border:1px solid var(--ewt-line);background:var(--ewt-card);padding:28px;text-align:left}
 .ewt .ewt-up-sub{color:var(--ewt-mut);font-size:16px;margin-bottom:18px}
