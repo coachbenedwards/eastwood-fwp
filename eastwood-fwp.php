@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.7.1
+ * Version: 3.8.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -225,6 +225,32 @@ function ew_badge_download( $names ) {
 }
 
 /**
+ * Which Stripe environment the site is using.
+ */
+function ew_stripe_env() {
+	return 'live' === get_option( 'ew_stripe_env', 'test' ) ? 'live' : 'test';
+}
+
+/**
+ * The Stripe keys for one environment, or for the one in use.
+ *
+ * Shaped like ew_sq_creds() on purpose. Square takes the CIC\'s money and
+ * Stripe takes Ventures\', so a page that charges for something has to say
+ * which company it is charging for, and both answer the same way.
+ *
+ * @param string|null $env 'live', 'test', or null for whichever is on.
+ * @return array env, publishable, secret.
+ */
+function ew_stripe_creds( $env = null ) {
+	$env = in_array( $env, array( 'live', 'test' ), true ) ? $env : ew_stripe_env();
+	return array(
+		'env'         => $env,
+		'publishable' => (string) get_option( 'ew_stripe_pk_' . $env, '' ),
+		'secret'      => (string) get_option( 'ew_stripe_sk_' . $env, '' ),
+	);
+}
+
+/**
  * Which Square environment the site is using.
  */
 function ew_sq_env() {
@@ -428,6 +454,86 @@ function ew_fwp_settings_page() {
 		esc_html( 'Switches which set above the site uses. Nothing is retyped and nothing is lost.' )
 	);
 	submit_button( 'Save Square settings', 'primary', 'ew_sq_save', false );
+	echo '</form>';
+
+	/* ------------------------------------------------------------------
+	 * Stripe. Square takes the CIC money; Stripe is Ventures. Keeping
+	 * both means a page can charge into the right company without
+	 * anybody having to remember which, which is the whole point of
+	 * running the two.
+	 *
+	 * Same shape as Square above: both environments held at once, a
+	 * radio deciding which is used, and a secret that is written but
+	 * never shown back.
+	 * ------------------------------------------------------------------ */
+
+	if ( isset( $_POST['ew_stripe_save'] ) && check_admin_referer( 'ew_stripe_save' ) ) {
+		foreach ( array( 'test', 'live' ) as $post_env ) {
+			$pk = 'ew_stripe_pk_' . $post_env;
+			if ( isset( $_POST[ $pk ] ) ) {
+				update_option( $pk, sanitize_text_field( wp_unslash( $_POST[ $pk ] ) ), false );
+			}
+			// Blank means keep, so saving one environment cannot wipe the other.
+			$sk = 'ew_stripe_sk_' . $post_env;
+			if ( isset( $_POST[ $sk ] ) && '' !== trim( (string) wp_unslash( $_POST[ $sk ] ) ) ) {
+				update_option( $sk, sanitize_text_field( wp_unslash( $_POST[ $sk ] ) ), false );
+			}
+		}
+		if ( isset( $_POST['ew_stripe_env'] ) ) {
+			update_option( 'ew_stripe_env', 'live' === $_POST['ew_stripe_env'] ? 'live' : 'test', false );
+		}
+		echo '<div class="notice notice-success"><p>Saved.</p></div>';
+	}
+
+	$st_env = ew_stripe_env();
+
+	echo '<h2>Stripe</h2>';
+	echo '<p>Card payments for Eastwood FC Ventures Ltd &mdash; shirts, tickets and anything'
+		. ' else that is Ventures money rather than the club CIC. Square above is the CIC.</p>';
+	echo '<form method="post">';
+	wp_nonce_field( 'ew_stripe_save' );
+
+	foreach ( array( 'live' => 'Live', 'test' => 'Test' ) as $row_env => $row_label ) {
+		$creds = ew_stripe_creds( $row_env );
+		printf(
+			'<h3 style="margin-bottom:0">%s%s</h3>',
+			esc_html( $row_label ),
+			$row_env === $st_env
+				? ' <span style="font-weight:400;color:#1d6b32">&mdash; in use</span>'
+				: ' <span style="font-weight:400;color:#646970">&mdash; stored, not in use</span>'
+		);
+		echo '<table class="form-table"><tbody>';
+		printf(
+			'<tr><th scope="row">Publishable key</th><td><input type="text" name="ew_stripe_pk_%s" size="50" value="%s" autocomplete="off">'
+				. '<p class="description">%s</p></td></tr>',
+			esc_attr( $row_env ),
+			esc_attr( $creds['publishable'] ),
+			esc_html( 'live' === $row_env ? 'Begins pk_live_' : 'Begins pk_test_' )
+		);
+		printf(
+			'<tr><th scope="row">Secret key</th><td><p>%s</p>'
+				. '<input type="password" name="ew_stripe_sk_%s" size="50" autocomplete="off" placeholder="%s">'
+				. '<p class="description">%s</p></td></tr>',
+			wp_kses_post( '' !== $creds['secret']
+				? 'Secret key: <strong>set (' . (int) strlen( $creds['secret'] ) . ' characters)</strong>'
+				: '<strong>No secret key saved.</strong>' ),
+			esc_attr( $row_env ),
+			esc_attr( '' !== $creds['secret'] ? 'paste a new one to replace it' : ( 'live' === $row_env ? 'begins sk_live_' : 'begins sk_test_' ) ),
+			esc_html( 'Left blank, the key already saved is kept.' )
+		);
+		echo '</tbody></table>';
+	}
+
+	printf(
+		'<table class="form-table"><tbody><tr><th scope="row">Mode</th><td>'
+			. '<label><input type="radio" name="ew_stripe_env" value="test"%s> Test</label> &nbsp; '
+			. '<label><input type="radio" name="ew_stripe_env" value="live"%s> Live</label>'
+			. '<p class="description">%s</p></td></tr></tbody></table>',
+		'test' === $st_env ? ' checked' : '',
+		'live' === $st_env ? ' checked' : '',
+		esc_html( 'Switches which set above the site uses. Nothing is retyped and nothing is lost.' )
+	);
+	submit_button( 'Save Stripe settings', 'primary', 'ew_stripe_save', false );
 	echo '</form>';
 
 	$yt_key   = function_exists( 'ew_yt_api_key' ) ? ew_yt_api_key() : '';
@@ -3577,7 +3683,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.7.1';
+const EW_FWP_VERSION = '3.8.0';
 
 /*
  * Parts loader.
