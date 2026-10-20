@@ -306,12 +306,12 @@ add_action( 'rest_api_init', function () {
 				'body'    => $body,
 			) );
 			if ( is_wp_error( $res ) ) {
-				return new WP_Error( 'ewt_stripe', 'Could not reach Stripe.', array( 'status' => 502 ) );
+				return new WP_Error( 'ewt_stripe', 'Could not reach Stripe.', array( 'status' => 503 ) );
 			}
 			$j = json_decode( (string) wp_remote_retrieve_body( $res ), true );
 			if ( empty( $j['client_secret'] ) ) {
 				$msg = (string) ( $j['error']['message'] ?? 'Stripe refused the booking.' );
-				return new WP_Error( 'ewt_stripe', $msg, array( 'status' => 502 ) );
+				return new WP_Error( 'ewt_stripe', $msg, array( 'status' => 400 ) );
 			}
 			return array( 'clientSecret' => $j['client_secret'] );
 		},
