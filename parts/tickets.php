@@ -231,7 +231,8 @@ add_action( 'rest_api_init', function () {
 
 function ew_tix_css() {
 	return <<<'CSS'
-.ewt{--ewt-card:#231c16;--ewt-cream:#e8d5b0;--ewt-txt:#e9e2d6;--ewt-mut:rgba(233,226,214,.6);--ewt-line:rgba(232,213,176,.22);max-width:1180px;margin:0 auto;padding:8px 0;color:var(--ewt-txt);font-family:'Instrument Sans',system-ui,sans-serif}
+.ewt,.ewt-bar{--ewt-card:#231c16;--ewt-cream:#e8d5b0;--ewt-txt:#e9e2d6;--ewt-mut:rgba(233,226,214,.6);--ewt-line:rgba(232,213,176,.22)}
+.ewt{max-width:1180px;margin:0 auto;padding:8px 0;color:var(--ewt-txt);font-family:'Instrument Sans',system-ui,sans-serif}
 .ewt p{margin:0}
 .ewt .ewt-kick{font-family:Anton,Impact,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:var(--ewt-cream);font-size:15px;text-align:center}
 .ewt .ewt-title{font-family:Anton,Impact,sans-serif;font-weight:400;text-transform:uppercase;color:var(--ewt-cream);font-size:clamp(34px,5vw,52px);line-height:1;text-align:center;margin:12px 0 10px;background:none;padding:0}
