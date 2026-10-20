@@ -114,6 +114,16 @@ function ew_shirt_shortcode( $atts, $content = null ) {
 			'in_stock'      => 'In stock',
 			'sold_out'      => 'Sold out',
 			'how_note'      => 'Collect free at the ground, or we post it for {price}.',
+			'print_price'   => '',
+			'print_label'   => 'Add a name and number',
+			'print_note'    => 'Printed on the back.',
+			'print_name'    => 'Name',
+			'print_num'     => 'Number',
+			'print_max'     => '12',
+			'print_chars'   => '{n} of {max} characters',
+			'print_range'   => '1 to 99',
+			'print_warn'    => 'Printed shirts cannot be returned.',
+			'print_bad'     => 'Give a name or a number to print.',
 			'share_label'   => 'Share',
 			'ful_label'     => 'How do you want it',
 			'collect_title' => 'Collect at the ground',
@@ -180,6 +190,13 @@ function ew_shirt_shortcode( $atts, $content = null ) {
 		'instock'   => $a['in_stock'],
 		'soldout'   => $a['sold_out'],
 		'hownote'   => $a['how_note'],
+		'print'     => '' === trim( (string) $a['print_price'] ) ? null : array(
+			'price' => round( (float) $a['print_price'], 2 ),
+			'label' => $a['print_label'],
+			'chars' => $a['print_chars'],
+			'max'   => max( 1, (int) $a['print_max'] ),
+			'bad'   => $a['print_bad'],
+		),
 		'sizelab'   => $a['size_label'],
 		'emailbad'  => $a['email_bad'],
 		'title'     => $a['title'],
@@ -226,6 +243,32 @@ function ew_shirt_shortcode( $atts, $content = null ) {
      <?php endif; ?>
     </div>
     <div class="ewsh-sizes" id="ewshSizes"></div>
+
+    <?php if ( '' !== trim( (string) $a['print_price'] ) ) : ?>
+    <div class="ewsh-print" id="ewshPrint">
+     <label class="ewsh-ptick">
+      <input type="checkbox" id="ewshPrintOn">
+      <span>
+       <b id="ewshPrintLab"></b>
+       <span><?php echo esc_html( $a['print_note'] ); ?></span>
+      </span>
+     </label>
+     <div class="ewsh-pfields" id="ewshPFields" hidden>
+      <div class="ewsh-pf">
+       <label class="ewsh-flab" for="ewshPName"><?php echo esc_html( $a['print_name'] ); ?></label>
+       <input class="ewsh-email ewsh-pname" id="ewshPName" type="text" maxlength="<?php echo esc_attr( max( 1, (int) $a['print_max'] ) ); ?>" autocomplete="off">
+       <p class="ewsh-fnote" id="ewshPCount"></p>
+      </div>
+      <div class="ewsh-pf ewsh-pf-num">
+       <label class="ewsh-flab" for="ewshPNum"><?php echo esc_html( $a['print_num'] ); ?></label>
+       <input class="ewsh-email" id="ewshPNum" type="text" maxlength="2" inputmode="numeric" autocomplete="off">
+       <p class="ewsh-fnote"><?php echo esc_html( $a['print_range'] ); ?></p>
+      </div>
+     </div>
+     <p class="ewsh-pwarn" id="ewshPWarn" hidden><?php echo esc_html( $a['print_warn'] ); ?></p>
+    </div>
+    <?php endif; ?>
+
     <div class="ewsh-pay" id="ewshPay"></div>
     <p class="ewsh-how" id="ewshHow"></p>
     <div class="ewsh-share">
@@ -340,7 +383,7 @@ function ew_shirt_css() {
 		   pixels of difference that were really two larger ones cancelling.
 		   Measured at 390: with this the page is the height it was. */
 		'@media(max-width:767px){.ewsh{padding-left:30px;padding-right:30px}}'
-		. '.ewsh{font-family:"Instrument Sans",system-ui,sans-serif;color:#101010}.ewsh-wrap{display:flex;gap:52px;align-items:flex-start;max-width:1140px;margin:0 auto}.ewsh-gal{flex:0 0 470px;background:#f2f2f2;border-radius:12px;padding:26px 36px 20px}.ewsh-info{flex:1 1 auto;min-width:0}.ewsh-info h1,.ewsh-info h2{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:42px;line-height:1.03;letter-spacing:.5px;text-transform:uppercase;margin:0 0 6px;color:#101010}.ewsh-sub{font-size:14px;color:#777;margin:0 0 22px}.ewsh-price{font-family:Anton,Impact,sans-serif;font-size:38px;margin:0 0 4px;color:#101010}.ewsh-note{font-size:13px;color:#8a8a8a;margin:0 0 26px}.ewsh-lab{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin:0 0 10px}.ewsh-sizes{display:flex;gap:9px;flex-wrap:wrap;margin:0 0 26px}.ewsh-sizes button{min-width:62px;padding:13px 6px;background:#fff;border:1.5px solid #d6d6d6;border-radius:6px;font:inherit;font-size:14px;font-weight:600;cursor:pointer}.ewsh-sizes button.on{border-color:#101010;background:#101010;color:#fff}.ewsh-sizes button[disabled]{color:#c0c0c0;border-style:dashed;cursor:not-allowed;text-decoration:line-through}.ewsh-ful{display:flex;flex-direction:column;gap:10px;margin:0 0 26px}.ewsh-ful label{display:flex;gap:12px;align-items:flex-start;border:1.5px solid #d6d6d6;border-radius:8px;padding:15px 16px;cursor:pointer}.ewsh-ful label.on{border-color:#101010}.ewsh-ful b{display:block;font-size:15px;margin-bottom:3px}.ewsh-ful span span{display:block;font-size:13px;color:#777;line-height:1.45}.ewsh-pay{border:1.5px solid #e2e2e2;border-radius:10px;padding:22px;background:#fafafa}.ewsh-pay p{margin:0;font-size:14px;line-height:1.6;color:#666}.ewsh-pay b{display:block;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#101010;margin-bottom:6px}@media(max-width:900px){.ewsh-wrap{flex-direction:column;gap:26px}.ewsh-gal{flex:1 1 auto;width:100%}} .ewsh-fits{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 18px} .ewsh-fits button{font:700 13px/1 Inter,sans-serif;letter-spacing:.4px;padding:11px 18px; border:1.5px solid #d8d8dc;background:#fff;color:#111;border-radius:4px;cursor:pointer} .ewsh-fits button.on{border-color:#CC0000;background:#CC0000;color:#fff} .ewsh-sizes button[disabled]{opacity:.4;text-decoration:line-through;cursor:not-allowed} .ewsh-sizes button.on{border-color:#CC0000;background:#CC0000;color:#fff}      .ewsh-go{margin:0;width:100%;background:#CC0000;color:#fff;border:0;border-radius:6px;font:700 15px/1 Inter,sans-serif;letter-spacing:.4px;padding:17px 20px;cursor:pointer}      .ewsh-go:not([disabled]):hover{background:#b30000}      .ewsh-go[disabled]{background:#e6e6e8;color:#9b9b9f;cursor:not-allowed}      .ewsh-small{margin:12px 0 0;font-size:13px;color:#777;line-height:1.5}      .ewsh-co{margin:0}      .ewsh-mount{background:#fff;border-radius:6px;min-height:40px}      .ewsh-mount:empty{display:none}      .ewsh-msg{margin:10px 0 0;font-size:13px;color:#777}      .ewsh-thanks{border:1.5px solid #CC0000;border-radius:8px;padding:16px 18px;margin:0 0 22px;font-size:15px;color:#101010}      .ewsh-head{margin:0 0 14px}      .ewsh-head h2{margin:0}      .ewsh-back{margin:7px 0 0;font-size:13px;color:#777}      .ewsh-back button{background:none;border:0;padding:0;font:inherit;color:#777;cursor:pointer;text-decoration:underline}      .ewsh-back button:hover{color:#CC0000}      .ewsh-card{background:#fff;border:1.5px solid #e2e2e2;border-radius:10px;overflow:hidden}      .ewsh-sum{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 18px;border-bottom:1px solid #ececec}      .ewsh-sum p{margin:0;font-size:14px;color:#555}      .ewsh-sum p+p{font-family:Anton,Impact,sans-serif;font-size:24px;color:#101010;white-space:nowrap}      .ewsh-det{margin:0;padding:22px;background:#fafafa}      .ewsh-det .ewsh-ful{margin:0 0 18px}      .ewsh-sub-lab{margin-top:18px}      .ewsh-flab{display:block;font-size:13px;font-weight:600;margin:0 0 6px}      .ewsh-flab2{margin-top:14px}      .ewsh-email{width:100%;box-sizing:border-box;border:1.5px solid #d6d6d6;border-radius:6px;padding:13px 14px;font:400 15px "Instrument Sans",system-ui,sans-serif;color:#101010;background:#fff}      .ewsh-email:focus{outline:none;border-color:#101010}      .ewsh-fnote{margin:7px 0 0;font-size:12px;color:#777}      .ewsh-check{display:flex;align-items:center;gap:9px;margin:16px 0 20px;font-size:13px;color:#555;cursor:pointer}      .ewsh-cont{margin:0}      .ewsh-err{margin:10px 0 0;font-size:13px;color:#CC0000;font-weight:600}      .ewsh-err:empty{display:none}      .ewsh [hidden]{display:none}      .ewsh-stock{margin:0 0 24px;font-size:14px;font-weight:600;color:#1a7f4b}      .ewsh-stock:empty{display:none}      .ewsh-stock.out{color:#8a8a8a}      .ewsh-price{margin-bottom:20px}      .ewsh-rule{height:1px;background:#e2e2e2;margin:0 0 20px}      .ewsh-sizerow{display:flex;justify-content:space-between;align-items:baseline;gap:16px}      .ewsh-chart{font-size:13px;color:#555}      .ewsh-chart:hover{color:#CC0000}      .ewsh-how{display:flex;gap:10px;margin:16px 0 0;font-size:13px;color:#777;line-height:1.5}      .ewsh-how:empty{display:none}      .ewsh-share{display:flex;align-items:center;gap:14px;margin:26px 0 0;padding-top:18px;border-top:1px solid #e2e2e2;color:#555}      .ewsh-share span{font-size:13px;color:#777}      .ewsh-share a{color:#555;display:flex}      .ewsh-share a:hover{color:#CC0000}      .ewsh-order{max-width:460px}      .ewsh-pay{border:0;padding:0;background:none}      .ewsh-pay .ewsh-go{width:100%;font-size:15px;padding:19px 20px}';
+		. '.ewsh{font-family:"Instrument Sans",system-ui,sans-serif;color:#101010}.ewsh-wrap{display:flex;gap:52px;align-items:flex-start;max-width:1140px;margin:0 auto}.ewsh-gal{flex:0 0 470px;background:#f2f2f2;border-radius:12px;padding:26px 36px 20px}.ewsh-info{flex:1 1 auto;min-width:0}.ewsh-info h1,.ewsh-info h2{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:42px;line-height:1.03;letter-spacing:.5px;text-transform:uppercase;margin:0 0 6px;color:#101010}.ewsh-sub{font-size:14px;color:#777;margin:0 0 22px}.ewsh-price{font-family:Anton,Impact,sans-serif;font-size:38px;margin:0 0 4px;color:#101010}.ewsh-note{font-size:13px;color:#8a8a8a;margin:0 0 26px}.ewsh-lab{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin:0 0 10px}.ewsh-sizes{display:flex;gap:9px;flex-wrap:wrap;margin:0 0 26px}.ewsh-sizes button{min-width:62px;padding:13px 6px;background:#fff;border:1.5px solid #d6d6d6;border-radius:6px;font:inherit;font-size:14px;font-weight:600;cursor:pointer}.ewsh-sizes button.on{border-color:#101010;background:#101010;color:#fff}.ewsh-sizes button[disabled]{color:#c0c0c0;border-style:dashed;cursor:not-allowed;text-decoration:line-through}.ewsh-ful{display:flex;flex-direction:column;gap:10px;margin:0 0 26px}.ewsh-ful label{display:flex;gap:12px;align-items:flex-start;border:1.5px solid #d6d6d6;border-radius:8px;padding:15px 16px;cursor:pointer}.ewsh-ful label.on{border-color:#101010}.ewsh-ful b{display:block;font-size:15px;margin-bottom:3px}.ewsh-ful span span{display:block;font-size:13px;color:#777;line-height:1.45}.ewsh-pay{border:1.5px solid #e2e2e2;border-radius:10px;padding:22px;background:#fafafa}.ewsh-pay p{margin:0;font-size:14px;line-height:1.6;color:#666}.ewsh-pay b{display:block;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#101010;margin-bottom:6px}@media(max-width:900px){.ewsh-wrap{flex-direction:column;gap:26px}.ewsh-gal{flex:1 1 auto;width:100%}} .ewsh-fits{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 18px} .ewsh-fits button{font:700 13px/1 Inter,sans-serif;letter-spacing:.4px;padding:11px 18px; border:1.5px solid #d8d8dc;background:#fff;color:#111;border-radius:4px;cursor:pointer} .ewsh-fits button.on{border-color:#CC0000;background:#CC0000;color:#fff} .ewsh-sizes button[disabled]{opacity:.4;text-decoration:line-through;cursor:not-allowed} .ewsh-sizes button.on{border-color:#CC0000;background:#CC0000;color:#fff}      .ewsh-go{margin:0;width:100%;background:#CC0000;color:#fff;border:0;border-radius:6px;font:700 15px/1 Inter,sans-serif;letter-spacing:.4px;padding:17px 20px;cursor:pointer}      .ewsh-go:not([disabled]):hover{background:#b30000}      .ewsh-go[disabled]{background:#e6e6e8;color:#9b9b9f;cursor:not-allowed}      .ewsh-small{margin:12px 0 0;font-size:13px;color:#777;line-height:1.5}      .ewsh-co{margin:0}      .ewsh-mount{background:#fff;border-radius:6px;min-height:40px}      .ewsh-mount:empty{display:none}      .ewsh-msg{margin:10px 0 0;font-size:13px;color:#777}      .ewsh-thanks{border:1.5px solid #CC0000;border-radius:8px;padding:16px 18px;margin:0 0 22px;font-size:15px;color:#101010}      .ewsh-head{margin:0 0 14px}      .ewsh-head h2{margin:0}      .ewsh-back{margin:7px 0 0;font-size:13px;color:#777}      .ewsh-back button{background:none;border:0;padding:0;font:inherit;color:#777;cursor:pointer;text-decoration:underline}      .ewsh-back button:hover{color:#CC0000}      .ewsh-card{background:#fff;border:1.5px solid #e2e2e2;border-radius:10px;overflow:hidden}      .ewsh-sum{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 18px;border-bottom:1px solid #ececec}      .ewsh-sum p{margin:0;font-size:14px;color:#555}      .ewsh-sum p+p{font-family:Anton,Impact,sans-serif;font-size:24px;color:#101010;white-space:nowrap}      .ewsh-det{margin:0;padding:22px;background:#fafafa}      .ewsh-det .ewsh-ful{margin:0 0 18px}      .ewsh-sub-lab{margin-top:18px}      .ewsh-flab{display:block;font-size:13px;font-weight:600;margin:0 0 6px}      .ewsh-flab2{margin-top:14px}      .ewsh-email{width:100%;box-sizing:border-box;border:1.5px solid #d6d6d6;border-radius:6px;padding:13px 14px;font:400 15px "Instrument Sans",system-ui,sans-serif;color:#101010;background:#fff}      .ewsh-email:focus{outline:none;border-color:#101010}      .ewsh-fnote{margin:7px 0 0;font-size:12px;color:#777}      .ewsh-check{display:flex;align-items:center;gap:9px;margin:16px 0 20px;font-size:13px;color:#555;cursor:pointer}      .ewsh-cont{margin:0}      .ewsh-err{margin:10px 0 0;font-size:13px;color:#CC0000;font-weight:600}      .ewsh-err:empty{display:none}      .ewsh [hidden]{display:none}      .ewsh-stock{margin:0 0 24px;font-size:14px;font-weight:600;color:#1a7f4b}      .ewsh-stock:empty{display:none}      .ewsh-stock.out{color:#8a8a8a}      .ewsh-price{margin-bottom:20px}      .ewsh-rule{height:1px;background:#e2e2e2;margin:0 0 20px}      .ewsh-sizerow{display:flex;justify-content:space-between;align-items:baseline;gap:16px}      .ewsh-chart{font-size:13px;color:#555}      .ewsh-chart:hover{color:#CC0000}      .ewsh-how{display:flex;gap:10px;margin:16px 0 0;font-size:13px;color:#777;line-height:1.5}      .ewsh-how:empty{display:none}      .ewsh-share{display:flex;align-items:center;gap:14px;margin:26px 0 0;padding-top:18px;border-top:1px solid #e2e2e2;color:#555}      .ewsh-share span{font-size:13px;color:#777}      .ewsh-share a{color:#555;display:flex}      .ewsh-share a:hover{color:#CC0000}      .ewsh-order{max-width:460px}      .ewsh-print{border:1.5px solid #e2e2e2;border-radius:8px;background:#fff;padding:16px 18px;margin:0 0 20px}      .ewsh-print.on{border-color:#CC0000}      .ewsh-ptick{display:flex;align-items:flex-start;gap:11px;cursor:pointer}      .ewsh-ptick b{display:block;font-size:15px;margin-bottom:2px}      .ewsh-ptick span span{display:block;font-size:13px;color:#777;line-height:1.45}      .ewsh-pfields{display:flex;gap:12px;margin:16px 0 0}      .ewsh-pf{flex:1 1 auto;min-width:0}      .ewsh-pf-num{flex:0 0 110px}      .ewsh-pname{letter-spacing:.08em;text-transform:uppercase;font-weight:600}      .ewsh-pwarn{margin:14px 0 0;font-size:13px;color:#777}      .ewsh-pay{border:0;padding:0;background:none}      .ewsh-pay .ewsh-go{width:100%;font-size:15px;padding:19px 20px}';
 }
 
 /**
@@ -374,8 +417,12 @@ function ewStripeCheckout(stripe, opts){
  });
 
  var model = {}, fit = null, size = null, post = false, checkout = null, stage = 'pick';
+ var P = W.print || null, printOn = false;
  var $ = function(id){ return document.getElementById(id); };
  function money(n){ return '\u00a3' + Number(n).toFixed(2); }
+ function printCost(){ return (P && printOn) ? Number(P.price) : 0; }
+ function printName(){ var e = $('ewshPName'); return e ? (e.value || '').trim().toUpperCase() : ''; }
+ function printNum(){ var e = $('ewshPNum'); return e ? (e.value || '').replace(/[^0-9]/g, '') : ''; }
 
  function load(){
   var jobs = Object.keys(SKUS).map(function(sku){
@@ -461,6 +508,8 @@ function ewStripeCheckout(stripe, opts){
    btn.addEventListener('click', openDetails);
    pay.appendChild(btn);
   }
+  var total = Number(model[fit].price) + printCost();
+  pay.querySelector('.ewsh-go').textContent = W.paybtn + ' \u00b7 ' + money(total);
   pay.querySelector('.ewsh-go').disabled = !size;
   $('ewshHow').textContent = String(W.hownote || '').replace('{price}', money(model[fit].postage));
  }
@@ -484,7 +533,10 @@ function ewStripeCheckout(stripe, opts){
  function drawSum(){
   var m = model[fit],
       what = (size || '').toUpperCase() + ', ' + (post ? W.sumpost : W.sumcol),
-      cost = Number(m.price) + (post ? Number(m.postage) : 0);
+      cost = Number(m.price) + (post ? Number(m.postage) : 0) + printCost();
+  if(printOn){
+   what += ' \u00b7 ' + [printName(), printNum()].filter(Boolean).join(' ');
+  }
   if(stage === 'pay'){
    what += ' \u00b7 ' + String(W.sumto).replace('{email}', ($('ewshEmail').value || '').trim());
   } else {
@@ -492,6 +544,38 @@ function ewStripeCheckout(stripe, opts){
   }
   $('ewshSumWhat').textContent = what;
   $('ewshSumCost').textContent = money(cost);
+ }
+
+ function wirePrint(){
+  if(!P) return;
+  var box = $('ewshPrintOn'), fields = $('ewshPFields'), wrap = $('ewshPrint'),
+      warn = $('ewshPWarn'), nm = $('ewshPName'), nu = $('ewshPNum');
+  $('ewshPrintLab').textContent = P.label + ' \u00b7 +' + money(P.price);
+  function count(){
+   $('ewshPCount').textContent = String(P.chars)
+     .replace('{n}', printName().length).replace('{max}', P.max);
+  }
+  box.addEventListener('change', function(){
+   printOn = box.checked;
+   fields.hidden = !printOn; warn.hidden = !printOn;
+   wrap.className = 'ewsh-print' + (printOn ? ' on' : '');
+   closePay(); drawPay();
+   if(printOn){ nm.focus(); }
+  });
+  /* Letters, spaces, hyphens and apostrophes only -- it has to be
+     cuttable in vinyl. */
+  nm.addEventListener('input', function(){
+   var v = nm.value.toUpperCase().replace(/[^A-Z '-]/g, '').slice(0, P.max);
+   if(v !== nm.value){ nm.value = v; }
+   count(); closePay(); drawPay();
+  });
+  nu.addEventListener('input', function(){
+   var v = nu.value.replace(/[^0-9]/g, '').slice(0, 2);
+   if('0' === v){ v = ''; }
+   if(v !== nu.value){ nu.value = v; }
+   closePay(); drawPay();
+  });
+  count();
  }
 
  function openDetails(){
@@ -526,6 +610,12 @@ function ewStripeCheckout(stripe, opts){
    $('ewshEmail').focus();
    return;
   }
+  if(printOn && !printName() && !printNum()){
+   err.textContent = P.bad;
+   step('pick');
+   $('ewshPName').focus();
+   return;
+  }
   err.textContent = '';
 
   step('pay');
@@ -538,7 +628,8 @@ function ewStripeCheckout(stripe, opts){
      server. */
   ewStripeCheckout(stripe, {fetchClientSecret: function(){
    return fetch(W.rest, {method:'POST', headers:{'Content-Type':'application/json'},
-     body: JSON.stringify({sku: m.sku, size: size, post: post, email: email, consent: consent, page: W.page})})
+     body: JSON.stringify({sku: m.sku, size: size, post: post, email: email, consent: consent, page: W.page,
+       print: printOn, pname: printName(), pnum: printNum()})})
     .then(function(r){ return r.json(); })
     .then(function(j){ if(!j.clientSecret) throw new Error(j.message || 'error');
       return j.clientSecret; });
@@ -553,6 +644,7 @@ function ewStripeCheckout(stripe, opts){
   }
  });
 
+ wirePrint();
  load();
 })();
 JS;
@@ -704,6 +796,10 @@ add_action( 'rest_api_init', function () {
 			$size = sanitize_text_field( (string) $req->get_param( 'size' ) );
 			$post    = (bool) $req->get_param( 'post' );
 			$email   = sanitize_email( (string) $req->get_param( 'email' ) );
+			$want    = (bool) $req->get_param( 'print' );
+			$pname   = strtoupper( trim( preg_replace( "/[^A-Za-z '-]/", '', (string) $req->get_param( 'pname' ) ) ) );
+			$pnum    = (string) (int) preg_replace( '/[^0-9]/', '', (string) $req->get_param( 'pnum' ) );
+			$pnum    = ( $pnum > 0 && $pnum < 100 ) ? $pnum : '';
 			$consent = (bool) $req->get_param( 'consent' );
 			if ( '' === $sku || '' === $size ) {
 				return new WP_Error( 'ewsh_what', 'Choose a size first.', array( 'status' => 400 ) );
@@ -756,13 +852,27 @@ add_action( 'rest_api_init', function () {
 					explode( ',', (string) ( $block['fields']['hide_pay'] ?? '' ) )
 				) ) );
 			}
+			// What the printing costs is read here, off the block, so the
+			// browser cannot talk the price down.
+			$pp = 0;
+			if ( $want && $page ) {
+				$pp = (int) round( (float) ( $block['fields']['print_price'] ?? 0 ) * 100 );
+			}
+			$pname = $pp > 0 ? substr( $pname, 0, max( 1, (int) ( $block['fields']['print_max'] ?? 12 ) ) ) : '';
+			$pnum  = $pp > 0 ? $pnum : '';
+			if ( $pp > 0 && '' === $pname && '' === $pnum ) {
+				return new WP_Error( 'ewsh_print', 'Give a name or a number to print.', array( 'status' => 400 ) );
+			}
+			$plabel = trim( $pname . ( '' !== $pname && '' !== $pnum ? ' ' : '' ) . $pnum );
+
 			$booking = $page ? ew_shirt_booking(
 				$page,
 				trim( (string) ( $item['name'] ?? 'Shirt' ) ),
 				'',
 				$email,
-				trim( $size . ' · ' . ( $post ? 'posted' : 'collecting' ) ),
-				$pence + ( $post ? $ship : 0 ),
+				trim( $size . ' · ' . ( $post ? 'posted' : 'collecting' )
+					. ( $pp > 0 ? ' · printed ' . $plabel : '' ) ),
+				$pence + ( $post ? $ship : 0 ) + $pp,
 				$hook,
 				(string) ( $block['fields']['greeting'] ?? '' )
 			) : 0;
@@ -809,14 +919,23 @@ add_action( 'rest_api_init', function () {
 				$body['allow_promotion_codes'] = 'true';
 			}
 
-			// Something posted needs somewhere to post it to, and postage goes
-			// on as its own line so the receipt shows it.
+			// Printing and postage each go on as their own line, so the
+			// receipt breaks the order down rather than showing one figure.
+			$line = 1;
+			if ( $pp > 0 ) {
+				$body[ 'line_items[' . $line . '][quantity]' ]                       = '1';
+				$body[ 'line_items[' . $line . '][price_data][currency]' ]           = 'gbp';
+				$body[ 'line_items[' . $line . '][price_data][unit_amount]' ]        = (string) $pp;
+				$body[ 'line_items[' . $line . '][price_data][product_data][name]' ] = 'Printing · ' . $plabel;
+				$body['metadata[printing]']                                          = $plabel;
+				++$line;
+			}
 			if ( $post ) {
-				$body['shipping_address_collection[allowed_countries][0]'] = 'GB';
-				$body['line_items[1][quantity]']                          = '1';
-				$body['line_items[1][price_data][currency]']              = 'gbp';
-				$body['line_items[1][price_data][unit_amount]']           = (string) $ship;
-				$body['line_items[1][price_data][product_data][name]']    = 'Postage';
+				$body['shipping_address_collection[allowed_countries][0]']           = 'GB';
+				$body[ 'line_items[' . $line . '][quantity]' ]                       = '1';
+				$body[ 'line_items[' . $line . '][price_data][currency]' ]           = 'gbp';
+				$body[ 'line_items[' . $line . '][price_data][unit_amount]' ]        = (string) $ship;
+				$body[ 'line_items[' . $line . '][price_data][product_data][name]' ] = 'Postage';
 			}
 
 			$res = wp_remote_post( 'https://api.stripe.com/v1/checkout/sessions', array(
