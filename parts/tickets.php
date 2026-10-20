@@ -16,7 +16,15 @@
  * banner="Drinks on us" runs across its top, stamp="10" with
  * stamp_small="Seats" draws the round stamp, and bonus_head="On the house"
  * with bonus="10 pints; 2 bottles of wine" draws the drinks panel (a line
- * mentioning wine gets the bottle, anything else the pint glass). A blank price shows the "to be
+ * mentioning wine gets the bottle, anything else the pint glass).
+ *
+ * Any card can also take two more columns on its line:
+ *   ... | seats | banner across the top | panel
+ * The banner is an outline (the featured card's banner stays solid). The
+ * panel is "Heading > item; item", e.g. "Plus > Food on the night": a
+ * number or the first word is drawn big, the rest small, with an icon
+ * picked from the words. icons="1" puts a small drawn icon at the start of
+ * each included line on card 1 (a list of card numbers, e.g. "1,2"). A blank price shows the "to be
  * confirmed" wording and the ticket cannot be added until a price is set.
  *
  * Every word the block shows is a field or a line on the block, so a person
@@ -63,6 +71,8 @@ function ew_tix_lines( $content ) {
 			'tag'   => (string) ( $b[2] ?? '' ),
 			'inc'   => array_values( array_filter( array_map( 'trim', explode( ';', (string) ( $b[3] ?? '' ) ) ) ) ),
 			'seats' => max( 1, (int) ( $b[4] ?? 1 ) ),
+			'flag'  => (string) ( $b[5] ?? '' ),
+			'panel' => (string) ( $b[6] ?? '' ),
 		);
 	}
 	return $out;
@@ -102,6 +112,63 @@ function ew_tix_sold( $page_id ) {
 	return $sold;
 }
 
+/** A small line icon chosen from the words it sits next to. */
+function ew_tix_icon( $words, $size = 30 ) {
+	$w     = strtolower( (string) $words );
+	$paths = array(
+		'wine'   => 'M10 2h4v4.5c0 1 2 2.2 2 4.5V21a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V11c0-2.3 2-3.5 2-4.5zM8 13h8',
+		'pint'   => 'M6 4h10l-1.2 16H7.2zM6.3 8h9.4M16 9h2a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-2.6',
+		'food'   => 'M3 18h18M4.5 18a7.5 7.5 0 0 1 15 0M12 10.5V8M10.5 8h3M4 21h16',
+		'clock'  => 'M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17zM12 7v5l3 2',
+		'race'   => 'M5 21V4M5 4h12l-2.5 4L17 12H5',
+		'casino' => 'M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17zM12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3',
+		'ticket' => 'M3 8a2 2 0 0 0 2-2h14a2 2 0 0 0 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 0-2 2H5a2 2 0 0 0-2-2v-2a2 2 0 0 0 0-4z',
+	);
+	$key = '';
+	foreach ( array(
+		'wine'   => '/wine/',
+		'pint'   => '/pint|beer|lager|drink/',
+		'food'   => '/food|meal|dinner|buffet/',
+		'race'   => '/race/',
+		'casino' => '/casino|roulette|blackjack|poker/',
+		'clock'  => '/entry|doors|\d\s*(am|pm)\b/',
+		'ticket' => '/ticket|everything/',
+	) as $k => $re ) {
+		if ( preg_match( $re, $w ) ) {
+			$key = $k;
+			break;
+		}
+	}
+	if ( '' === $key ) {
+		return '';
+	}
+	return '<svg width="' . (int) $size . '" height="' . (int) $size . '" viewBox="0 0 24 24" aria-hidden="true"><path d="' . $paths[ $key ] . '"/></svg>';
+}
+
+/** A boxed panel: a small heading, then items with a big number or word. */
+function ew_tix_panel( $head, $items ) {
+	$items = array_filter( array_map( 'trim', explode( ';', (string) $items ) ) );
+	if ( ! $items ) {
+		return '';
+	}
+	$h = '<div class="ewt-bonus">';
+	if ( '' !== trim( (string) $head ) ) {
+		$h .= '<p class="ewt-bonus-head">' . esc_html( trim( $head ) ) . '</p>';
+	}
+	$h .= '<div class="ewt-drinks">';
+	foreach ( $items as $d ) {
+		if ( preg_match( '/^(\d+)\s*(.*)$/', $d, $m ) || preg_match( '/^(\S+)\s*(.*)$/', $d, $m ) ) {
+			$big   = $m[1];
+			$small = $m[2];
+		} else {
+			$big   = $d;
+			$small = '';
+		}
+		$h .= '<div class="ewt-drink">' . ew_tix_icon( $d ) . '<div><strong>' . esc_html( $big ) . '</strong>' . ( '' !== $small ? '<em>' . esc_html( $small ) . '</em>' : '' ) . '</div></div>';
+	}
+	return $h . '</div></div>';
+}
+
 function ew_tix_money( $pence ) {
 	return '£' . ( 0 === $pence % 100 ? number_format( $pence / 100 ) : number_format( $pence / 100, 2 ) );
 }
@@ -129,6 +196,7 @@ function ew_tix_shortcode( $atts, $content = null ) {
 		'stamp_small' => '',
 		'bonus_head'  => '',
 		'bonus'       => '',
+		'icons'       => '',
 	), $atts, 'eastwood_tickets' );
 
 	$tix = ew_tix_lines( $content );
@@ -156,14 +224,16 @@ function ew_tix_shortcode( $atts, $content = null ) {
 	if ( '' !== $a['sub'] ) {
 		$h .= '<p class="ewt-sub">' . esc_html( $a['sub'] ) . '</p>';
 	}
+	$iconed = array_map( 'intval', array_filter( array_map( 'trim', explode( ',', (string) $a['icons'] ) ) ) );
 	$h .= '<div class="ewt-grid ewt-n' . min( 4, count( $tix ) ) . '">';
 	foreach ( $tix as $i => $t ) {
 		$on  = $t['pence'] > 0;
 		$out  = $on && $left < $t['seats'];
 		$feat = (int) $a['feature'] === $i + 1;
-		$h .= '<div class="ewt-card' . ( $on && ! $out ? '' : ' ewt-off' ) . ( $feat ? ' ewt-feat' : '' ) . ( $feat && '' !== $a['banner'] ? ' ewt-has-banner' : '' ) . '" data-i="' . (int) $i . '" data-p="' . (int) $t['pence'] . '" data-n="' . esc_attr( $t['name'] ) . '">';
-		if ( $feat && '' !== $a['banner'] ) {
-			$h .= '<p class="ewt-banner">' . esc_html( $a['banner'] ) . '</p>';
+		$flag = $feat ? (string) $a['banner'] : $t['flag'];
+		$h .= '<div class="ewt-card' . ( $on && ! $out ? '' : ' ewt-off' ) . ( $feat ? ' ewt-feat' : '' ) . ( '' !== $flag ? ' ewt-has-banner' : '' ) . ( ! $feat && '' !== $flag ? ' ewt-flagged' : '' ) . '" data-i="' . (int) $i . '" data-p="' . (int) $t['pence'] . '" data-n="' . esc_attr( $t['name'] ) . '">';
+		if ( '' !== $flag ) {
+			$h .= '<p class="ewt-banner' . ( $feat ? '' : ' ewt-banner-line' ) . '">' . esc_html( $flag ) . '</p>';
 		}
 		if ( $feat && '' !== $a['stamp'] ) {
 			$h .= '<p class="ewt-stamp">' . ( '' !== $a['stamp_small'] ? '<small>' . esc_html( $a['stamp_small'] ) . '</small>' : '' ) . '<b>' . esc_html( $a['stamp'] ) . '</b></p>';
@@ -172,23 +242,16 @@ function ew_tix_shortcode( $atts, $content = null ) {
 		$h .= '<h3 class="ewt-name">' . esc_html( $t['name'] ) . '</h3>';
 		$h .= '<p class="ewt-price">' . esc_html( $on ? ew_tix_money( $t['pence'] ) : $a['tbc'] ) . ( $on && '' !== $a['each'] ? '<small>' . esc_html( $a['each'] ) . '</small>' : '' ) . '</p>';
 		if ( $feat && '' !== trim( $a['bonus'] ) ) {
-			$h .= '<div class="ewt-bonus">';
-			if ( '' !== $a['bonus_head'] ) {
-				$h .= '<p class="ewt-bonus-head">' . esc_html( $a['bonus_head'] ) . '</p>';
-			}
-			$h .= '<div class="ewt-drinks">';
-			foreach ( array_filter( array_map( 'trim', explode( ';', $a['bonus'] ) ) ) as $d ) {
-				$num  = preg_match( '/^(\d+)\s*(.*)$/', $d, $m ) ? $m[1] : '';
-				$word = $num ? $m[2] : $d;
-				$icon = false !== stripos( $d, 'wine' ) ? 'M10 2h4v4.5c0 1 2 2.2 2 4.5V21a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V11c0-2.3 2-3.5 2-4.5zM8 13h8' : 'M6 4h10l-1.2 16H7.2zM6.3 8h9.4M16 9h2a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-2.6';
-				$h   .= '<div class="ewt-drink"><svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><path d="' . $icon . '"/></svg><div>' . ( $num ? '<strong>' . esc_html( $num ) . '</strong>' : '' ) . '<em>' . esc_html( $word ) . '</em></div></div>';
-			}
-			$h .= '</div></div>';
+			$h .= ew_tix_panel( $a['bonus_head'], $a['bonus'] );
+		} elseif ( '' !== $t['panel'] ) {
+			$pp  = explode( '>', $t['panel'], 2 );
+			$h  .= isset( $pp[1] ) ? ew_tix_panel( $pp[0], $pp[1] ) : ew_tix_panel( '', $pp[0] );
 		}
 		if ( $t['inc'] ) {
-			$h .= '<ul class="ewt-inc">';
+			$withi = in_array( $i + 1, $iconed, true );
+			$h    .= '<ul class="ewt-inc' . ( $withi ? ' ewt-inc-icons' : '' ) . '">';
 			foreach ( $t['inc'] as $li ) {
-				$h .= '<li>' . esc_html( $li ) . '</li>';
+				$h .= '<li>' . ( $withi ? ew_tix_icon( $li, 20 ) : '' ) . '<span>' . esc_html( $li ) . '</span></li>';
 			}
 			$h .= '</ul>';
 		}
@@ -341,6 +404,12 @@ function ew_tix_css() {
 .ewt-card.ewt-feat{border-color:rgba(232,213,176,.75);background:linear-gradient(180deg,#2c231b,#231c16);transform:translateY(-14px);box-shadow:0 18px 40px rgba(0,0,0,.45)}
 .ewt .ewt-banner{position:absolute;top:-1px;left:-1px;right:-1px;background:var(--ewt-cream);color:#1b140f;text-align:center;font-family:Anton,Impact,sans-serif;letter-spacing:.14em;text-transform:uppercase;font-size:14px;padding:8px;margin:0}
 .ewt-card.ewt-has-banner .ewt-tag{margin-top:30px}
+.ewt-card.ewt-flagged{border-color:rgba(232,213,176,.45)}
+.ewt .ewt-banner.ewt-banner-line{background:none;color:var(--ewt-cream);border:1px solid rgba(232,213,176,.45);border-bottom-color:var(--ewt-line)}
+.ewt .ewt-inc.ewt-inc-icons li::before{display:none}
+.ewt .ewt-inc.ewt-inc-icons li{display:flex;align-items:center;gap:12px}
+.ewt .ewt-inc-icons li svg{stroke:var(--ewt-cream);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ewt .ewt-inc li span{display:inline}
 .ewt .ewt-stamp{position:absolute;top:58px;right:22px;width:88px;height:88px;border:1.5px solid var(--ewt-cream);border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--ewt-cream);transform:rotate(-10deg);margin:0}
 .ewt-stamp small{font-size:10px;letter-spacing:.14em;text-transform:uppercase}
 .ewt-stamp b{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:30px;line-height:1}
