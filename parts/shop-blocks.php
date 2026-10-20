@@ -114,7 +114,6 @@ function ew_shirt_shortcode( $atts, $content = null ) {
 			'collect_note'  => '',
 			'post_title'    => 'Post it to me',
 			'post_note'     => 'Royal Mail. {price} added at checkout.',
-			'pay_note'      => 'Payments are handled by Stripe. Your card details never touch this site.',
 			'empty'         => 'Not on sale yet.',
 			'failed'        => 'Could not load the shop just now.',
 			'pay'           => 'Buy it now',
@@ -326,7 +325,7 @@ function ewStripeCheckout(stripe, opts){
   (SKUS[f.sku] = SKUS[f.sku] || []).push(f.code);
  });
 
- var model = {}, fit = null, size = null, post = false, checkout = null;
+ var model = {}, fit = null, size = null, post = false, checkout = null, stage = 'pick';
  var $ = function(id){ return document.getElementById(id); };
  function money(n){ return '\u00a3' + Number(n).toFixed(2); }
 
@@ -407,19 +406,23 @@ function ewStripeCheckout(stripe, opts){
    btn.type = 'button'; btn.className = 'ewsh-go'; btn.textContent = W.paybtn;
    btn.addEventListener('click', openDetails);
    pay.appendChild(btn);
-   if(W.pay){
-    var small = document.createElement('p');
-    small.className = 'ewsh-small'; small.textContent = W.pay;
-    pay.appendChild(small);
-   }
   }
   pay.querySelector('.ewsh-go').disabled = !size;
  }
 
+ /* One step on screen at a time. The shirt, the price and the size
+    buttons stay put above; what changes underneath them is the single
+    panel for whichever step they are on. */
+ function step(s){
+  stage = s;
+  EL.querySelector('.ewsh-pay').hidden = (s !== 'pick');
+  EL.querySelector('.ewsh-det').hidden = (s !== 'details');
+  EL.querySelector('.ewsh-co').hidden  = (s !== 'pay');
+ }
+
  function openDetails(){
-  var d = EL.querySelector('.ewsh-det');
-  d.hidden = false;
-  d.scrollIntoView({behavior:'smooth', block:'nearest'});
+  step('details');
+  EL.querySelector('.ewsh-det').scrollIntoView({behavior:'smooth', block:'nearest'});
   var e = $('ewshEmail'); if(e) e.focus();
  }
 
@@ -431,7 +434,9 @@ function ewStripeCheckout(stripe, opts){
   if(checkout){ checkout.destroy(); checkout = null; }
   EL.querySelector('.ewsh-mount').innerHTML = '';
   EL.querySelector('.ewsh-msg').textContent = '';
-  co.hidden = true;
+  /* Priced for the old choice, so it goes -- back to the details they
+     had already filled in, not back to the start. */
+  if(stage === 'pay'){ step('details'); }
  }
 
  function startPay(){
@@ -451,7 +456,7 @@ function ewStripeCheckout(stripe, opts){
   }
   err.textContent = '';
 
-  co.hidden = false;
+  step('pay');
   co.scrollIntoView({behavior:'smooth', block:'nearest'});
   if(!W.pk || !window.Stripe){ msg.textContent = W.off; return; }
   if(checkout) return;
