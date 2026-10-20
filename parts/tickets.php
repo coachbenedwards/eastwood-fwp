@@ -202,6 +202,7 @@ function ew_tix_shortcode( $atts, $content = null ) {
 		'continue'    => 'Continue to payment',
 		'need'        => 'Please add your email.',
 		'crm_hook'    => '',
+		'greeting'    => '',
 		'upsell'        => '',
 		'upsell_title'  => '',
 		'upsell_sub'    => '',
@@ -390,7 +391,7 @@ add_action( 'rest_api_init', function () {
 
 			// The booker is saved before the card form opens.
 			$hook = (string) ( $block['fields']['crm_hook'] ?? '' );
-			$bid  = function_exists( 'ew_tix_booking_start' ) ? ew_tix_booking_start( $post, $event, $name, $email, implode( ', ', $said ), $total, $hook ) : 0;
+			$bid  = function_exists( 'ew_tix_booking_start' ) ? ew_tix_booking_start( $post, $event, $name, $email, implode( ', ', $said ), $total, $hook, (string) ( $block['fields']['greeting'] ?? '' ) ) : 0;
 			$cus  = function_exists( 'ew_tix_stripe' ) ? ew_tix_stripe( 'POST', 'customers', array(
 				'name'              => $name,
 				'email'             => $email,

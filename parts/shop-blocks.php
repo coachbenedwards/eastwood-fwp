@@ -135,6 +135,7 @@ function ew_shirt_shortcode( $atts, $content = null ) {
 			'email_bad'     => 'We need an email to send your receipt to.',
 			'consent'       => 'Tell me when new kit and home tickets go on sale',
 			'crm_hook'      => '',
+			'greeting'      => '',
 			'promos'        => '',
 			'hide_pay'      => '',
 			'cont'          => 'Continue',
@@ -651,11 +652,11 @@ function ew_shirt_block_on( $post ) {
  * Everything here is guarded: if the tickets part is ever not loaded, the
  * shirt still sells, it just goes unrecorded.
  */
-function ew_shirt_booking( $post, $what, $name, $email, $lines, $pence, $hook ) {
+function ew_shirt_booking( $post, $what, $name, $email, $lines, $pence, $hook, $greeting = '' ) {
 	if ( ! function_exists( 'ew_tix_booking_start' ) ) {
 		return 0;
 	}
-	return (int) ew_tix_booking_start( $post, $what, $name, $email, $lines, $pence, $hook );
+	return (int) ew_tix_booking_start( $post, $what, $name, $email, $lines, $pence, $hook, $greeting );
 }
 
 /**
@@ -762,7 +763,8 @@ add_action( 'rest_api_init', function () {
 				$email,
 				trim( $size . ' · ' . ( $post ? 'posted' : 'collecting' ) ),
 				$pence + ( $post ? $ship : 0 ),
-				$hook
+				$hook,
+				(string) ( $block['fields']['greeting'] ?? '' )
 			) : 0;
 			if ( $booking && $consent ) {
 				update_post_meta( $booking, '_ewt_consent', 'yes' );

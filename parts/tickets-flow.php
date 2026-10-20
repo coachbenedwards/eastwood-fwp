@@ -150,6 +150,7 @@ function ew_tix_crm( $hook, $booking_id, $step ) {
 		'headers'  => array( 'Content-Type' => 'application/json' ),
 		'body'     => wp_json_encode( array(
 			'step'       => $step,
+			'greeting'   => '' !== $m( 'greeting' ) ? $m( 'greeting' ) : 'Hi Eastwood Fan',
 			'first_name' => false === $sp ? $name : substr( $name, 0, $sp ),
 			'last_name'  => false === $sp ? '' : trim( substr( $name, $sp + 1 ) ),
 			'name'       => $name,
@@ -167,7 +168,7 @@ function ew_tix_crm( $hook, $booking_id, $step ) {
 }
 
 /** Save the booker as soon as they press Continue. */
-function ew_tix_booking_start( $post, $event, $name, $email, $lines, $total, $hook ) {
+function ew_tix_booking_start( $post, $event, $name, $email, $lines, $total, $hook, $greeting = '' ) {
 	$id = wp_insert_post( array(
 		'post_type'   => 'ewt_booking',
 		'post_status' => 'publish',
@@ -185,6 +186,9 @@ function ew_tix_booking_start( $post, $event, $name, $email, $lines, $total, $ho
 		'lines'  => $lines,
 		'total'  => $total,
 		'status' => 'started',
+		// How the emails open. A field on the block, so each event can
+		// have its own; unpaid bookers have given no name.
+		'greeting' => trim( (string) $greeting ),
 	) as $k => $v ) {
 		update_post_meta( $id, '_ewt_' . $k, $v );
 	}
