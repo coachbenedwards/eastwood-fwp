@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.0.4
+ * Version: 3.1.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -244,6 +244,57 @@ function ew_fwp_settings_page() {
 		}
 		echo '<div class="notice notice-success"><p>Cleared. The next page view goes and looks at the channel again.</p></div>';
 	}
+
+	/* ------------------------------------------------------------------
+	 * Square. The shop plugin takes the card payment, and that needs
+	 * three values from the Square dashboard. They are pasted here, the
+	 * same way the other keys are, so none of them reaches the
+	 * repository. The token is write-once: the screen never shows it
+	 * back, only whether one is set and how long it is.
+	 * ------------------------------------------------------------------ */
+
+	if ( isset( $_POST['ew_sq_save'] ) && check_admin_referer( 'ew_sq_save' ) ) {
+		foreach ( array( 'ew_sq_app_id', 'ew_sq_location_id', 'ew_sq_token' ) as $field ) {
+			if ( isset( $_POST[ $field ] ) && '' !== trim( (string) wp_unslash( $_POST[ $field ] ) ) ) {
+				update_option( $field, sanitize_text_field( wp_unslash( $_POST[ $field ] ) ), false );
+			}
+		}
+		if ( isset( $_POST['ew_sq_env'] ) ) {
+			update_option( 'ew_sq_env', 'live' === $_POST['ew_sq_env'] ? 'live' : 'sandbox', false );
+		}
+		echo '<div class="notice notice-success"><p>Saved.</p></div>';
+	}
+
+	$sq_app = (string) get_option( 'ew_sq_app_id', '' );
+	$sq_loc = (string) get_option( 'ew_sq_location_id', '' );
+	$sq_tok = (string) get_option( 'ew_sq_token', '' );
+	$sq_env = 'live' === get_option( 'ew_sq_env', 'sandbox' ) ? 'live' : 'sandbox';
+
+	echo '<h2>Square</h2>';
+	echo '<p>Card payments in the club shop. These three come from the Square dashboard, under Developer, and are stored on this site only.</p>';
+	echo '<form method="post"><table class="form-table"><tbody>';
+	wp_nonce_field( 'ew_sq_save' );
+	printf(
+		'<tr><th scope="row">Application ID</th><td><input type="text" name="ew_sq_app_id" size="50" value="%s" autocomplete="off"></td></tr>',
+		esc_attr( $sq_app )
+	);
+	printf(
+		'<tr><th scope="row">Location ID</th><td><input type="text" name="ew_sq_location_id" size="30" value="%s" autocomplete="off"></td></tr>',
+		esc_attr( $sq_loc )
+	);
+	printf(
+		'<tr><th scope="row">Access token</th><td><input type="password" name="ew_sq_token" size="50" autocomplete="off" placeholder="%s"><p class="description">%s</p></td></tr>',
+		esc_attr( '' !== $sq_tok ? 'set (' . strlen( $sq_tok ) . ' characters) -- paste a new one to replace it' : 'paste token here' ),
+		esc_html( 'Left blank, the token already saved is kept.' )
+	);
+	printf(
+		'<tr><th scope="row">Mode</th><td><label><input type="radio" name="ew_sq_env" value="sandbox"%s> Sandbox</label> &nbsp; <label><input type="radio" name="ew_sq_env" value="live"%s> Live</label></td></tr>',
+		'sandbox' === $sq_env ? ' checked' : '',
+		'live' === $sq_env ? ' checked' : ''
+	);
+	echo '</tbody></table>';
+	submit_button( 'Save Square settings', 'primary', 'ew_sq_save', false );
+	echo '</form>';
 
 	$yt_key   = function_exists( 'ew_yt_api_key' ) ? ew_yt_api_key() : '';
 	$yt_route = (string) get_option( 'ew_yt_route', '' );
@@ -2913,7 +2964,6 @@ function ew_squad_details() {
 		// only. Willow is read as Ryan Wilson, because Tyree Wilson is named
 		// outright at 14.
 		//
-		// Theo Sackey-Mensah is the one still open -- he was not in the list
 		// and Ben is checking whether he has a number or has left. A null
 		// number means the page falls back to the shirt the player has worn
 		// most often, which is what it did for everyone until today.
@@ -2929,7 +2979,6 @@ function ew_squad_details() {
 		'Jake Wright'        => array( 12, 'df' ),
 		'Toby Moore'         => array( 15, 'df' ),
 		'Charlie Marzano'    => array( 2, 'df' ),
-		'Theo Sackey-Mensah' => array( null, 'df' ),
 		'Connor Dimaio'      => array( 6, 'mf' ),
 		'Jamie Walker'       => array( 11, 'mf' ),
 		'Jacob Pearce'       => array( 7, 'mf' ),
@@ -3337,7 +3386,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.0.4';
+const EW_FWP_VERSION = '3.1.0';
 
 /*
  * Parts loader.

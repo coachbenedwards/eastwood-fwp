@@ -1319,13 +1319,30 @@ function ew_hb_shop_sc( $atts, $content = '' ) {
 			'title'   => 'Get Kitted Out',
 			'all'     => 'Shop all',
 			'all_url' => '/shop/',
+			'soon'    => 'Coming soon',
 		),
 		$atts,
 		'eastwood_home_shop'
 	);
 
-	$items = array();
+	/*
+	 * A line that opens with # names a tab and everything under it
+	 * belongs to that tab. With no # lines at all the block behaves
+	 * exactly as it did: one row, no tab strip.
+	 */
+	$groups = array();
+	$open   = null;
+
 	foreach ( ew_hb_lines( $content ) as $line ) {
+		if ( 0 === strpos( $line, '#' ) ) {
+			$name = trim( ltrim( $line, '#' ) );
+			if ( '' !== $name ) {
+				$open            = $name;
+				$groups[ $open ] = isset( $groups[ $open ] ) ? $groups[ $open ] : array();
+			}
+			continue;
+		}
+
 		$parts = array_map( 'trim', explode( '|', $line ) );
 		if ( '' === $parts[0] || ! isset( $parts[1] ) || '' === $parts[1] ) {
 			continue;
@@ -1334,7 +1351,12 @@ function ew_hb_shop_sc( $atts, $content = '' ) {
 		if ( 0 !== strpos( $url, 'http' ) ) {
 			$url = home_url( '/' . ltrim( $url, '/' ) );
 		}
-		$items[] = array(
+
+		$key = null === $open ? '' : $open;
+		if ( ! isset( $groups[ $key ] ) ) {
+			$groups[ $key ] = array();
+		}
+		$groups[ $key ][] = array(
 			$parts[0],
 			$url,
 			isset( $parts[2] ) ? $parts[2] : '',
@@ -1342,9 +1364,13 @@ function ew_hb_shop_sc( $atts, $content = '' ) {
 		);
 	}
 
-	if ( ! $items ) {
+	if ( ! $groups ) {
 		return '';
 	}
+
+	$names  = array_keys( $groups );
+	$tabbed = ( 1 < count( $names ) ) || ( 1 === count( $names ) && '' !== $names[0] );
+	$uid    = 'ewshop' . substr( md5( serialize( $groups ) . $atts['title'] ), 0, 6 );
 
 	ob_start();
 	?>
@@ -1354,24 +1380,44 @@ function ew_hb_shop_sc( $atts, $content = '' ) {
 		<h2 class="ewp-h2 is-center is-red"><?php echo esc_html( $atts['title'] ); ?></h2>
 		<?php endif; ?>
 
-		<ul class="ewp-shopGrid">
-			<?php foreach ( $items as $item ) : ?>
-			<li>
-				<a href="<?php echo esc_url( $item[1] ); ?>">
-					<span class="ewp-shopImg">
-						<?php if ( '' !== $item[3] ) : ?>
-						<img src="<?php echo esc_url( $item[3] ); ?>" alt="" loading="lazy"
-							onerror="this.style.display='none'">
-						<?php endif; ?>
-					</span>
-					<b><?php echo esc_html( $item[0] ); ?></b>
-					<?php if ( '' !== $item[2] ) : ?>
-					<i><?php echo esc_html( $item[2] ); ?></i>
-					<?php endif; ?>
-				</a>
-			</li>
+		<?php if ( $tabbed ) : ?>
+		<div class="ewp-shopTabs" role="tablist">
+			<?php foreach ( $names as $i => $name ) : ?>
+			<button type="button" role="tab" class="ewp-shopTab<?php echo 0 === $i ? ' is-on' : ''; ?>"
+				aria-selected="<?php echo 0 === $i ? 'true' : 'false'; ?>"
+				aria-controls="<?php echo esc_attr( $uid . '-' . $i ); ?>"
+				data-pane="<?php echo (int) $i; ?>"><?php echo esc_html( $name ); ?></button>
 			<?php endforeach; ?>
-		</ul>
+		</div>
+		<?php endif; ?>
+
+		<?php foreach ( $names as $i => $name ) : ?>
+		<div class="ewp-shopPane<?php echo 0 === $i ? ' is-on' : ''; ?>"
+			id="<?php echo esc_attr( $uid . '-' . $i ); ?>" data-pane="<?php echo (int) $i; ?>">
+			<?php if ( $groups[ $name ] ) : ?>
+			<ul class="ewp-shopGrid">
+				<?php foreach ( $groups[ $name ] as $item ) : ?>
+				<li>
+					<a href="<?php echo esc_url( $item[1] ); ?>">
+						<span class="ewp-shopImg">
+							<?php if ( '' !== $item[3] ) : ?>
+							<img src="<?php echo esc_url( $item[3] ); ?>" alt="" loading="lazy"
+								onerror="this.style.display='none'">
+							<?php endif; ?>
+						</span>
+						<b><?php echo esc_html( $item[0] ); ?></b>
+						<?php if ( '' !== $item[2] ) : ?>
+						<i><?php echo esc_html( $item[2] ); ?></i>
+						<?php endif; ?>
+					</a>
+				</li>
+				<?php endforeach; ?>
+			</ul>
+			<?php elseif ( '' !== $atts['soon'] ) : ?>
+			<p class="ewp-shopSoon"><?php echo esc_html( $atts['soon'] ); ?></p>
+			<?php endif; ?>
+		</div>
+		<?php endforeach; ?>
 
 		<?php if ( '' !== $atts['all'] ) : ?>
 		<p class="ewp-shopAll"><a href="<?php echo esc_url( home_url( $atts['all_url'] ) ); ?>"><?php
@@ -2532,6 +2578,21 @@ function ew_hb_css() {
 
 /* Get Kitted Out — typed-in tiles until there is a real store. */
 .ewp-shop{background:#f3f3f3;padding:44px 0 50px}
+/* The tab strip, read off the reference: Anton 700 at 16px, no caps
+   transform, 128 wide minimum and 32 tall, 4px between them, sitting
+   on the left of the column. The one you are on is white on #CC0000;
+   the rest are near-black on nothing. 36px under the heading and 24
+   over the row, which is their rhythm. */
+.ewp-shopTabs{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-start;margin:36px 0 24px}
+.ewp-shopTab{min-width:128px;height:32px;padding:8px 16px;border:0;border-radius:2px;
+ background:none;color:#101010;cursor:pointer;
+ font-family:Anton,"Instrument Sans",sans-serif;font-weight:700;font-size:16px;line-height:16px}
+.ewp-shopTab.is-on{background:#CC0000;color:#fff}
+.ewp-shopPane{display:none}
+.ewp-shopPane.is-on{display:block}
+.ewp-shopSoon{margin:0;padding:64px 0;text-align:center;
+ font-family:Anton,"Instrument Sans",sans-serif;font-size:20px;line-height:20px;
+ text-transform:uppercase;color:#8a8a8a}
 .ewp-shopGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
  gap:14px;list-style:none;margin:0;padding:0}
 .ewp-shopGrid a{display:block;text-decoration:none;color:#111;text-align:center}
@@ -3101,6 +3162,22 @@ function ew_hb_js() {
     a drag, so the fixture links keep working. */
  /* The chevrons. One press is one card; each hides when there is
     nothing that way, which is what the reference does. */
+ [].forEach.call(document.querySelectorAll('.ewp-shopTabs'), function(bar){
+  bar.addEventListener('click', function(e){
+   var hit = e.target.closest('.ewp-shopTab');
+   if (!hit) { return; }
+   var box = bar.parentNode;
+   [].forEach.call(box.querySelectorAll('.ewp-shopTab'), function(t){
+    var on = t === hit;
+    t.classList.toggle('is-on', on);
+    t.setAttribute('aria-selected', on ? 'true' : 'false');
+   });
+   [].forEach.call(box.querySelectorAll('.ewp-shopPane'), function(p){
+    p.classList.toggle('is-on', p.getAttribute('data-pane') === hit.getAttribute('data-pane'));
+   });
+  });
+ });
+
  [].forEach.call(document.querySelectorAll('.ewp-strip, .ewp-disc, .ewp-tv'), function(strip){
   var list = strip.querySelector('.ewp-stripList');
   var prev = strip.querySelector('.ewp-stripNav.is-prev');
