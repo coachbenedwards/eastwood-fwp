@@ -2593,7 +2593,10 @@ function ew_hb_css() {
 .ewp-shopSoon{margin:0;padding:64px 0;text-align:center;
  font-family:Anton,"Instrument Sans",sans-serif;font-size:20px;line-height:20px;
  text-transform:uppercase;color:#8a8a8a}
-.ewp-shopGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+/* auto-fill, not auto-fit: a tab holding two products should show two
+   cards the size of all the others, left on the column, not two cards
+   stretched across half the row each. */
+.ewp-shopGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));
  gap:14px;list-style:none;margin:0;padding:0}
 .ewp-shopGrid a{display:block;text-decoration:none;color:#111;text-align:center}
 .ewp-shopImg{display:flex;align-items:center;justify-content:center;aspect-ratio:1/1;
