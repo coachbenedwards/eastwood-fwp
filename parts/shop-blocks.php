@@ -271,6 +271,13 @@ function ew_shirt_css() {
  */
 function ew_shirt_js() {
 	return <<<'JS'
+/* Stripe renamed initEmbeddedCheckout to createEmbeddedCheckoutPage. Ask for
+   whichever this browser's copy of Stripe.js actually has, so the page keeps
+   working either side of that change. */
+function ewStripeCheckout(stripe, opts){
+ var make = stripe.createEmbeddedCheckoutPage || stripe.initEmbeddedCheckout;
+ return make.call(stripe, opts);
+}
 (function(){
  var EL = document.querySelector('.ewsh');
  if(!EL) return;
@@ -401,7 +408,7 @@ function ew_shirt_js() {
   var stripe = window.Stripe(W.pk), m = model[fit];
   /* The browser says which shirt, which size and whether it is posted.
      What any of it costs is read again on the server. */
-  stripe.initEmbeddedCheckout({fetchClientSecret: function(){
+  ewStripeCheckout(stripe, {fetchClientSecret: function(){
    return fetch(W.rest, {method:'POST', headers:{'Content-Type':'application/json'},
      body: JSON.stringify({sku: m.sku, size: size, post: post})})
     .then(function(r){ return r.json(); })
@@ -518,7 +525,7 @@ add_action( 'rest_api_init', function () {
 			$back = $back ? strtok( $back, '?' ) : home_url( '/shop/' );
 
 			$body = array(
-				'ui_mode'                          => 'embedded',
+				'ui_mode'                          => 'embedded_page',
 				'mode'                             => 'payment',
 				'return_url'                       => add_query_arg( 'ewsh_paid', '{CHECKOUT_SESSION_ID}', $back ),
 				'phone_number_collection[enabled]' => 'true',
@@ -543,7 +550,10 @@ add_action( 'rest_api_init', function () {
 
 			$res = wp_remote_post( 'https://api.stripe.com/v1/checkout/sessions', array(
 				'timeout' => 20,
-				'headers' => array( 'Authorization' => 'Bearer ' . $sk ),
+				'headers' => array(
+					'Authorization' => 'Bearer ' . $sk,
+					'Stripe-Version' => '2026-03-25.dahlia',
+				),
 				'body'    => $body,
 			) );
 			if ( is_wp_error( $res ) ) {

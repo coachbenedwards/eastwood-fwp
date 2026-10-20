@@ -263,7 +263,7 @@ add_action( 'rest_api_init', function () {
 			$event = (string) ( $block['fields']['event'] ?? get_the_title( $post ) );
 
 			$body  = array(
-				'ui_mode'                         => 'embedded',
+				'ui_mode'                         => 'embedded_page',
 				'mode'                            => 'payment',
 				'return_url'                      => add_query_arg( 'ewt_paid', '{CHECKOUT_SESSION_ID}', get_permalink( $post ) ) . '#tickets',
 				'phone_number_collection[enabled]' => 'true',
@@ -302,7 +302,10 @@ add_action( 'rest_api_init', function () {
 
 			$res = wp_remote_post( 'https://api.stripe.com/v1/checkout/sessions', array(
 				'timeout' => 20,
-				'headers' => array( 'Authorization' => 'Bearer ' . $sk ),
+				'headers' => array(
+					'Authorization' => 'Bearer ' . $sk,
+					'Stripe-Version' => '2026-03-25.dahlia',
+				),
 				'body'    => $body,
 			) );
 			if ( is_wp_error( $res ) ) {
@@ -383,6 +386,13 @@ CSS;
 
 function ew_tix_js() {
 	return <<<'JS'
+/* Stripe renamed initEmbeddedCheckout to createEmbeddedCheckoutPage. Ask for
+   whichever this browser's copy of Stripe.js actually has, so the page keeps
+   working either side of that change. */
+function ewStripeCheckout(stripe, opts){
+ var make = stripe.createEmbeddedCheckoutPage || stripe.initEmbeddedCheckout;
+ return make.call(stripe, opts);
+}
 (function(){
   document.querySelectorAll('.ewt').forEach(function(root){
     var q={}, cards=root.querySelectorAll('.ewt-card'), bar=root.querySelector('.ewt-bar'), co=root.querySelector('.ewt-co'), mount=root.querySelector('.ewt-mount'), msg=root.querySelector('.ewt-msg'), checkout=null;
@@ -404,7 +414,7 @@ function ew_tix_js() {
       if(checkout)return;
       msg.textContent=root.dataset.loading;
       var stripe=window.Stripe(root.dataset.pk);
-      stripe.initEmbeddedCheckout({fetchClientSecret:function(){
+      ewStripeCheckout(stripe,{fetchClientSecret:function(){
         return fetch(root.dataset.rest,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:+root.dataset.page,items:q})})
           .then(function(r){return r.json();}).then(function(j){if(!j.clientSecret)throw new Error(j.message||'error');return j.clientSecret;});
       }}).then(function(c){checkout=c;msg.textContent='';c.mount(mount);bar.classList.remove('ewt-on');})
