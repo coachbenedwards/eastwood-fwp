@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.2.2
+ * Version: 3.2.3
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -3401,7 +3401,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.2.2';
+const EW_FWP_VERSION = '3.2.3';
 
 /*
  * Parts loader.
@@ -4565,18 +4565,46 @@ function ew_rewrite_topbar( $html ) {
 	foreach ( ew_topbar_changes() as $was => $now ) {
 		list( $label, $link ) = $now;
 
-		$from = '<p class="z-10">' . $was . '</p>';
-		$to   = '<p class="z-10">' . esc_html( $label ) . '</p>';
+		/*
+		 * Matched loosely on purpose. The first version of this wanted
+		 * the exact wrapper the captured markup happened to use, and one
+		 * item out of two did not have it -- so that item kept its old
+		 * word, and the bar kept its old order, with nothing said. The
+		 * word between a closing bracket and a closing paragraph is what
+		 * is actually being changed; the wrapper around it is the
+		 * reference build's business and may be anything.
+		 */
+		$shapes = array(
+			array( '<p class="z-10">' . $was . '</p>', '<p class="z-10">' . esc_html( $label ) . '</p>' ),
+			array( '>' . $was . '</p>', '>' . esc_html( $label ) . '</p>' ),
+			array( '>' . $was . '</span>', '>' . esc_html( $label ) . '</span>' ),
+		);
 
-		if ( false !== strpos( $html, $to ) ) {
-			$log[ $was ] = 'already';
-		} elseif ( false !== strpos( $html, $from ) ) {
-			$html        = str_replace( $from, $to, $html );
-			$log[ $was ] = 'renamed';
-		} else {
-			$log[ $was ] = 'label not on page';
+		$done = '';
+		foreach ( $shapes as $i => $shape ) {
+			if ( false !== strpos( $html, $shape[1] ) ) {
+				$done = 'already';
+				break;
+			}
+			if ( false !== strpos( $html, $shape[0] ) ) {
+				$html = str_replace( $shape[0], $shape[1], $html );
+				$done = 'renamed (shape ' . ( $i + 1 ) . ')';
+				break;
+			}
+		}
+
+		if ( '' === $done ) {
+			// Say where the word is, if it is anywhere, so the next look at
+			// this does not start from scratch.
+			$at          = strpos( $html, $was );
+			$log[ $was ] = false === $at
+				? 'not on the page at all'
+				: 'word is there but not in a shape this knows: '
+					. substr( preg_replace( '#\s+#', ' ', substr( $html, max( 0, $at - 40 ), 90 ) ), 0, 90 );
 			continue;
 		}
+
+		$log[ $was ] = $done;
 
 		if ( '' === $link ) {
 			continue;
@@ -4795,6 +4823,29 @@ add_action( 'wp_enqueue_scripts', function () {
 	wp_register_style( 'ew-blockrow', false, array(), EW_FWP_VERSION );
 	wp_enqueue_style( 'ew-blockrow' );
 	wp_add_inline_style( 'ew-blockrow', ew_blockrow_css() );
+}, 22 );
+
+/**
+ * The strip under an article headline.
+ *
+ * It carries a byline reading "By Eastwood Community FC" on the club's
+ * own site, which tells a reader nothing, and a Share control that came
+ * across in the capture with nothing behind it -- a button that looks
+ * like a button and does not do anything is worse than no button.
+ * The whole strip goes rather than its contents, or its padding would
+ * leave a band of empty page where it used to be.
+ */
+function ew_article_strip_css() {
+	return '[class*="max-w-[720px]"]:has(> p.font-bold):has(> .ml-auto){display:none}';
+}
+
+add_action( 'wp_enqueue_scripts', function () {
+	if ( ! is_singular( 'post' ) ) {
+		return;
+	}
+	wp_register_style( 'ew-article', false, array(), EW_FWP_VERSION );
+	wp_enqueue_style( 'ew-article' );
+	wp_add_inline_style( 'ew-article', ew_article_strip_css() );
 }, 22 );
 
 function ew_prose_css_inline() {
