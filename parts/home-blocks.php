@@ -2041,13 +2041,13 @@ function ew_hb_css() {
    editor no longer does anything -- which is the point of having one. */
 .elementor-template-full-width .elementor-widget.elementor-widget-heading
  h2.elementor-heading-title{
- font-family:Anton,"Instrument Sans",sans-serif;font-size:54px;letter-spacing:.02em;
- line-height:1.02;text-transform:uppercase;margin:0 0 26px;text-align:center}
+ font-family:Anton,"Instrument Sans",sans-serif;font-size:56px;letter-spacing:.02em;
+ line-height:56px;text-transform:uppercase;margin:0 0 24px;text-align:center}
 @media(max-width:820px){
  .elementor-template-full-width .elementor-widget.elementor-widget-heading
-  h2.elementor-heading-title{font-size:30px;margin-bottom:20px}
+  h2.elementor-heading-title{font-size:30px;line-height:30px;margin-bottom:24px}
 }
-.ewp-allRow{margin:30px 0 0;text-align:center}
+.ewp-allRow{margin:24px 0 0;text-align:center}
 .ewp-all{font-family:Anton,"Instrument Sans",sans-serif;font-size:14px;letter-spacing:.09em;
  text-transform:uppercase;color:#CC0000;text-decoration:none;
  border-bottom:1px solid rgba(204,0,0,.4);padding-bottom:3px}
@@ -2105,7 +2105,7 @@ function ew_hb_css() {
 .ewp-tiles.is-dark .ewp-tileSub,.ewp-tiles.is-red .ewp-tileSub{color:rgba(255,255,255,.78)}
 
 /* Partners, pulled from the sponsor store rather than typed again. */
-.ewp-sponsors{background:#fff;padding:46px 0 52px}
+.ewp-sponsors{background:#fff;padding:32px 0}
 .ewp-sponsorLabel{margin:26px 0 18px;text-align:center;font-size:11px;font-weight:700;
  letter-spacing:.16em;text-transform:uppercase;color:#9a9aa3}
 .ewp-sponsorRow{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;
@@ -2574,20 +2574,20 @@ function ew_hb_css() {
  transition:background .15s,color .15s}
 .ewp-pills button:hover{color:#fff}
 .ewp-pills button[aria-selected="true"]{background:#fff;color:#CC0000}
-.ewp-upcomingAll{margin:28px 0 0;text-align:center}
+.ewp-upcomingAll{margin:24px 0 0;text-align:center}
 .ewp-upcomingAll a{font-family:Anton,"Instrument Sans",sans-serif;font-size:14px;letter-spacing:.09em;
  text-transform:uppercase;color:#fff;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.45);
  padding-bottom:3px}
 .ewp-upcomingAll a:hover{border-bottom-color:#fff}
 
 /* Get Kitted Out — typed-in tiles until there is a real store. */
-.ewp-shop{background:#f3f3f3;padding:44px 0 50px}
+.ewp-shop{background:#f3f3f3;padding:32px 0}
 /* The tab strip, read off the reference: Anton 700 at 16px, no caps
    transform, 128 wide minimum and 32 tall, 4px between them, sitting
    on the left of the column. The one you are on is white on #CC0000;
    the rest are near-black on nothing. 36px under the heading and 24
    over the row, which is their rhythm. */
-.ewp-shopTabs{display:flex;flex-wrap:nowrap;gap:4px;justify-content:flex-start;margin:36px 0 24px;
+.ewp-shopTabs{display:flex;flex-wrap:nowrap;gap:4px;justify-content:flex-start;margin:0 0 24px;
  overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;
  -webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
 .ewp-shopTabs::-webkit-scrollbar{display:none}
@@ -2613,13 +2613,13 @@ function ew_hb_css() {
 .ewp-shopImg img{width:100%;height:100%;object-fit:cover;display:block}
 .ewp-shopGrid b{display:block;font-size:14px;font-weight:600;line-height:1.35;margin:0 0 4px}
 .ewp-shopGrid i{font-style:normal;font-size:14px;color:#6b6b6b}
-.ewp-shopAll{margin:30px 0 0;text-align:center}
+.ewp-shopAll{margin:24px 0 0;text-align:center}
 .ewp-shopAll a{font-family:Anton,"Instrument Sans",sans-serif;font-size:14px;letter-spacing:.09em;
  text-transform:uppercase;color:#CC0000;text-decoration:none;border-bottom:1px solid rgba(204,0,0,.4);
  padding-bottom:3px}
 .ewp-shopAll a:hover{border-bottom-color:#CC0000}
 
-.ewp-discover{background:#111;padding:46px 0 52px}
+.ewp-discover{background:#111;padding:32px 0}
 .ewp-discoverGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:10px}
 .ewp-discoverGrid a{display:block;position:relative;background:#17171a;border-radius:4px;
  padding:22px 46px 22px 22px;text-decoration:none;transition:background .15s}
@@ -2678,7 +2678,7 @@ function ew_hb_css() {
 .ewp-disc .ewp-stripNav.is-prev{left:max(16px,calc(50vw - 640px))}
 .ewp-disc .ewp-stripNav.is-next{right:max(16px,calc(50vw - 640px))}
 @media(max-width:820px){
- .ewp-discH{font-size:38px;line-height:38px;margin:0 0 26px}
+ .ewp-discH{font-size:30px;line-height:30px;margin:0 0 24px}
  .ewp-discSlide{flex:0 0 232px;max-width:232px}
  .ewp-discCard{width:232px;height:348px}
  .ewp-disc .ewp-stripNav{display:none}
@@ -2807,12 +2807,12 @@ function ew_hb_css() {
    air under it, cards 300 by 279 with an 8px corner and 16 between
    them, the still 300 by 169, the category 12 in grey, the title Anton
    16 in near-black and the age of the clip on the last line. */
-.ewp-tv{position:relative;background:#990000;padding:40px 0 48px;
+.ewp-tv{position:relative;background:#990000;padding:32px 0;
  width:100vw;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw)}
-.ewp-tvMark{margin:0 0 30px;text-align:center;color:#fff;
- font-family:Anton,"Instrument Sans",sans-serif;font-size:44px;line-height:44px;
+.ewp-tvMark{margin:0 0 24px;text-align:center;color:#fff;
+ font-family:Anton,"Instrument Sans",sans-serif;font-size:56px;line-height:56px;
  font-weight:400;text-transform:uppercase;letter-spacing:.01em}
-.ewp-tvHead{margin:0 0 40px;padding:0 max(16px,calc(50vw - 624px));color:#fff;text-align:left;
+.ewp-tvHead{margin:0 0 24px;padding:0 max(16px,calc(50vw - 624px));color:#fff;text-align:left;
  font-family:Anton,"Instrument Sans",sans-serif;font-size:40px;line-height:40px;
  font-weight:400;text-transform:uppercase}
 .ewp-tvRail{position:relative}
@@ -2874,13 +2874,13 @@ function ew_hb_css() {
 .ewp-tv.is-shorts .ewp-stripNav{top:179px}
 .ewp-tv .ewp-stripNav.is-prev{left:max(16px,calc(50vw - 640px))}
 .ewp-tv .ewp-stripNav.is-next{right:max(16px,calc(50vw - 640px))}
-.ewp-tvAll{margin:36px 0 0;text-align:center}
+.ewp-tvAll{margin:24px 0 0;text-align:center}
 .ewp-tvAll a{font-family:Anton,"Instrument Sans",sans-serif;font-size:14px;letter-spacing:.1em;
  text-transform:uppercase;color:#fff;text-decoration:none;
  border-bottom:2px solid rgba(255,255,255,.9);padding-bottom:5px}
 @media(max-width:820px){
- .ewp-tvMark{font-size:32px;line-height:32px;margin-bottom:20px}
- .ewp-tvHead{font-size:28px;line-height:28px;margin-bottom:24px}
+ .ewp-tvMark{font-size:30px;line-height:30px;margin-bottom:24px}
+ .ewp-tvHead{font-size:22px;line-height:22px;margin-bottom:24px}
  .ewp-tv .ewp-stripNav{display:none}
  .ewp-tv.is-shorts .ewp-tvSlide{flex:0 0 160px;max-width:160px}
  .ewp-tv.is-shorts .ewp-tvCard{width:160px;height:284px}
@@ -2943,7 +2943,7 @@ function ew_hb_css() {
 .ewp-newsOver i{font-style:normal;font-size:12px;line-height:12px;color:rgba(255,255,255,.82)}
 @media(max-width:900px){.ewp-newsGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.ewp-newsGrid{grid-template-columns:1fr}
- .ewp-newsH{font-size:34px;line-height:36px;margin-bottom:20px}
+ .ewp-newsH{font-size:30px;line-height:30px;margin-bottom:24px}
  .ewp-newsIcon{font-size:28px}}
 
 /* The editor wraps loose text in paragraphs. Blocks sit flush; stray empty
@@ -2954,7 +2954,7 @@ function ew_hb_css() {
 @media(max-width:820px){
  .ewp-hero a{min-height:380px}
  .ewp-heroText b{font-size:30px;max-width:none}
- .ewp-h2{font-size:30px;margin-bottom:20px}
+ .ewp-h2{font-size:30px;line-height:30px;margin-bottom:24px}
  .ewp-news{padding:32px 0 36px}
  .ewp-fixturesBody{padding:26px 0 36px}
  .ewp-teamTabs{gap:18px;flex-wrap:nowrap}
