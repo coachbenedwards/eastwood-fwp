@@ -1572,7 +1572,7 @@ function ew_hb_player_sc( $atts, $content = '' ) {
 			// Fields rather than numbers in the stylesheet, because the
 			// right answer depends on the photograph.
 			'name_top' => '17%',
-			'num_top'  => '40%',
+			'num_top'  => '36%',
 		),
 		$atts,
 		'eastwood_home_player'
@@ -2855,7 +2855,7 @@ function ew_hb_css() {
  font-family:Oswald,"Instrument Sans",sans-serif;font-weight:700;font-size:36px;line-height:26px;
  color:#fff;text-transform:uppercase;
  -webkit-text-stroke:3px rgba(40,0,6,.9);paint-order:stroke fill}
-.ewp-pickShirt i{position:absolute;left:0;right:0;top:var(--ew-num-top,40%);text-align:center;
+.ewp-pickShirt i{position:absolute;left:0;right:0;top:var(--ew-num-top,36%);text-align:center;
  font-family:Oswald,"Instrument Sans",sans-serif;font-weight:700;font-style:normal;
  font-size:134px;line-height:98px;color:#fff;
  -webkit-text-stroke:3px rgba(40,0,6,.9);paint-order:stroke fill}
