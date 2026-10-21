@@ -78,6 +78,44 @@ function ew_claim_defaults() {
 		'pass_none'     => "We can't find that pass. Check the link, or ask at the turnstile.",
 		'let_in'        => 'Let them in',
 		'is_in'         => 'In at {time}',
+		'shirt_page'     => '107',
+		'offer_tick'     => "You're on the list for Saturday.",
+		'offer_title'    => 'Be truly part of it',
+		'offer_label'    => 'Shirts',
+		'offer_rows'     => "KIDS | Kids home shirt | home-shirt-2627-kids | Kids size | kids; ADULT | Adult home shirt | home-shirt-2627 | Adult size | adult; WOMENS | Women's home shirt | home-shirt-2627 | Women's size | women's",
+		'offer_img'      => 'claim/home-shirt-front.jpg',
+		'offer_pay'      => 'Pay {price}',
+		'offer_skip'     => "No thanks, I'm not an Eastwood fan.",
+		'offer_loading'  => 'Loading the payment form…',
+		'paid_tick'      => 'Paid {price}. Your {word} shirt is ordered.',
+		'print_shirt'    => 'Home shirt 2026/27',
+		'print_sub'      => '{what} · {size}',
+		'print_back'     => 'shop/home-shirt-back.png',
+		'print_title'    => 'Roster or Name & Number',
+		'print_players'  => 'Players',
+		'print_custom'   => 'Custom',
+		'print_none'     => 'None',
+		'print_pick'     => 'Select Player',
+		'print_name'     => 'Name',
+		'print_num'      => 'Number',
+		'print_chars'    => '{n} of {max} characters',
+		'print_range'    => '1 to 99',
+		'print_prints'   => 'Prints {what} on the back.',
+		'print_and'      => 'and',
+		'print_add'      => 'Add printing {price} · one tap',
+		'print_go'       => 'Continue',
+		'print_card'     => 'Charged to the card you just used',
+		'print_other'    => 'Use a different card',
+		'print_warn'     => 'Printed shirts cannot be returned.',
+		'terms_word'     => 'Full terms',
+		'terms_url'      => '/terms/',
+		'print_bad'      => 'Pick a player, or give a name or a number.',
+		'print_late'     => 'This offer has closed.',
+		'print_declined' => 'Your bank wanted another check, so nothing was taken. Try a different card.',
+		'rec_free'       => 'Free',
+		'rec_shirt'      => '{what}, {size}',
+		'rec_print'      => 'Printed {what}',
+		'rec_total'      => 'Total',
 		'crm_hook'      => '',
 	);
 }
@@ -194,6 +232,9 @@ function ew_claim_pass_html( $a, $id ) {
 	} elseif ( current_user_can( 'edit_posts' ) ) {
 		$h .= '<button type="button" class="ewc-btn ewc-letin" data-done="' . esc_attr( $a['is_in'] ) . '" data-code="' . esc_attr( $code ) . '" data-k="' . esc_attr( $m( 'key' ) ) . '">' . esc_html( $a['let_in'] ) . '</button>';
 	}
+	if ( function_exists( 'ew_claim_receipt_html' ) ) {
+		$h .= ew_claim_receipt_html( $a, $id );
+	}
 	$h .= '<div class="ewc-grow"></div><p class="ewc-small">' . esc_html( $a['done_note'] ) . '</p>';
 	return $h;
 }
@@ -234,6 +275,13 @@ function ew_claim_shortcode( $atts, $content = null ) {
 	/* Opened from a pass link: show the pass, nothing else. */
 	if ( isset( $_GET['pass'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
 		$id = ew_claim_find( wp_unslash( $_GET['pass'] ), wp_unslash( $_GET['k'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification,WordPress.Security.ValidatedSanitizedInput
+		/* Back from paying for a shirt: record it, and offer the printing next. */
+		if ( $id && function_exists( 'ew_claim_shirt_page' ) ) {
+			$alt = ew_claim_shirt_page( $a, $id );
+			if ( '' !== $alt ) {
+				return $alt;
+			}
+		}
 		$h .= $id ? ew_claim_pass_html( $a, $id ) : '<p class="ewc-small">' . esc_html( $a['pass_none'] ) . '</p>';
 		$h .= '</div></div>';
 		if ( $id ) {
@@ -417,7 +465,10 @@ add_action( 'rest_api_init', function () {
 			if ( function_exists( 'ew_tix_crm' ) ) {
 				ew_tix_crm( (string) $a['crm_hook'], $id, 'claimed' );
 			}
-			return array( 'html' => ew_claim_pass_html( $a, $id ) );
+			return array(
+				'html'  => ew_claim_pass_html( $a, $id ),
+				'offer' => function_exists( 'ew_claim_offer_html' ) ? ew_claim_offer_html( $a, $id ) : '',
+			);
 		},
 	) );
 
@@ -553,6 +604,7 @@ function ew_claim_js() {
    });
  }); }
  draw(); letin();
+ window.ewcRedraw = function(){ draw(); letin(); };
  var wordsEl = root.querySelector('.ewc-words'); if(!wordsEl) return;
  var W = JSON.parse(wordsEl.textContent), page = root.getAttribute('data-page');
  var s1 = root.querySelector('[data-step="1"]'), s2 = root.querySelector('[data-step="2"]'), s3 = root.querySelector('[data-step="3"]');
@@ -632,8 +684,14 @@ function ew_claim_js() {
    .then(function(res){
      if(!res.ok || !res.j.html){ err(s2, (res.j && res.j.message) || W.failed); go.disabled = false; return; }
      root.querySelector('.ewc-big').hidden = true; root.querySelector('.ewc-month').hidden = true;
-     s2.hidden = true; s3.innerHTML = res.j.html; s3.hidden = false;
-     var after = root.querySelector('.ewc-after'); if(after) after.hidden = false;
+     s2.hidden = true; s3.hidden = false;
+     if(res.j.offer && window.ewcOffer){
+       /* The shirt offer first; No thanks goes to the pass. */
+       s3.innerHTML = res.j.offer; window.ewcOffer(s3.querySelector('.ewc-offer'), res.j.html);
+     } else {
+       s3.innerHTML = res.j.html;
+       var after = root.querySelector('.ewc-after'); if(after) after.hidden = false;
+     }
      draw(); letin();
      root.scrollIntoView({behavior:'smooth', block:'start'});
    })
