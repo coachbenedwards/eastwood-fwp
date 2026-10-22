@@ -106,6 +106,33 @@ function ew_news_css() {
 		. '.ewn-m{font-family:"Instrument Sans",system-ui,sans-serif;font-size:13px;color:#777}'
 		. '.ewn-m b{font-weight:600;color:#111}'
 		. '.ewn-card:hover .ewn-h{color:#111}'
+		/* THE LEAD STORY.
+		   Four differences from the reference, each measured on its page
+		   rather than judged by eye:
+		   - It puts no wash on the picture at all. Ours carried a flat 60%
+		     black over the whole frame, which is why a bright photograph came
+		     out murky. A bottom gradient instead: the picture stays bright
+		     like theirs, and the white words still hold on a pale photo,
+		     which theirs can assume and ours cannot.
+		   - Its headline is uppercase. Ours was sentence case, so the lead
+		     did not match the three cards underneath it.
+		   - Its text block is inset 32px. Ours had p-6 in the markup that the
+		     theme never built, so the words sat flush against the edge.
+		   - Its meta line is 12px with a rule between category and time.
+		     Ours was 16px with a gap. */
+		. 'section.hero > div > a > span.bg-opacity-dark-60{'
+		. 'background:linear-gradient(to top,rgba(0,0,0,.78) 0%,'
+		. 'rgba(0,0,0,.42) 24%,rgba(0,0,0,0) 52%)!important}'
+		. 'section.hero > div > a > div.z-10{padding:32px!important}'
+		. 'section.hero > div > a h2{text-transform:uppercase}'
+		. 'section.hero > div > a > div.z-10 > div{font-size:12px;'
+		. 'padding-top:16px!important;gap:4px!important}'
+		. 'section.hero > div > a > div.z-10 > div p,'
+		. 'section.hero > div > a > div.z-10 > div span{font-size:12px;line-height:1.1}'
+		. "section.hero > div > a > div.z-10 > div p::after{content:' |';opacity:.75}"
+		. '@media(max-width:700px){'
+		. 'section.hero > div > a > div.z-10{padding:20px!important}'
+		. '}'
 		/* The category bar. The reference sets Anton 18 with a red rule
 		   under the live one; ours was the body face at two weights,
 		   which is why the two bars did not look related. */
