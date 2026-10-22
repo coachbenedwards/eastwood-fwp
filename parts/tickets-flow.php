@@ -137,6 +137,7 @@ function ew_tix_stripe( $method, $path, $body = array() ) {
 function ew_tix_crm( $hook, $booking_id, $step ) {
 	$hook = trim( (string) $hook );
 	if ( '' === $hook || 0 !== strpos( $hook, 'https://' ) ) {
+		do_action( 'ew_tix_step', (int) $booking_id, (string) $step );
 		return;
 	}
 	$m    = function ( $k ) use ( $booking_id ) {
@@ -171,6 +172,8 @@ function ew_tix_crm( $hook, $booking_id, $step ) {
 			'consent'    => $m( 'consent' ),
 		) ),
 	) );
+	// The website's own emails for this step (order-mail.php).
+	do_action( 'ew_tix_step', (int) $booking_id, (string) $step );
 }
 
 /** Save the booker as soon as they press Continue. */

@@ -912,7 +912,11 @@ function ew_shirt_booking( $post, $what, $name, $email, $lines, $pence, $hook, $
 	if ( ! function_exists( 'ew_tix_booking_start' ) ) {
 		return 0;
 	}
-	return (int) ew_tix_booking_start( $post, $what, $name, $email, $lines, $pence, $hook, $greeting );
+	$id = (int) ew_tix_booking_start( $post, $what, $name, $email, $lines, $pence, $hook, $greeting );
+	if ( $id ) {
+		update_post_meta( $id, '_ewt_kind', 'shop' ); // which order emails it gets
+	}
+	return $id;
 }
 
 /**
