@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.17.1
+ * Version: 3.18.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -534,6 +534,40 @@ function ew_fwp_settings_page() {
 		esc_html( 'Switches which set above the site uses. Nothing is retyped and nothing is lost.' )
 	);
 	submit_button( 'Save Stripe settings', 'primary', 'ew_stripe_save', false );
+	echo '</form>';
+
+	/* ------------------------------------------------------------------
+	 * Who gets told. Every ticket, shirt order, school ticket claim,
+	 * half-time sign-up and trial registration becomes a Booking. These
+	 * addresses get a plain email the moment one is real, so nobody has
+	 * to go looking at the list to find out.
+	 * ------------------------------------------------------------------ */
+
+	if ( isset( $_POST['ew_notify_save'] ) && check_admin_referer( 'ew_notify_save' ) ) {
+		update_option( 'ew_notify_to',
+			sanitize_text_field( wp_unslash( (string) ( $_POST['ew_notify_to'] ?? '' ) ) ), false );
+		echo '<div class="notice notice-success"><p>Saved.</p></div>';
+	}
+
+	$notify_now = function_exists( 'ew_notify_to' ) ? ew_notify_to() : array();
+
+	echo '<h2>Who gets told</h2>';
+	echo '<p>Email addresses to tell when a booking comes in &mdash; a ticket paid for, a shirt'
+		. ' ordered, a school ticket claimed, a half-time place taken, an Academy trial'
+		. ' registration. Separate several with commas. Left empty, nobody is told and the'
+		. ' bookings only appear in the Bookings list.</p>';
+	echo '<form method="post">';
+	wp_nonce_field( 'ew_notify_save' );
+	printf(
+		'<p><input type="text" name="ew_notify_to" size="70" value="%s" placeholder="%s"></p>',
+		esc_attr( (string) get_option( 'ew_notify_to', '' ) ),
+		esc_attr( 'info@eastwoodfc.com, somebody@eastwoodfc.com' )
+	);
+	printf( '<p class="description">%s</p>',
+		esc_html( $notify_now
+			? 'Telling ' . count( $notify_now ) . ' address' . ( 1 === count( $notify_now ) ? '' : 'es' ) . ': ' . implode( ', ', $notify_now )
+			: 'Nobody is being told at the moment.' ) );
+	submit_button( 'Save who gets told', 'primary', 'ew_notify_save', false );
 	echo '</form>';
 
 	$yt_key   = function_exists( 'ew_yt_api_key' ) ? ew_yt_api_key() : '';
@@ -3683,7 +3717,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.17.1';
+const EW_FWP_VERSION = '3.18.0';
 
 /*
  * Parts loader.

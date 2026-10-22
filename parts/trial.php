@@ -45,6 +45,10 @@ function ew_trial_defaults() {
 		'done_title'  => 'You are down',
 		'done_note'   => 'We will be in touch before the day with the time to arrive and what to bring.',
 		'crm_hook'    => '',
+		/* The Google Form this also fills in, and which of its boxes takes what.
+		   Leave either empty and no form is filled. */
+		'gform'       => '',
+		'gmap'        => '',
 	);
 }
 
@@ -207,10 +211,57 @@ add_action( 'rest_api_init', function () {
 			if ( function_exists( 'ew_tix_crm' ) ) {
 				ew_tix_crm( (string) $a['crm_hook'], $id, 'trial' );
 			}
+			ew_trial_gform( $a, array(
+				'name'  => $name,
+				'email' => $email,
+				'phone' => $phone,
+				'pos'   => $pos,
+				'dob'   => $dob,
+				'club'  => $club,
+				'event' => $event,
+			) );
 			return array( 'ok' => 1 );
 		},
 	) );
 } );
+
+/**
+ * Fill in a Google Form as well, where the block names one.
+ *
+ * gform is the form address with /formResponse on the end, and gmap says
+ * which of our answers goes in which of its boxes:
+ * "name=entry.123; email=entry.456". Sent without waiting, so a slow or a
+ * changed form never holds up the person registering.
+ */
+function ew_trial_gform( $a, $vals ) {
+	$url = trim( (string) ( $a['gform'] ?? '' ) );
+	$map = trim( (string) ( $a['gmap'] ?? '' ) );
+	if ( '' === $url || '' === $map || 0 !== strpos( $url, 'https://' ) ) {
+		return;
+	}
+	$body = array();
+	foreach ( preg_split( '/[;\n]+/', $map ) as $pair ) {
+		$pair = trim( (string) $pair );
+		if ( '' === $pair || false === strpos( $pair, '=' ) ) {
+			continue;
+		}
+		$bits   = explode( '=', $pair, 2 );
+		$ours   = trim( $bits[0] );
+		$theirs = trim( $bits[1] );
+		if ( '' === $theirs || empty( $vals[ $ours ] ) ) {
+			continue;
+		}
+		$body[ $theirs ] = (string) $vals[ $ours ];
+	}
+	if ( ! $body ) {
+		return;
+	}
+	wp_remote_post( $url, array(
+		'timeout'  => 5,
+		'blocking' => false,
+		'body'     => $body,
+	) );
+}
 
 function ew_trial_css() {
 	return '
