@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.15.11
+ * Version: 3.16.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -3683,7 +3683,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.15.11';
+const EW_FWP_VERSION = '3.16.0';
 
 /*
  * Parts loader.
@@ -4109,7 +4109,7 @@ add_filter( 'pre_get_document_title', function ( $title ) {
  * there. The moment somebody edits a page by hand, we leave it alone.
  * ------------------------------------------------------------------ */
 
-const EW_PAGES_V = '11';
+const EW_PAGES_V = '12';
 
 function ew_owned_pages() {
 	$pages = array(
@@ -4132,6 +4132,10 @@ function ew_owned_pages() {
 		'matches' => array(
 			'title'   => 'Matches',
 			'content' => '[eastwood_matches]',
+		),
+		'halftimeshow' => array(
+			'title'   => 'Half time show',
+			'content' => '[eastwood_halftime]',
 		),
 		'tickets' => array(
 			'title'   => 'Tickets',

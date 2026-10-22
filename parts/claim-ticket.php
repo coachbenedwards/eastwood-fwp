@@ -117,7 +117,57 @@ function ew_claim_defaults() {
 		'rec_print'      => 'Printed {what}',
 		'rec_total'      => 'Total',
 		'crm_hook'      => '',
+		/* The game after this one. At next_at (site time, "2026-10-24 15:40")
+		   the page turns over to it: the match, the stub, the background,
+		   and the event written on every claim from then on. Empty = never. */
+		'next_at'         => '',
+		'next_event'      => '',
+		'next_away'       => '',
+		'next_away_crest' => '',
+		'next_background' => '',
+		'next_day'        => '',
+		'next_date'       => '',
+		'next_time'       => '',
+		'next_stub_day'   => '',
+		'next_stub_month' => '',
 	);
+}
+
+/** When the block turns over to the next game, as a timestamp; 0 if never. */
+function ew_claim_next_at( $a ) {
+	$v = trim( (string) ( $a['next_at'] ?? '' ) );
+	if ( '' === $v ) {
+		return 0;
+	}
+	try {
+		$d = new DateTimeImmutable( $v, wp_timezone() );
+	} catch ( Exception $e ) {
+		return 0;
+	}
+	return $d->getTimestamp();
+}
+
+/** The next game's fields, keyed by the field they replace. */
+function ew_claim_next_fields( $a ) {
+	$out = array();
+	foreach ( array( 'event', 'away', 'away_crest', 'background', 'day', 'date', 'time', 'stub_day', 'stub_month' ) as $k ) {
+		$v = trim( (string) ( $a[ 'next_' . $k ] ?? '' ) );
+		if ( '' !== $v ) {
+			$out[ $k ] = $v;
+		}
+	}
+	return $out;
+}
+
+/** The block as it reads right now: this game, or the next one once its time has come. */
+function ew_claim_live( $a ) {
+	$at = ew_claim_next_at( $a );
+	if ( $at && time() >= $at ) {
+		foreach ( ew_claim_next_fields( $a ) as $k => $v ) {
+			$a[ $k ] = $v;
+		}
+	}
+	return $a;
 }
 
 /** An image field: a full address, or a file in the plugin's assets. */
@@ -260,7 +310,7 @@ function ew_claim_extras_html( $a ) {
 }
 
 function ew_claim_shortcode( $atts, $content = null ) {
-	$a    = shortcode_atts( ew_claim_defaults(), (array) $atts, 'eastwood_claim' );
+	$a    = ew_claim_live( shortcode_atts( ew_claim_defaults(), (array) $atts, 'eastwood_claim' ) );
 	$post = get_post();
 	$bg   = ew_claim_img( $a['background'] );
 	$step = function ( $n ) use ( $a ) {
@@ -302,6 +352,17 @@ function ew_claim_shortcode( $atts, $content = null ) {
 		'schools'     => ew_claim_schools( $content ),
 		'rest'        => esc_url_raw( rest_url( 'eastwood/v1/claim' ) ),
 	);
+	$next_at = ew_claim_next_at( $a );
+	if ( $next_at && time() < $next_at ) {
+		$nf = ew_claim_next_fields( $a );
+		if ( isset( $nf['away_crest'] ) ) {
+			$nf['away_crest'] = ew_claim_img( $nf['away_crest'] );
+		}
+		if ( isset( $nf['background'] ) ) {
+			$nf['background'] = ew_claim_img( $nf['background'] );
+		}
+		$words['next'] = array( 'at' => $next_at * 1000, 'fields' => $nf );
+	}
 
 	$h .= '<p class="ewc-big">' . esc_html( $a['stub_day'] ) . '</p><p class="ewc-month">' . esc_html( $a['stub_month'] ) . '</p>';
 
@@ -374,7 +435,7 @@ function ew_claim_block_on( $post ) {
 	if ( preg_match( '/\](.*)\[\/eastwood_claim\]/s', $found, $c ) ) {
 		$body = $c[1];
 	}
-	return array( 'atts' => shortcode_atts( ew_claim_defaults(), $atts, 'eastwood_claim' ), 'body' => $body );
+	return array( 'atts' => ew_claim_live( shortcode_atts( ew_claim_defaults(), $atts, 'eastwood_claim' ) ), 'body' => $body );
 }
 
 add_action( 'rest_api_init', function () {
@@ -611,6 +672,22 @@ function ew_claim_js() {
  var input = root.querySelector('#ewcSchool'), list = root.querySelector('#ewcList'), box = root.querySelector('.ewc-search');
  var school = '', schools = W.schools || [];
  var count = {adults: 1, children: 0};
+
+ /* The next game: once its time comes the ticket turns over, cached page or not. */
+ if(W.next && W.next.at){
+   var turned = false;
+   var turn = function(){
+     if(turned || Date.now() < W.next.at) return;
+     turned = true;
+     var f = W.next.fields || {}, teams = root.querySelectorAll('.ewc-team'), crests = root.querySelectorAll('.ewc-crests img');
+     var set = function(sel, v){ var el = root.querySelector(sel); if(el && v) el.textContent = v; };
+     if(f.away && teams[1]) teams[1].textContent = f.away;
+     if(f.away_crest && crests[1]){ crests[1].src = f.away_crest; if(f.away) crests[1].alt = f.away; }
+     if(f.background){ var tk = root.querySelector('.ewc-tk'); if(tk) tk.style.backgroundImage = 'url(' + f.background + ')'; }
+     set('.ewc-day', f.day); set('.ewc-date', f.date); set('.ewc-time', f.time); set('.ewc-big', f.stub_day); set('.ewc-month', f.stub_month);
+   };
+   turn(); setInterval(turn, 15000);
+ }
 
  function norm(s){ return String(s).toLowerCase().replace(/&/g,'and').replace(/[^a-z0-9]+/g,' ').trim(); }
  function close(){ list.hidden = true; box.classList.remove('open'); input.setAttribute('aria-expanded','false'); }
