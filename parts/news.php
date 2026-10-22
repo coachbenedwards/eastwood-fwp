@@ -86,7 +86,15 @@ function ew_news_card( $post ) {
 function ew_news_css() {
 	return '<style id="ew-news-strip">'
 		. '.ewn-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;'
-		. 'width:100%;margin-top:16px}'
+		. 'width:100%}'
+		/* The hero container is a fixed 828 tall with a 16px gap of its own,
+		   so the strip needs no margin and the lead has to stretch into what
+		   is left: 828 - 16 - 215 = 597, which is the reference's lead height
+		   exactly. Measured, not guessed -- without this the lead stops at its
+		   420 floor and leaves 177px of empty grey above the category bar. */
+		. '@media(min-width:1001px){'
+		. 'section.hero > div > a:has(img.wp-post-image){flex:1 1 auto}'
+		. '}'
 		. '.ewn-card{display:grid;grid-template-columns:196px minmax(0,1fr);background:#fff;'
 		. 'border-radius:8px;overflow:hidden;min-height:215px;text-decoration:none;color:inherit}'
 		. '.ewn-pic{display:block;overflow:hidden;background:#d8d8d8}'
