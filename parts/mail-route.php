@@ -52,7 +52,7 @@ function ew_mail_html( $body, $headers ) {
 
 add_filter( 'pre_wp_mail', function ( $null, $atts ) {
 	$hook = ew_mail_hook();
-	if ( null !== $null || '' === $hook ) {
+	if ( null !== $null || '' === $hook || ew_smtp_ready() ) {
 		return $null;
 	}
 	$to = $atts['to'];
@@ -121,3 +121,105 @@ add_action( 'ew_fwp_after_settings', function () {
 			. ( $last['code'] >= 200 && $last['code'] < 300 ? 'handed to GoHighLevel' : 'failed (' . esc_html( $last['code'] . ' ' . $last['error'] ) . ')' ) . '</p>';
 	}
 } );
+
+/* ------------------------------------------------------------------ *
+ * Sending through the club's Google mailbox (orders@, with tickets@ as
+ * its second address). Once a mailbox and its app password are saved,
+ * every wp_mail() goes out through smtp.gmail.com as that mailbox, with
+ * no unsubscribe line and no tracked links, and GoHighLevel is not used.
+ * ------------------------------------------------------------------ */
+
+function ew_smtp_user() {
+	return trim( (string) get_option( 'ew_smtp_user', 'orders@eastwoodfc.com' ) );
+}
+
+function ew_smtp_from() {
+	$v = trim( (string) get_option( 'ew_smtp_from', 'tickets@eastwoodfc.com' ) );
+	return is_email( $v ) ? $v : ew_smtp_user();
+}
+
+function ew_smtp_ready() {
+	return is_email( ew_smtp_user() ) && '' !== (string) get_option( 'ew_smtp_pass', '' );
+}
+
+add_action( 'phpmailer_init', function ( $mail ) {
+	if ( ! ew_smtp_ready() ) {
+		return;
+	}
+	$mail->isSMTP();
+	$mail->Host       = 'smtp.gmail.com';
+	$mail->Port       = 587;
+	$mail->SMTPSecure = 'tls';
+	$mail->SMTPAuth   = true;
+	$mail->Username   = ew_smtp_user();
+	$mail->Password   = (string) get_option( 'ew_smtp_pass', '' );
+	// The site's emails are written "from info@"; info@ is a group and cannot
+	// send, so they go from the mailbox's address instead, and replies come back to it.
+	$from = strtolower( (string) $mail->From );
+	if ( '' === $from || 'info@eastwoodfc.com' === $from || false !== strpos( $from, 'wordpress@' ) ) {
+		$mail->setFrom( ew_smtp_from(), 'Eastwood FC', false );
+	}
+	$mail->clearReplyTos();
+	$mail->addReplyTo( $mail->From, 'Eastwood FC' );
+	$mail->Sender = ew_smtp_user();
+} );
+
+add_action( 'wp_mail_failed', function ( $err ) {
+	update_option( 'ew_mail_last', array(
+		'at'      => time(),
+		'to'      => implode( ', ', (array) ( $err->get_error_data()['to'] ?? array() ) ),
+		'subject' => (string) ( $err->get_error_data()['subject'] ?? '' ),
+		'code'    => 0,
+		'error'   => $err->get_error_message(),
+	), false );
+} );
+
+add_action( 'wp_mail_succeeded', function ( $data ) {
+	if ( ! ew_smtp_ready() ) {
+		return;
+	}
+	update_option( 'ew_mail_last', array(
+		'at'      => time(),
+		'to'      => implode( ', ', (array) ( $data['to'] ?? array() ) ),
+		'subject' => (string) ( $data['subject'] ?? '' ),
+		'code'    => 250,
+		'error'   => '',
+		'via'     => 'google',
+	), false );
+} );
+
+add_action( 'ew_fwp_after_settings', function () {
+	if ( isset( $_POST['ew_smtp_user'] ) && check_admin_referer( 'ew_smtp_save' ) ) {
+		update_option( 'ew_smtp_user', sanitize_email( wp_unslash( $_POST['ew_smtp_user'] ) ) );
+		update_option( 'ew_smtp_from', sanitize_email( wp_unslash( $_POST['ew_smtp_from'] ?? '' ) ) );
+		$pass = preg_replace( '/\s+/', '', (string) wp_unslash( $_POST['ew_smtp_pass'] ?? '' ) );
+		if ( '' !== $pass ) {
+			update_option( 'ew_smtp_pass', $pass, false );
+		}
+		if ( ! empty( $_POST['ew_smtp_clear'] ) ) {
+			delete_option( 'ew_smtp_pass' );
+		}
+		echo '<div class="notice notice-success"><p>Google mailbox saved.</p></div>';
+	}
+	if ( isset( $_POST['ew_smtp_test'] ) && check_admin_referer( 'ew_smtp_test' ) ) {
+		$to = sanitize_email( wp_unslash( $_POST['ew_smtp_test'] ) );
+		$ok = is_email( $to ) && wp_mail( $to, 'Test from eastwoodfc.com', "This is a test email from the website.\n\nTeam EastwoodFC" );
+		echo '<div class="notice ' . ( $ok ? 'notice-success' : 'notice-error' ) . '"><p>' . ( $ok ? 'Test email sent to ' . esc_html( $to ) . '.' : 'The test email could not be sent. See "Last sent" below.' ) . '</p></div>';
+	}
+	echo '<h2>Google mailbox</h2>';
+	echo '<p>When a mailbox and its Google app password are saved here, every email the website sends goes out through it, and GoHighLevel is not used. '
+		. 'Status: <strong>' . ( ew_smtp_ready() ? 'sending through ' . esc_html( ew_smtp_user() ) : 'not set up, so emails go through GoHighLevel' ) . '</strong>.</p>';
+	echo '<form method="post">';
+	wp_nonce_field( 'ew_smtp_save' );
+	echo '<p><label>Mailbox<br><input type="email" name="ew_smtp_user" size="40" value="' . esc_attr( ew_smtp_user() ) . '"></label></p>';
+	echo '<p><label>Send as<br><input type="email" name="ew_smtp_from" size="40" value="' . esc_attr( ew_smtp_from() ) . '"></label></p>';
+	echo '<p><label>App password' . ( '' !== (string) get_option( 'ew_smtp_pass', '' ) ? ' (saved; leave blank to keep it)' : '' ) . '<br><input type="password" name="ew_smtp_pass" size="40" autocomplete="new-password" value=""></label></p>';
+	echo '<p><label><input type="checkbox" name="ew_smtp_clear" value="1"> Remove the saved app password</label></p>';
+	submit_button( 'Save Google mailbox' );
+	echo '</form>';
+	echo '<form method="post">';
+	wp_nonce_field( 'ew_smtp_test' );
+	echo '<p><label>Send a test email to<br><input type="email" name="ew_smtp_test" size="40" value=""></label></p>';
+	submit_button( 'Send test email', 'secondary' );
+	echo '</form>';
+}, 20 );
