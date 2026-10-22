@@ -163,6 +163,12 @@ function ew_tix_crm( $hook, $booking_id, $step ) {
 			'paid'       => number_format( (int) $m( 'paid' ) / 100, 2, '.', '' ),
 			'status'     => $m( 'status' ),
 			'booking_id' => (int) $booking_id,
+			/* Claims and half-time sign-ups carry these; paid bookings leave them empty. */
+			'phone'      => $m( 'phone' ),
+			'school'     => $m( 'school' ),
+			'adults'     => $m( 'adults' ),
+			'children'   => $m( 'children' ),
+			'consent'    => $m( 'consent' ),
 		) ),
 	) );
 }
