@@ -35,6 +35,20 @@ function ew_news_is_listing() {
 }
 
 /**
+ * A category archive -- the page a category in the bar points at.
+ *
+ * The bar appears on these too, so the filtering has to work from them
+ * as well, or a reader who lands on one is back to a row of links that
+ * reload the page.
+ *
+ * @return bool
+ */
+function ew_news_is_category() {
+	$path = (string) wp_parse_url( (string) ( $_SERVER['REQUEST_URI'] ?? '' ), PHP_URL_PATH );
+	return ( 0 === strpos( ltrim( $path, '/' ), 'category/' ) );
+}
+
+/**
  * The three posts under the lead.
  *
  * @return WP_Post[]
@@ -156,6 +170,74 @@ function ew_news_css() {
 }
 
 /**
+ * Make the category bar filter the grid instead of reloading the page.
+ *
+ * The reference's bar is a row of buttons with no address: clicking one
+ * swaps the stories underneath and leaves the big story where it is.
+ * Ours was five links to five archive pages, so every click threw the
+ * whole page away and built it again -- which is what made it feel
+ * unlike the tabs on the home page.
+ *
+ * The links keep their addresses, so this is an improvement on top of
+ * something that already worked rather than a replacement for it: with
+ * no JavaScript, or if a fetch fails, the click still goes to the
+ * archive page the way it always did.
+ *
+ * @return string
+ */
+function ew_news_js() {
+	return <<<'JS'
+<script id="ew-news-tabs">
+(function(){
+	var bar = document.querySelector('.tabs');
+	if ( ! bar || ! window.fetch || ! window.DOMParser ) { return; }
+	var box = bar.querySelector('.container') || bar;
+	var busy = false;
+
+	function mark( link ) {
+		var all = box.querySelectorAll('a'), i;
+		for ( i = 0; i < all.length; i++ ) {
+			all[i].className = all[i].className.replace(/\btext-black\b/, 'text-slate-800');
+		}
+		link.className = link.className.replace(/\btext-slate-800\b/, 'text-black');
+		if ( link.className.indexOf('text-black') < 0 ) { link.className += ' text-black'; }
+	}
+
+	function swap( url, link ) {
+		if ( busy ) { return; }
+		busy = true;
+		var here = document.querySelector('.container.grid');
+		if ( here ) { here.style.transition = 'opacity .15s'; here.style.opacity = '.3'; }
+		fetch( url, { credentials: 'same-origin' } )
+			.then(function(r){ if(!r.ok){throw 0;} return r.text(); })
+			.then(function(t){
+				var next = new DOMParser().parseFromString(t,'text/html').querySelector('.container.grid');
+				var now  = document.querySelector('.container.grid');
+				if ( ! next || ! now ) { throw 0; }
+				now.innerHTML = next.innerHTML;
+				now.style.opacity = '';
+				mark( link );
+				if ( window.history && history.pushState ) { history.pushState({ewn:1},'',url); }
+				busy = false;
+			})
+			['catch'](function(){ busy = false; window.location.href = url; });
+	}
+
+	box.addEventListener('click', function(e){
+		var link = e.target && e.target.closest ? e.target.closest('a') : null;
+		if ( ! link || ! box.contains(link) ) { return; }
+		if ( e.metaKey || e.ctrlKey || e.shiftKey || 1 === e.button ) { return; }
+		e.preventDefault();
+		swap( link.getAttribute('href'), link );
+	});
+
+	window.addEventListener('popstate', function(){ window.location.reload(); });
+}());
+</script>
+JS;
+}
+
+/**
  * Put the strip inside the hero's own container.
  *
  * Called from ew_rewrite_markup() in the main file under
@@ -165,7 +247,19 @@ function ew_news_css() {
  * @return string
  */
 function ew_news_markup( $html ) {
-	if ( is_admin() || ! ew_news_is_listing() ) {
+	if ( is_admin() ) {
+		return $html;
+	}
+
+	// The bar lives on the archives as well, so the script goes on both.
+	// The strip and the lead's own treatment stay on the listing.
+	if ( ! ew_news_is_listing() ) {
+		if ( ew_news_is_category() ) {
+			$at = strripos( $html, '</body>' );
+			return ( false === $at )
+				? $html . ew_news_js()
+				: substr( $html, 0, $at ) . ew_news_js() . substr( $html, $at );
+		}
 		return $html;
 	}
 
@@ -193,5 +287,5 @@ function ew_news_markup( $html ) {
 	}
 	$strip .= '</div>';
 
-	return substr( $html, 0, $end ) . $strip . ew_news_css() . substr( $html, $end );
+	return substr( $html, 0, $end ) . $strip . ew_news_css() . ew_news_js() . substr( $html, $end );
 }
