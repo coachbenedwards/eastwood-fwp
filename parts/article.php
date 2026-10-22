@@ -132,6 +132,9 @@ function ew_article_css() {
 		/* The body comes from the editor, so every element it can produce
 		   needs a rule. A content box, so the 72ch is the measure and not
 		   the measure minus the gutters. */
+		/* The editor container carries 8px 16px of its own, which set the
+		   body a notch to the right of its own headline. */
+		. '.ew-art-body{padding:0}'
 		. '.ew-art-body > *{box-sizing:content-box;max-width:72ch}'
 		. '.ew-art-body p{font-size:17px;line-height:1.7;margin:0 0 18px}'
 		. '.ew-art-body h2,.ew-art-body h3{font-family:Anton,"Instrument Sans",sans-serif;'
