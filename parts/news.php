@@ -118,8 +118,12 @@ function ew_news_css() {
 		. '.tabs .container{gap:0!important}'
 		. '@media(max-width:1000px){'
 		. '.ewn-strip{grid-template-columns:1fr}'
-		. '.ewn-card{min-height:0}'
-		. '.ewn-pic{height:150px}'
+		/* One column inside the card too, or the 196px picture takes more
+		   than half a 358px phone and the headline wraps three words to a
+		   line. Every other card on this page stacks picture over headline
+		   on a phone; these now do the same. */
+		. '.ewn-card{min-height:0;grid-template-columns:1fr}'
+		. '.ewn-pic{height:180px}'
 		. '}'
 		. '</style>';
 }
