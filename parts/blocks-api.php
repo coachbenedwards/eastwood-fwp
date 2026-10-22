@@ -41,7 +41,7 @@ function ew_blocks_allowed() {
 		'eastwood_teams', 'eastwood_squad', 'eastwood_matches', 'eastwood_tv',
 		'eastwood_gate', 'eastwood_sponsors', 'eastwood_prose',
 		'eastwood_sponsor_cards', 'eastwood_shop', 'eastwood_shirt',
-		'eastwood_tickets', 'eastwood_claim', 'eastwood_halftime',
+		'eastwood_tickets', 'eastwood_claim', 'eastwood_halftime', 'eastwood_community_games', 'eastwood_community_request',
 		'eastwood_trial',
 	);
 }

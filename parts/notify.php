@@ -41,6 +41,7 @@ function ew_notify_kinds() {
 		'claimed'  => 'School ticket claimed',
 		'halftime' => 'Half-time show sign-up',
 		'trial'    => 'Academy trial registration',
+		'community' => 'Community ticket request',
 	);
 }
 
