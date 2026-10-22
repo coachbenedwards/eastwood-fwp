@@ -214,3 +214,28 @@ function ew_article_markup( $html ) {
 
 	return substr( $html, 0, $open ) . '</div>' . $article . $after;
 }
+
+/* ------------------------------------------------------------------ *
+ * The lead story's photograph on the news page.
+ *
+ * The captured markup gives that image -z-10. Nothing in the card
+ * establishes a stacking context, so the negative z-index takes the
+ * picture behind the nearest one that does -- the section around it,
+ * which paints a background. The result is a grey void where the lead
+ * story should be, with the headline stranded two thirds down it. It
+ * has been that way for every lead story the site has ever had.
+ *
+ * Isolating the card keeps the image behind the card's own overlay and
+ * text, which is what the -z-10 was for, while bringing it back in
+ * front of the section's background, which is what it was not.
+ * ------------------------------------------------------------------ */
+
+add_action( 'wp_head', function () {
+	if ( is_admin() ) {
+		return;
+	}
+	echo '<style id="ew-lead-fix">'
+		. 'section.hero > div > a:has(> img.wp-post-image){isolation:isolate}'
+		. 'section.hero > div > a > img.wp-post-image{z-index:0}'
+		. '</style>';
+}, 99 );
