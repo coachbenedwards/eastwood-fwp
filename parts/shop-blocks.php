@@ -53,6 +53,14 @@ function ew_shop_shortcode( $atts, $content = null ) {
 			'price' => (string) ( $bits[1] ?? '' ),
 			'note'  => (string) ( $bits[2] ?? '' ),
 			'href'  => (string) ( $bits[3] ?? '' ),
+			/*
+			 * The product's own photograph. Without one the card falls
+			 * back to the drawn shirt, which is fine for a product we
+			 * have no picture of and wrong for one we do -- the index
+			 * was showing a drawing of a shirt next to a product page
+			 * showing the real thing.
+			 */
+			'pic'   => (string) ( $bits[4] ?? '' ),
 		);
 	}
 	if ( ! $cards ) {
@@ -69,7 +77,13 @@ function ew_shop_shortcode( $atts, $content = null ) {
 	$out = '<div class="ewshop"><div class="ewshop-grid">';
 	foreach ( $cards as $c ) {
 		$out .= '<a class="ewshop-card" href="' . esc_url( $c['href'] ) . '">';
-		$out .= '<div class="ewshop-pic">' . ew_shop_shirt_svg() . '</div>';
+		if ( '' !== $c['pic'] ) {
+			$out .= '<div class="ewshop-pic ewshop-pic-img"><img src="'
+				. esc_url( $c['pic'] ) . '" alt="' . esc_attr( $c['name'] )
+				. '" loading="lazy" decoding="async"></div>';
+		} else {
+			$out .= '<div class="ewshop-pic">' . ew_shop_shirt_svg() . '</div>';
+		}
 		$out .= '<div class="ewshop-body">';
 		$out .= '<h2>' . esc_html( $c['name'] ) . '</h2>';
 		if ( '' !== $c['price'] ) {
@@ -419,7 +433,7 @@ function ew_shop_css() {
 		. 'color:#5c5c5c;margin:0 0 30px;'
 		. 'padding-left:max(16px,calc(50vw - 624px));'
 		. 'padding-right:max(16px,calc(50vw - 624px))}'
-		. '.ewshop{max-width:1120px;margin:0 auto;padding:40px 20px 70px; font:400 16px/1.6 Inter,-apple-system,system-ui,sans-serif;color:#111} .ewshop h1{font-size:40px;line-height:1.05;margin:0 0 6px;letter-spacing:.3px} .ewshop .lede{color:#5c5c5c;margin:0 0 30px;font-size:15px} .ewshop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px} .ewshop-card{border:1px solid #e4e4e7;border-radius:6px;overflow:hidden;background:#fff; text-decoration:none;color:inherit;display:block;transition:border-color .15s} .ewshop-card:hover{border-color:#CC0000} .ewshop-pic{background:#CC0000;height:190px;display:flex;align-items:center;justify-content:center} .ewshop-pic svg{width:120px;height:auto} .ewshop-body{padding:16px 18px 20px} .ewshop-body h2{font-size:17px;margin:0 0 4px;line-height:1.3} .ewshop-body .p{font-weight:700;margin:0 0 6px} .ewshop-body .m{font-size:13px;color:#6a6a6a;margin:0}';
+		. '.ewshop{max-width:1120px;margin:0 auto;padding:40px 20px 70px; font:400 16px/1.6 Inter,-apple-system,system-ui,sans-serif;color:#111} .ewshop h1{font-size:40px;line-height:1.05;margin:0 0 6px;letter-spacing:.3px} .ewshop .lede{color:#5c5c5c;margin:0 0 30px;font-size:15px} .ewshop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px} .ewshop-card{border:1px solid #e4e4e7;border-radius:6px;overflow:hidden;background:#fff; text-decoration:none;color:inherit;display:block;transition:border-color .15s} .ewshop-card:hover{border-color:#CC0000} .ewshop-pic{background:#CC0000;height:190px;display:flex;align-items:center;justify-content:center} .ewshop-pic svg{width:120px;height:auto} .ewshop-pic-img{background:#f1f1f3} .ewshop-pic-img img{width:100%;height:100%;object-fit:contain;padding:14px;box-sizing:border-box;display:block} .ewshop-body{padding:16px 18px 20px} .ewshop-body h2{font-size:17px;margin:0 0 4px;line-height:1.3} .ewshop-body .p{font-weight:700;margin:0 0 6px} .ewshop-body .m{font-size:13px;color:#6a6a6a;margin:0}';
 }
 
 /**
