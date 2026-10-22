@@ -237,5 +237,10 @@ add_action( 'wp_head', function () {
 	echo '<style id="ew-lead-fix">'
 		. 'section.hero > div > a:has(> img.wp-post-image){isolation:isolate}'
 		. 'section.hero > div > a > img.wp-post-image{z-index:0}'
+		/* The dark wash the headline sits on carries the same -z-10. */
+		. 'section.hero > div > a > span{z-index:0}'
+		/* And the headline asks for --clear, which nothing on this page
+		   sets, so it came out near-black on the photograph. */
+		. 'section.hero > div > a.text-clear{--clear:#fff}'
 		. '</style>';
 }, 99 );
