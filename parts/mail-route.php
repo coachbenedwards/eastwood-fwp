@@ -123,18 +123,20 @@ add_action( 'ew_fwp_after_settings', function () {
 } );
 
 /* ------------------------------------------------------------------ *
- * Sending through the club's Google mailbox (orders@, with tickets@ as
- * its second address). Once a mailbox and its app password are saved,
- * every wp_mail() goes out through smtp.gmail.com as that mailbox, with
- * no unsubscribe line and no tracked links, and GoHighLevel is not used.
+ * Sending through Google. orders@ is a group inbox and cannot sign in, so
+ * calendar@ signs in and sends with orders@ as the From -- orders@ is a
+ * confirmed "send mail as" address on calendar@, so Google keeps it.
+ * Customers see orders@, and their replies land in the Orders inbox.
+ * Once the app password is saved, every wp_mail() goes out this way,
+ * with no unsubscribe line and no tracked links, and GoHighLevel is not used.
  * ------------------------------------------------------------------ */
 
 function ew_smtp_user() {
-	return trim( (string) get_option( 'ew_smtp_user', 'orders@eastwoodfc.com' ) );
+	return trim( (string) get_option( 'ew_smtp_user', 'calendar@eastwoodfc.com' ) );
 }
 
 function ew_smtp_from() {
-	$v = trim( (string) get_option( 'ew_smtp_from', 'tickets@eastwoodfc.com' ) );
+	$v = trim( (string) get_option( 'ew_smtp_from', 'orders@eastwoodfc.com' ) );
 	return is_email( $v ) ? $v : ew_smtp_user();
 }
 
@@ -153,15 +155,16 @@ add_action( 'phpmailer_init', function ( $mail ) {
 	$mail->SMTPAuth   = true;
 	$mail->Username   = ew_smtp_user();
 	$mail->Password   = (string) get_option( 'ew_smtp_pass', '' );
-	// The site's emails are written "from info@"; info@ is a group and cannot
-	// send, so they go from the mailbox's address instead, and replies come back to it.
+	// The site's emails are written "from info@"; they go from the send-as
+	// address (orders@) instead, and replies come back to it.
 	$from = strtolower( (string) $mail->From );
 	if ( '' === $from || 'info@eastwoodfc.com' === $from || false !== strpos( $from, 'wordpress@' ) ) {
 		$mail->setFrom( ew_smtp_from(), 'Eastwood FC', false );
 	}
 	$mail->clearReplyTos();
 	$mail->addReplyTo( $mail->From, 'Eastwood FC' );
-	$mail->Sender = ew_smtp_user();
+	// No separate sender is named, so nothing anywhere reads "calendar@ on behalf of".
+	$mail->Sender = '';
 } );
 
 add_action( 'wp_mail_failed', function ( $err ) {
