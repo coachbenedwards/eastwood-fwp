@@ -28,13 +28,19 @@ function ew_trial_defaults() {
 		'name_label'  => "Player's full name",
 		'pos_label'   => 'Position',
 		'dob_label'   => 'Date of birth',
-		'club_label'  => 'Current club',
+		'club_label'  => 'Current football club',
+		'loc_label'   => 'Where you live',
+		'school_label'=> 'Current school',
 		'email_label' => 'Your email',
 		'phone_label' => 'Your mobile',
+		'guard_label' => 'Parent or guardian number',
 		'show_pos'    => '1',
 		'show_dob'    => '1',
 		'show_club'   => '1',
+		'show_loc'    => '1',
+		'show_school' => '1',
 		'show_phone'  => '1',
+		'show_guard'  => '1',
 		'consent'     => 'Tell me about the next trial too',
 		'send'        => 'Put my name down',
 		'free_note'   => 'Free. Nothing is taken from you on this page.',
@@ -92,12 +98,21 @@ function ew_trial_shortcode( $atts ) {
 		}
 		$h .= '</div>';
 	}
+	if ( ew_trial_on( $a['show_loc'] ) ) {
+		$h .= $field( 'ewtrLoc', $a['loc_label'], 'text', 'address-level2' );
+	}
 	if ( ew_trial_on( $a['show_club'] ) ) {
 		$h .= $field( 'ewtrClub', $a['club_label'], 'text', 'off' );
+	}
+	if ( ew_trial_on( $a['show_school'] ) ) {
+		$h .= $field( 'ewtrSchool', $a['school_label'], 'text', 'off' );
 	}
 	$h .= $field( 'ewtrEmail', $a['email_label'], 'email', 'email' );
 	if ( ew_trial_on( $a['show_phone'] ) ) {
 		$h .= $field( 'ewtrPhone', $a['phone_label'], 'tel', 'tel' );
+	}
+	if ( ew_trial_on( $a['show_guard'] ) ) {
+		$h .= $field( 'ewtrGuard', $a['guard_label'], 'tel', 'off' );
 	}
 	$h .= '<label class="ewtr-tick"><input type="checkbox" id="ewtrConsent" checked><span>' . esc_html( $a['consent'] ) . '</span></label>';
 	$h .= '<p class="ewtr-err" role="alert"></p>';
@@ -163,6 +178,9 @@ add_action( 'rest_api_init', function () {
 			$pos   = trim( sanitize_text_field( (string) $req->get_param( 'pos' ) ) );
 			$dob   = trim( sanitize_text_field( (string) $req->get_param( 'dob' ) ) );
 			$club  = trim( sanitize_text_field( (string) $req->get_param( 'club' ) ) );
+			$loc    = trim( sanitize_text_field( (string) $req->get_param( 'loc' ) ) );
+			$school = trim( sanitize_text_field( (string) $req->get_param( 'school' ) ) );
+			$guard  = trim( sanitize_text_field( (string) $req->get_param( 'guard' ) ) );
 			if ( '' === $name ) {
 				return new WP_REST_Response( array( 'message' => $a['need_name'] ), 400 );
 			}
@@ -182,6 +200,12 @@ add_action( 'rest_api_init', function () {
 			if ( '' !== $club ) {
 				$about[] = $club;
 			}
+			if ( '' !== $loc ) {
+				$about[] = $loc;
+			}
+			if ( '' !== $school ) {
+				$about[] = $school;
+			}
 			$about = implode( ', ', $about );
 			$id    = wp_insert_post( array(
 				'post_type'   => 'ewt_booking',
@@ -196,6 +220,9 @@ add_action( 'rest_api_init', function () {
 				'name'    => $name,
 				'email'   => $email,
 				'phone'   => $phone,
+				'loc'     => $loc,
+				'school'  => $school,
+				'guardian'=> $guard,
 				'event'   => $event,
 				'page'    => $post->ID,
 				'url'     => get_permalink( $post ),
@@ -217,8 +244,11 @@ add_action( 'rest_api_init', function () {
 				'phone' => $phone,
 				'pos'   => $pos,
 				'dob'   => $dob,
-				'club'  => $club,
-				'event' => $event,
+				'club'   => $club,
+				'loc'    => $loc,
+				'school' => $school,
+				'guard'  => $guard,
+				'event'  => $event,
 			) );
 			return array( 'ok' => 1 );
 		},
@@ -308,6 +338,7 @@ function ew_trial_js() {
    fetch(W.rest, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
      page: page, name: name, email: email, phone: phone,
      pos: val('ewtrPos'), dob: val('ewtrDob'), club: val('ewtrClub'),
+     loc: val('ewtrLoc'), school: val('ewtrSchool'), guard: val('ewtrGuard'),
      consent: (tick && tick.checked) ? 1 : 0
    })})
    .then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); })
