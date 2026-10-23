@@ -21,17 +21,36 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-/** The addresses to tell, as an array. Empty array means tell nobody. */
-function ew_notify_to() {
-	$raw = (string) get_option( 'ew_notify_to', '' );
+/** Pull the real addresses out of a comma-or-space separated line. */
+function ew_notify_parse( $raw ) {
 	$out = array();
-	foreach ( preg_split( '/[,;\s]+/', $raw ) as $one ) {
+	foreach ( preg_split( '/[,;\s]+/', (string) $raw ) as $one ) {
 		$one = trim( (string) $one );
 		if ( '' !== $one && is_email( $one ) ) {
 			$out[] = $one;
 		}
 	}
 	return array_values( array_unique( $out ) );
+}
+
+/** The addresses told about everything. Empty array means tell nobody. */
+function ew_notify_to() {
+	return ew_notify_parse( get_option( 'ew_notify_to', '' ) );
+}
+
+/**
+ * Everyone to tell about one kind of booking.
+ *
+ * The main list hears about all of them. Each kind can name people on
+ * top -- the Academy trial registrations go to whoever runs the academy
+ * as well as to the shop, without the academy hearing about every shirt.
+ *
+ * @param string $kind The booking status.
+ * @return string[]
+ */
+function ew_notify_to_kind( $kind ) {
+	$extra = ew_notify_parse( get_option( 'ew_notify_to_' . $kind, '' ) );
+	return array_values( array_unique( array_merge( ew_notify_to(), $extra ) ) );
 }
 
 /** Statuses worth an email, and what each one is called in it. */
@@ -102,7 +121,7 @@ function ew_notify_booking( $id ) {
 	if ( get_post_meta( $id, '_ewt_notified', true ) ) {
 		return;
 	}
-	$to = ew_notify_to();
+	$to = ew_notify_to_kind( $status );
 	if ( ! $to ) {
 		return;
 	}

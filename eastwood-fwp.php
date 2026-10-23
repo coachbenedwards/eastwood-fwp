@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.27.0
+ * Version: 3.28.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -543,9 +543,15 @@ function ew_fwp_settings_page() {
 	 * to go looking at the list to find out.
 	 * ------------------------------------------------------------------ */
 
+	$notify_kinds = function_exists( 'ew_notify_kinds' ) ? ew_notify_kinds() : array();
+
 	if ( isset( $_POST['ew_notify_save'] ) && check_admin_referer( 'ew_notify_save' ) ) {
 		update_option( 'ew_notify_to',
 			sanitize_text_field( wp_unslash( (string) ( $_POST['ew_notify_to'] ?? '' ) ) ), false );
+		foreach ( $notify_kinds as $k => $label ) {
+			update_option( 'ew_notify_to_' . $k,
+				sanitize_text_field( wp_unslash( (string) ( $_POST[ 'ew_notify_to_' . $k ] ?? '' ) ) ), false );
+		}
 		echo '<div class="notice notice-success"><p>Saved.</p></div>';
 	}
 
@@ -567,6 +573,24 @@ function ew_fwp_settings_page() {
 		esc_html( $notify_now
 			? 'Telling ' . count( $notify_now ) . ' address' . ( 1 === count( $notify_now ) ? '' : 'es' ) . ': ' . implode( ', ', $notify_now )
 			: 'Nobody is being told at the moment.' ) );
+	/* On top of the list above, per kind. Left empty, that kind just
+	   goes to the main list. */
+	echo '<h3>Anyone else, by kind</h3>';
+	echo '<p>Told as well as the addresses above, for that one kind only.'
+		. ' Leave empty and it simply goes to the list above.</p>';
+	echo '<table class="form-table"><tbody>';
+	foreach ( $notify_kinds as $k => $label ) {
+		printf(
+			'<tr><th scope="row"><label for="ew_notify_to_%1$s">%2$s</label></th>'
+			. '<td><input type="text" class="regular-text" id="ew_notify_to_%1$s"'
+			. ' name="ew_notify_to_%1$s" value="%3$s"></td></tr>',
+			esc_attr( $k ),
+			esc_html( $label ),
+			esc_attr( (string) get_option( 'ew_notify_to_' . $k, '' ) )
+		);
+	}
+	echo '</tbody></table>';
+
 	submit_button( 'Save who gets told', 'primary', 'ew_notify_save', false );
 	echo '</form>';
 
@@ -3728,7 +3752,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.27.0';
+const EW_FWP_VERSION = '3.28.0';
 
 /*
  * Parts loader.
