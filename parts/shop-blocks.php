@@ -145,6 +145,66 @@ function ew_shirt_size_rows( $text ) {
 	return $out;
 }
 
+/**
+ * The size guide, split into one table per fit.
+ *
+ * A line in square brackets names a fit -- [Adult], [Women's], [Kids] --
+ * and the first row under it is that table's heading, because the three
+ * are not measured the same way: a women's shirt is given as bust, waist
+ * and hip, a men's as chest and waist, a child's by age and height. Each
+ * fit keeps its own columns rather than being forced into shared ones.
+ *
+ * With no bracketed line anywhere, the whole thing is one table with the
+ * heading from the sizes_head field, which is how it was before.
+ *
+ * @param string $text  The sizes field.
+ * @param string $head  The fallback heading row.
+ * @return array[] Each: name, fit (the code the buttons use), head, rows.
+ */
+function ew_shirt_size_tables( $text, $head ) {
+	if ( false === strpos( (string) $text, '[' ) ) {
+		$rows = ew_shirt_size_rows( $text );
+		return $rows ? array( array(
+			'name' => '',
+			'fit'  => '',
+			'head' => ew_shirt_size_cells( $head ),
+			'rows' => $rows,
+		) ) : array();
+	}
+
+	$out  = array();
+	$here = null;
+	foreach ( preg_split( '/\r\n|\r|\n/', (string) $text ) as $line ) {
+		$line = trim( $line );
+		if ( preg_match( '/^\[(.+)\]$/', $line, $m ) ) {
+			if ( $here && $here['rows'] ) {
+				$out[] = $here;
+			}
+			$name = trim( $m[1] );
+			$here = array(
+				'name' => $name,
+				'fit'  => strtoupper( preg_replace( '/[^a-z0-9]/i', '', $name ) ),
+				'head' => array(),
+				'rows' => array(),
+			);
+			continue;
+		}
+		$cells = ew_shirt_size_cells( $line );
+		if ( ! $cells || ! $here ) {
+			continue;
+		}
+		if ( ! $here['head'] ) {
+			$here['head'] = $cells;
+		} else {
+			$here['rows'][] = $cells;
+		}
+	}
+	if ( $here && $here['rows'] ) {
+		$out[] = $here;
+	}
+	return $out;
+}
+
 function ew_shirt_shortcode( $atts, $content = null ) {
 	$a = shortcode_atts(
 		array(
@@ -462,15 +522,14 @@ function ew_shirt_shortcode( $atts, $content = null ) {
  if ( '' !== trim( (string) $a['about'] ) ) {
 	$panels[] = array( 'k' => 'about', 'lab' => $a['about_label'], 'text' => $a['about'] );
  }
- $guide_rows = ew_shirt_size_rows( $a['sizes'] );
- if ( $guide_rows ) {
+ $guide_tbls = ew_shirt_size_tables( $a['sizes'], $a['sizes_head'] );
+ if ( $guide_tbls ) {
 	$panels[] = array( 'k' => 'sizes', 'lab' => $a['chart_label'] );
  }
  if ( '' !== trim( (string) $a['ship'] ) ) {
 	$panels[] = array( 'k' => 'ship', 'lab' => $a['ship_label'], 'text' => $a['ship'] );
  }
  if ( $panels ) :
-	$guide_head = ew_shirt_size_cells( $a['sizes_head'] );
  ?>
  <div class="ewsh-tabs" id="ewshTabs">
   <div class="ewsh-tabrow" role="tablist">
@@ -488,18 +547,25 @@ function ew_shirt_shortcode( $atts, $content = null ) {
     <?php if ( '' !== trim( (string) $a['sizes_note'] ) ) : ?>
     <p class="ewsh-gnote"><?php echo esc_html( $a['sizes_note'] ); ?></p>
     <?php endif; ?>
-    <div class="ewsh-guide-scroll">
-     <table class="ewsh-guide-tbl">
-      <?php if ( $guide_head ) : ?>
-      <thead><tr><?php foreach ( $guide_head as $c ) : ?><th><?php echo esc_html( $c ); ?></th><?php endforeach; ?></tr></thead>
-      <?php endif; ?>
-      <tbody>
-       <?php foreach ( $guide_rows as $r ) : ?>
-       <tr><?php foreach ( $r as $ci => $c ) : ?><?php echo 0 === $ci ? '<th scope="row">' : '<td>'; ?><?php echo esc_html( $c ); ?><?php echo 0 === $ci ? '</th>' : '</td>'; ?><?php endforeach; ?></tr>
-       <?php endforeach; ?>
-      </tbody>
-     </table>
+    <?php foreach ( $guide_tbls as $gi => $g ) : ?>
+    <div class="ewsh-guide-blk" data-fit="<?php echo esc_attr( $g['fit'] ); ?>"<?php echo 0 === $gi ? '' : ' hidden'; ?>>
+     <?php if ( '' !== $g['name'] && count( $guide_tbls ) > 1 ) : ?>
+     <p class="ewsh-gfit"><?php echo esc_html( $g['name'] ); ?></p>
+     <?php endif; ?>
+     <div class="ewsh-guide-scroll">
+      <table class="ewsh-guide-tbl">
+       <?php if ( $g['head'] ) : ?>
+       <thead><tr><?php foreach ( $g['head'] as $c ) : ?><th><?php echo esc_html( $c ); ?></th><?php endforeach; ?></tr></thead>
+       <?php endif; ?>
+       <tbody>
+        <?php foreach ( $g['rows'] as $r ) : ?>
+        <tr><?php foreach ( $r as $ci => $c ) : ?><?php echo 0 === $ci ? '<th scope="row">' : '<td>'; ?><?php echo esc_html( $c ); ?><?php echo 0 === $ci ? '</th>' : '</td>'; ?><?php endforeach; ?></tr>
+        <?php endforeach; ?>
+       </tbody>
+      </table>
+     </div>
     </div>
+    <?php endforeach; ?>
    <?php else : ?>
     <?php echo wp_kses_post( wpautop( $pn['text'] ) ); ?>
    <?php endif; ?>
@@ -565,7 +631,7 @@ function ew_shirt_css() {
 		   pixels of difference that were really two larger ones cancelling.
 		   Measured at 390: with this the page is the height it was. */
 		'@media(max-width:767px){.ewsh{padding-left:30px;padding-right:30px}}'
-		. '.ewsh{font-family:"Instrument Sans",system-ui,sans-serif;color:#101010}.ewsh-wrap{display:flex;gap:52px;align-items:flex-start;max-width:1140px;margin:0 auto}.ewsh-gal{flex:0 0 470px;background:transparent;border-radius:0;padding:0}.ewsh-info{flex:1 1 auto;min-width:0}.ewsh-info h1,.ewsh-info h2{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:42px;line-height:1.03;letter-spacing:.5px;text-transform:uppercase;margin:0 0 6px;color:#101010}.ewsh-sub{font-size:14px;color:#777;margin:0 0 22px}.ewsh-price{font-family:Anton,Impact,sans-serif;font-size:26px;margin:0 0 4px;color:#101010}.ewsh-note{font-size:13px;color:#8a8a8a;margin:0 0 26px}.ewsh-lab{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin:0 0 10px}.ewsh-sizes{display:flex;gap:9px;flex-wrap:wrap;margin:0 0 26px}.ewsh-sizes button{min-width:62px;padding:13px 6px;background:#fff;border:1.5px solid #d6d6d6;border-radius:6px;font:inherit;font-size:14px;font-weight:600;cursor:pointer}.ewsh-sizes button.on{border-color:#101010;background:#101010;color:#fff}.ewsh-sizes button[disabled]{color:#c0c0c0;border-style:dashed;cursor:not-allowed;text-decoration:line-through}.ewsh-ful{display:flex;flex-direction:column;gap:10px;margin:0 0 26px}.ewsh-ful label{display:flex;gap:12px;align-items:flex-start;border:1.5px solid #d6d6d6;border-radius:8px;padding:15px 16px;cursor:pointer}.ewsh-ful label.on{border-color:#101010}.ewsh-ful b{display:block;font-size:15px;margin-bottom:3px}.ewsh-ful span span{display:block;font-size:13px;color:#777;line-height:1.45}.ewsh-pay{border:1.5px solid #e2e2e2;border-radius:10px;padding:22px;background:#fafafa}.ewsh-pay p{margin:0;font-size:14px;line-height:1.6;color:#666}.ewsh-pay b{display:block;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#101010;margin-bottom:6px}@media(max-width:900px){.ewsh-wrap{flex-direction:column;gap:26px}.ewsh-gal{flex:1 1 auto;width:100%}} .ewsh-fits{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 18px} .ewsh-fits button{font:700 13px/1 Inter,sans-serif;letter-spacing:.4px;padding:11px 18px; border:1.5px solid #d8d8dc;background:#fff;color:#111;border-radius:4px;cursor:pointer} .ewsh-fits button.on{border-color:#CC0000;background:#CC0000;color:#fff} .ewsh-sizes button[disabled]{opacity:.4;text-decoration:line-through;cursor:not-allowed} .ewsh-sizes button.on{border-color:#CC0000;background:#CC0000;color:#fff}      .ewsh-go{margin:0;width:100%;background:#CC0000;color:#fff;border:0;border-radius:6px;font:700 15px/1 Inter,sans-serif;letter-spacing:.4px;padding:17px 20px;cursor:pointer}      .ewsh-go:not([disabled]):hover{background:#b30000}      .ewsh-go[disabled]{background:#e6e6e8;color:#9b9b9f;cursor:not-allowed}      .ewsh-small{margin:12px 0 0;font-size:13px;color:#777;line-height:1.5}      .ewsh-co{margin:0}      .ewsh-mount{background:#fff;border-radius:6px;min-height:40px}      .ewsh-mount:empty{display:none}      .ewsh-msg{margin:10px 0 0;font-size:13px;color:#777}      .ewsh-thanks{border:1.5px solid #CC0000;border-radius:8px;padding:16px 18px;margin:0 0 22px;font-size:15px;color:#101010}      .ewsh-head{margin:0 0 14px}      .ewsh-head h2{margin:0}      .ewsh-back{margin:7px 0 0;font-size:13px;color:#777}      .ewsh-back button{background:none;border:0;padding:0;font:inherit;color:#777;cursor:pointer;text-decoration:underline}      .ewsh-back button:hover{color:#CC0000}      .ewsh-card{background:#fff;border:1.5px solid #e2e2e2;border-radius:10px;overflow:hidden}      .ewsh-sum{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 18px;border-bottom:1px solid #ececec}      .ewsh-sum p{margin:0;font-size:14px;color:#555}      .ewsh-sum p+p{font-family:Anton,Impact,sans-serif;font-size:24px;color:#101010;white-space:nowrap}      .ewsh-det{margin:0;padding:22px;background:#fafafa}      .ewsh-det .ewsh-ful{margin:0 0 18px}      .ewsh-sub-lab{margin-top:4px}      .ewsh-flab{display:block;font-size:13px;font-weight:600;margin:0 0 6px}      .ewsh-flab2{margin-top:14px}      .ewsh-email{width:100%;box-sizing:border-box;border:1.5px solid #d6d6d6;border-radius:6px;padding:13px 14px;font:400 15px "Instrument Sans",system-ui,sans-serif;color:#101010;background:#fff}      .ewsh-email:focus{outline:none;border-color:#101010}      .ewsh-fnote{margin:7px 0 0;font-size:12px;color:#777}      .ewsh-check{display:flex;align-items:center;gap:9px;margin:16px 0 20px;font-size:13px;color:#555;cursor:pointer}      .ewsh-cont{margin:0}      .ewsh-err{margin:10px 0 0;font-size:13px;color:#CC0000;font-weight:600}      .ewsh-err:empty{display:none}      .ewsh [hidden]{display:none}      .ewsh-stock{margin:0 0 24px;font-size:14px;font-weight:600;color:#1a7f4b}      .ewsh-stock:empty{display:none}      .ewsh-stock.out{color:#8a8a8a}      .ewsh-price{margin-bottom:20px}      .ewsh-rule{height:1px;background:#e2e2e2;margin:0 0 20px}      .ewsh-sizerow{display:flex;justify-content:space-between;align-items:baseline;gap:16px}      .ewsh-chart{font-size:13px;color:#555}      .ewsh-chart:hover{color:#CC0000}      .ewsh-share{display:flex;align-items:center;gap:14px;margin:26px 0 0;padding-top:18px;border-top:1px solid #e2e2e2;color:#555}      .ewsh-share span{font-size:13px;color:#777}      .ewsh-share a{color:#555;display:flex}      .ewsh-share a:hover{color:#CC0000}      .ewsh-order{max-width:460px}      .ewsh-print{margin:0 0 14px}      .ewsh-print.on{background:#fff;border:1.5px solid #e2e2e2;border-radius:8px;padding:16px 18px}      .ewsh-pbtn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:#101010;border:0;border-radius:6px;padding:17px 20px;font:700 13px/1 Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#fff;cursor:pointer}      .ewsh-pbtn:hover{background:#2a2a2a}      .ewsh-pbtn[disabled]{background:#e6e6e8;color:#9b9b9f;cursor:not-allowed}      .ewsh-pbtn[disabled]:hover{background:#e6e6e8}      .ewsh-print.on .ewsh-pbtn{background:#101010;color:#fff}      .ewsh-pfields{display:flex;gap:12px;margin:16px 0 0}      .ewsh-pf{flex:1 1 auto;min-width:0}      .ewsh-pf-num{flex:0 0 110px}      .ewsh-pname{letter-spacing:.08em;text-transform:uppercase;font-weight:600}      .ewsh-pwho{margin:16px 0 0}      .ewsh-pwho .ewsh-pf{flex:1 1 auto}      select.ewsh-email{padding-right:12px}      .ewsh-pwarn{margin:14px 0 0;font-size:13px;color:#777}      .ewsh-pay{border:0;padding:0;background:none}      .ewsh-ptitle{margin:0 0 10px;font-size:16px;font-weight:700;color:#101010}      .ewsh-pmodes{display:flex;gap:10px}      .ewsh-pmodes button{flex:1 1 0;min-width:0;background:#fff;color:#101010;border:1px solid #8a8a8a;border-radius:0;padding:16px 6px;font:700 15px/1 "Instrument Sans",system-ui,sans-serif;cursor:pointer}      .ewsh-pmodes button:hover{background:#f2f2f2;border-color:#101010}      .ewsh-pmodes button.on,.ewsh-pmodes button.on:hover{background:#000;border-color:#000;color:#fff}      .ewsh-pwho{margin:12px 0 0}      .ewsh-pwho select.ewsh-email{border-color:#8a8a8a;padding:15px 14px}      .ewsh-pay .ewsh-go{width:100%;font-size:15px;padding:19px 20px}      .ewsh-prt{margin:0;padding:22px;background:#fafafa}      .ewsh-printcta{margin:0 0 14px}      .ewsh-pchosen{margin:10px 0 0;font-size:13px;color:#777}      .ewsh-pchosen:empty{display:none}      .ewsh-prev{position:relative;width:100%;margin:0}      .ewsh-galface img{display:block;width:100%;height:auto}      .ewsh-prev img{display:block;width:100%;height:auto}      .ewsh-prev b,.ewsh-prev i{position:absolute;left:0;right:0;text-align:center;-webkit-text-fill-color:#fff;color:#fff;-webkit-text-stroke:3.9px rgba(40,0,6,.9);paint-order:stroke;font-family:Oswald,"Instrument Sans",sans-serif;font-weight:700}      .ewsh-prev b{top:17%;font-size:47px;line-height:34px;text-transform:uppercase}      .ewsh-prev i{top:36%;font-style:normal;font-size:174px;line-height:127px}      .ewsh-plead{margin:12px 0 0;font-size:13px;color:#777}      .ewsh-prt .ewsh-go{margin:18px 0 0}      .ewsh-guide{margin:0 0 26px;border-top:1px solid #e2e2e2;border-bottom:1px solid #e2e2e2}      .ewsh-guide summary{list-style:none;cursor:pointer;padding:15px 0;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#101010;display:flex;align-items:center;justify-content:space-between}      .ewsh-guide summary::-webkit-details-marker{display:none}      .ewsh-guide summary::after{content:"+";font-size:18px;font-weight:400;line-height:1;color:#777}      .ewsh-guide[open] summary::after{content:"\\2013"}      .ewsh-guide summary:hover{color:#CC0000}      .ewsh-guide-scroll{overflow-x:auto;padding:0 0 4px}      .ewsh-guide-tbl{width:100%;border-collapse:collapse;font-size:14px;margin:0 0 4px}      .ewsh-guide-tbl th,.ewsh-guide-tbl td{padding:11px 12px;text-align:center;white-space:nowrap}      .ewsh-guide-tbl thead th{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#777;border-bottom:1px solid #e2e2e2}      .ewsh-guide-tbl tbody th{text-align:left;font-weight:700;color:#101010}      .ewsh-guide-tbl tbody td{color:#555}      .ewsh-guide-tbl tbody tr+tr th,.ewsh-guide-tbl tbody tr+tr td{border-top:1px solid #f0f0f0}      .ewsh-guide-tbl thead th:first-child{text-align:left}      .ewsh-gnote{margin:0 0 18px;font-size:13px;color:#777;line-height:1.55;max-width:62ch}      .ewsh-tabs{max-width:1140px;margin:46px auto 0;padding:0}      .ewsh-tabrow{display:flex;gap:40px;flex-wrap:wrap;border-bottom:1px solid #e2e2e2}      .ewsh-tab{background:none;border:0;border-bottom:3px solid transparent;margin:0 0 -1px;padding:0 0 14px;font:400 20px/1 Anton,Impact,sans-serif;letter-spacing:.5px;text-transform:uppercase;color:#8a8a8a;cursor:pointer}      .ewsh-tab:hover{color:#101010}      .ewsh-tab.on{color:#101010;border-bottom-color:#CC0000}      .ewsh-panel{padding:30px 0 4px}      .ewsh-panel p{margin:0 0 14px;font-size:15px;line-height:1.65;color:#555;max-width:62ch}      .ewsh-tot{display:flex;flex-direction:column;gap:6px;margin:0 0 16px}      .ewsh-tot div{display:flex;justify-content:space-between;gap:16px;font-size:14px;color:#555}      .ewsh-tot div.ewsh-tot-sum{border-top:1px solid #e2e2e2;padding-top:9px;margin-top:3px;font-weight:700;color:#101010}';
+		. '.ewsh{font-family:"Instrument Sans",system-ui,sans-serif;color:#101010}.ewsh-wrap{display:flex;gap:52px;align-items:flex-start;max-width:1140px;margin:0 auto}.ewsh-gal{flex:0 0 470px;background:transparent;border-radius:0;padding:0}.ewsh-info{flex:1 1 auto;min-width:0}.ewsh-info h1,.ewsh-info h2{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:42px;line-height:1.03;letter-spacing:.5px;text-transform:uppercase;margin:0 0 6px;color:#101010}.ewsh-sub{font-size:14px;color:#777;margin:0 0 22px}.ewsh-price{font-family:Anton,Impact,sans-serif;font-size:26px;margin:0 0 4px;color:#101010}.ewsh-note{font-size:13px;color:#8a8a8a;margin:0 0 26px}.ewsh-lab{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin:0 0 10px}.ewsh-sizes{display:flex;gap:9px;flex-wrap:wrap;margin:0 0 26px}.ewsh-sizes button{min-width:62px;padding:13px 6px;background:#fff;border:1.5px solid #d6d6d6;border-radius:6px;font:inherit;font-size:14px;font-weight:600;cursor:pointer}.ewsh-sizes button.on{border-color:#101010;background:#101010;color:#fff}.ewsh-sizes button[disabled]{color:#c0c0c0;border-style:dashed;cursor:not-allowed;text-decoration:line-through}.ewsh-ful{display:flex;flex-direction:column;gap:10px;margin:0 0 26px}.ewsh-ful label{display:flex;gap:12px;align-items:flex-start;border:1.5px solid #d6d6d6;border-radius:8px;padding:15px 16px;cursor:pointer}.ewsh-ful label.on{border-color:#101010}.ewsh-ful b{display:block;font-size:15px;margin-bottom:3px}.ewsh-ful span span{display:block;font-size:13px;color:#777;line-height:1.45}.ewsh-pay{border:1.5px solid #e2e2e2;border-radius:10px;padding:22px;background:#fafafa}.ewsh-pay p{margin:0;font-size:14px;line-height:1.6;color:#666}.ewsh-pay b{display:block;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#101010;margin-bottom:6px}@media(max-width:900px){.ewsh-wrap{flex-direction:column;gap:26px}.ewsh-gal{flex:1 1 auto;width:100%}} .ewsh-fits{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 18px} .ewsh-fits button{font:700 13px/1 Inter,sans-serif;letter-spacing:.4px;padding:11px 18px; border:1.5px solid #d8d8dc;background:#fff;color:#111;border-radius:4px;cursor:pointer} .ewsh-fits button.on{border-color:#CC0000;background:#CC0000;color:#fff} .ewsh-sizes button[disabled]{opacity:.4;text-decoration:line-through;cursor:not-allowed} .ewsh-sizes button.on{border-color:#CC0000;background:#CC0000;color:#fff}      .ewsh-go{margin:0;width:100%;background:#CC0000;color:#fff;border:0;border-radius:6px;font:700 15px/1 Inter,sans-serif;letter-spacing:.4px;padding:17px 20px;cursor:pointer}      .ewsh-go:not([disabled]):hover{background:#b30000}      .ewsh-go[disabled]{background:#e6e6e8;color:#9b9b9f;cursor:not-allowed}      .ewsh-small{margin:12px 0 0;font-size:13px;color:#777;line-height:1.5}      .ewsh-co{margin:0}      .ewsh-mount{background:#fff;border-radius:6px;min-height:40px}      .ewsh-mount:empty{display:none}      .ewsh-msg{margin:10px 0 0;font-size:13px;color:#777}      .ewsh-thanks{border:1.5px solid #CC0000;border-radius:8px;padding:16px 18px;margin:0 0 22px;font-size:15px;color:#101010}      .ewsh-head{margin:0 0 14px}      .ewsh-head h2{margin:0}      .ewsh-back{margin:7px 0 0;font-size:13px;color:#777}      .ewsh-back button{background:none;border:0;padding:0;font:inherit;color:#777;cursor:pointer;text-decoration:underline}      .ewsh-back button:hover{color:#CC0000}      .ewsh-card{background:#fff;border:1.5px solid #e2e2e2;border-radius:10px;overflow:hidden}      .ewsh-sum{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 18px;border-bottom:1px solid #ececec}      .ewsh-sum p{margin:0;font-size:14px;color:#555}      .ewsh-sum p+p{font-family:Anton,Impact,sans-serif;font-size:24px;color:#101010;white-space:nowrap}      .ewsh-det{margin:0;padding:22px;background:#fafafa}      .ewsh-det .ewsh-ful{margin:0 0 18px}      .ewsh-sub-lab{margin-top:4px}      .ewsh-flab{display:block;font-size:13px;font-weight:600;margin:0 0 6px}      .ewsh-flab2{margin-top:14px}      .ewsh-email{width:100%;box-sizing:border-box;border:1.5px solid #d6d6d6;border-radius:6px;padding:13px 14px;font:400 15px "Instrument Sans",system-ui,sans-serif;color:#101010;background:#fff}      .ewsh-email:focus{outline:none;border-color:#101010}      .ewsh-fnote{margin:7px 0 0;font-size:12px;color:#777}      .ewsh-check{display:flex;align-items:center;gap:9px;margin:16px 0 20px;font-size:13px;color:#555;cursor:pointer}      .ewsh-cont{margin:0}      .ewsh-err{margin:10px 0 0;font-size:13px;color:#CC0000;font-weight:600}      .ewsh-err:empty{display:none}      .ewsh [hidden]{display:none}      .ewsh-stock{margin:0 0 24px;font-size:14px;font-weight:600;color:#1a7f4b}      .ewsh-stock:empty{display:none}      .ewsh-stock.out{color:#8a8a8a}      .ewsh-price{margin-bottom:20px}      .ewsh-rule{height:1px;background:#e2e2e2;margin:0 0 20px}      .ewsh-sizerow{display:flex;justify-content:space-between;align-items:baseline;gap:16px}      .ewsh-chart{font-size:13px;color:#555}      .ewsh-chart:hover{color:#CC0000}      .ewsh-share{display:flex;align-items:center;gap:14px;margin:26px 0 0;padding-top:18px;border-top:1px solid #e2e2e2;color:#555}      .ewsh-share span{font-size:13px;color:#777}      .ewsh-share a{color:#555;display:flex}      .ewsh-share a:hover{color:#CC0000}      .ewsh-order{max-width:460px}      .ewsh-print{margin:0 0 14px}      .ewsh-print.on{background:#fff;border:1.5px solid #e2e2e2;border-radius:8px;padding:16px 18px}      .ewsh-pbtn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:#101010;border:0;border-radius:6px;padding:17px 20px;font:700 13px/1 Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#fff;cursor:pointer}      .ewsh-pbtn:hover{background:#2a2a2a}      .ewsh-pbtn[disabled]{background:#e6e6e8;color:#9b9b9f;cursor:not-allowed}      .ewsh-pbtn[disabled]:hover{background:#e6e6e8}      .ewsh-print.on .ewsh-pbtn{background:#101010;color:#fff}      .ewsh-pfields{display:flex;gap:12px;margin:16px 0 0}      .ewsh-pf{flex:1 1 auto;min-width:0}      .ewsh-pf-num{flex:0 0 110px}      .ewsh-pname{letter-spacing:.08em;text-transform:uppercase;font-weight:600}      .ewsh-pwho{margin:16px 0 0}      .ewsh-pwho .ewsh-pf{flex:1 1 auto}      select.ewsh-email{padding-right:12px}      .ewsh-pwarn{margin:14px 0 0;font-size:13px;color:#777}      .ewsh-pay{border:0;padding:0;background:none}      .ewsh-ptitle{margin:0 0 10px;font-size:16px;font-weight:700;color:#101010}      .ewsh-pmodes{display:flex;gap:10px}      .ewsh-pmodes button{flex:1 1 0;min-width:0;background:#fff;color:#101010;border:1px solid #8a8a8a;border-radius:0;padding:16px 6px;font:700 15px/1 "Instrument Sans",system-ui,sans-serif;cursor:pointer}      .ewsh-pmodes button:hover{background:#f2f2f2;border-color:#101010}      .ewsh-pmodes button.on,.ewsh-pmodes button.on:hover{background:#000;border-color:#000;color:#fff}      .ewsh-pwho{margin:12px 0 0}      .ewsh-pwho select.ewsh-email{border-color:#8a8a8a;padding:15px 14px}      .ewsh-pay .ewsh-go{width:100%;font-size:15px;padding:19px 20px}      .ewsh-prt{margin:0;padding:22px;background:#fafafa}      .ewsh-printcta{margin:0 0 14px}      .ewsh-pchosen{margin:10px 0 0;font-size:13px;color:#777}      .ewsh-pchosen:empty{display:none}      .ewsh-prev{position:relative;width:100%;margin:0}      .ewsh-galface img{display:block;width:100%;height:auto}      .ewsh-prev img{display:block;width:100%;height:auto}      .ewsh-prev b,.ewsh-prev i{position:absolute;left:0;right:0;text-align:center;-webkit-text-fill-color:#fff;color:#fff;-webkit-text-stroke:3.9px rgba(40,0,6,.9);paint-order:stroke;font-family:Oswald,"Instrument Sans",sans-serif;font-weight:700}      .ewsh-prev b{top:17%;font-size:47px;line-height:34px;text-transform:uppercase}      .ewsh-prev i{top:36%;font-style:normal;font-size:174px;line-height:127px}      .ewsh-plead{margin:12px 0 0;font-size:13px;color:#777}      .ewsh-prt .ewsh-go{margin:18px 0 0}      .ewsh-guide{margin:0 0 26px;border-top:1px solid #e2e2e2;border-bottom:1px solid #e2e2e2}      .ewsh-guide summary{list-style:none;cursor:pointer;padding:15px 0;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#101010;display:flex;align-items:center;justify-content:space-between}      .ewsh-guide summary::-webkit-details-marker{display:none}      .ewsh-guide summary::after{content:"+";font-size:18px;font-weight:400;line-height:1;color:#777}      .ewsh-guide[open] summary::after{content:"\\2013"}      .ewsh-guide summary:hover{color:#CC0000}      .ewsh-guide-scroll{overflow-x:auto;padding:0 0 4px}      .ewsh-guide-tbl{width:100%;border-collapse:collapse;font-size:14px;margin:0 0 4px}      .ewsh-guide-tbl th,.ewsh-guide-tbl td{padding:11px 12px;text-align:center;white-space:nowrap}      .ewsh-guide-tbl thead th{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#777;border-bottom:1px solid #e2e2e2}      .ewsh-guide-tbl tbody th{text-align:left;font-weight:700;color:#101010}      .ewsh-guide-tbl tbody td{color:#555}      .ewsh-guide-tbl tbody tr+tr th,.ewsh-guide-tbl tbody tr+tr td{border-top:1px solid #f0f0f0}      .ewsh-guide-tbl thead th:first-child{text-align:left}      .ewsh-gfit{margin:0 0 12px;font:400 20px/1 Anton,Impact,sans-serif;letter-spacing:.5px;text-transform:uppercase;color:#101010}      .ewsh-guide-blk+.ewsh-guide-blk{margin-top:26px}      .ewsh-gnote{margin:0 0 18px;font-size:13px;color:#777;line-height:1.55;max-width:62ch}      .ewsh-tabs{max-width:1140px;margin:46px auto 0;padding:0}      .ewsh-tabrow{display:flex;gap:40px;flex-wrap:wrap;border-bottom:1px solid #e2e2e2}      .ewsh-tab{background:none;border:0;border-bottom:3px solid transparent;margin:0 0 -1px;padding:0 0 14px;font:400 20px/1 Anton,Impact,sans-serif;letter-spacing:.5px;text-transform:uppercase;color:#8a8a8a;cursor:pointer}      .ewsh-tab:hover{color:#101010}      .ewsh-tab.on{color:#101010;border-bottom-color:#CC0000}      .ewsh-panel{padding:30px 0 4px}      .ewsh-panel p{margin:0 0 14px;font-size:15px;line-height:1.65;color:#555;max-width:62ch}      .ewsh-tot{display:flex;flex-direction:column;gap:6px;margin:0 0 16px}      .ewsh-tot div{display:flex;justify-content:space-between;gap:16px;font-size:14px;color:#555}      .ewsh-tot div.ewsh-tot-sum{border-top:1px solid #e2e2e2;padding-top:9px;margin-top:3px;font-weight:700;color:#101010}';
 }
 
 /**
@@ -627,7 +693,7 @@ function ewStripeCheckout(stripe, opts){
    if(!have.length){ $('ewshNote').textContent = W.empty; return; }
    fit = have[0];
    $('ewshNote').textContent = '';
-   drawFits(have); drawSizes(); drawFul(); drawPay();
+   drawFits(have); drawSizes(); drawFul(); drawPay(); showGuide();
   }).catch(function(){ $('ewshNote').textContent = W.failed; });
  }
 
@@ -638,7 +704,7 @@ function ewStripeCheckout(stripe, opts){
    b.type = 'button'; b.textContent = NAMES[f] || f;
    if(f === fit) b.className = 'on';
    b.addEventListener('click', function(){ fit = f; size = null; post = false;
-     drawFits(have); drawSizes(); drawFul(); drawPay(); });
+     drawFits(have); drawSizes(); drawFul(); drawPay(); showGuide(); });
    w.appendChild(b);
   });
   $('ewshPrice').textContent = money(model[fit].price);
@@ -646,6 +712,22 @@ function ewStripeCheckout(stripe, opts){
   var st = $('ewshStock');
   st.textContent = any ? W.instock : W.soldout;
   st.className = 'ewsh-stock' + (any ? '' : ' out');
+ }
+
+ /* The size guide shows the fit you are actually looking at. An adult
+    being shown children's measurements is worse than no guide at all,
+    which is what the page did before. A guide written as one table with
+    no fit named still shows for every fit. */
+ function showGuide(){
+  var blks = EL.querySelectorAll('.ewsh-guide-blk');
+  if(!blks.length) return;
+  var named = false;
+  Array.prototype.forEach.call(blks, function(b){ if(b.getAttribute('data-fit')) named = true; });
+  if(!named) return;
+  Array.prototype.forEach.call(blks, function(b){
+   var f = b.getAttribute('data-fit');
+   b.hidden = !!f && f !== fit;
+  });
  }
 
  function drawSizes(){
