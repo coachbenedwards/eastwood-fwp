@@ -189,6 +189,7 @@ function ew_news_js() {
 	return <<<'JS'
 <script id="ew-news-tabs">
 (function(){
+function go(){
 	var bar = document.querySelector('.tabs');
 	if ( ! bar || ! window.fetch || ! window.DOMParser ) { return; }
 	var box = bar.querySelector('.container') || bar;
@@ -232,6 +233,16 @@ function ew_news_js() {
 	});
 
 	window.addEventListener('popstate', function(){ window.location.reload(); });
+}
+// On the listing this script is printed inside the hero, which is above
+// the bar in the document, so at this point the bar does not exist yet
+// and querySelector finds nothing. Wait for the document when it is
+// still parsing; run straight away when it is not.
+if ( 'loading' === document.readyState ) {
+	document.addEventListener('DOMContentLoaded', go);
+} else {
+	go();
+}
 }());
 </script>
 JS;
