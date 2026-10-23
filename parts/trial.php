@@ -88,15 +88,27 @@ function ew_trial_shortcode( $atts ) {
 		$h .= '<p class="ewtr-note">' . esc_html( $a['form_note'] ) . '</p>';
 	}
 	$h .= $field( 'ewtrName', $a['name_label'], 'text', 'name' );
-	if ( ew_trial_on( $a['show_pos'] ) || ew_trial_on( $a['show_dob'] ) ) {
+
+	/*
+	 * Position and date of birth share a row only when both are asked for.
+	 * The row is 1fr plus a fixed 150, so one field on its own used to sit
+	 * in the wide column with 150 pixels of nothing beside it.
+	 *
+	 * Date of birth is a date field rather than a text box. A text box
+	 * collects "12/03/08", "March 08" and "12th March 2008" in the same
+	 * column, and nothing downstream can read all three.
+	 */
+	$pos = ew_trial_on( $a['show_pos'] );
+	$dob = ew_trial_on( $a['show_dob'] );
+	if ( $pos && $dob ) {
 		$h .= '<div class="ewtr-two">';
-		if ( ew_trial_on( $a['show_pos'] ) ) {
-			$h .= '<div>' . $field( 'ewtrPos', $a['pos_label'], 'text', 'off' ) . '</div>';
-		}
-		if ( ew_trial_on( $a['show_dob'] ) ) {
-			$h .= '<div>' . $field( 'ewtrDob', $a['dob_label'], 'text', 'bday' ) . '</div>';
-		}
+		$h .= '<div>' . $field( 'ewtrPos', $a['pos_label'], 'text', 'off' ) . '</div>';
+		$h .= '<div>' . $field( 'ewtrDob', $a['dob_label'], 'date', 'bday' ) . '</div>';
 		$h .= '</div>';
+	} elseif ( $pos ) {
+		$h .= $field( 'ewtrPos', $a['pos_label'], 'text', 'off' );
+	} elseif ( $dob ) {
+		$h .= $field( 'ewtrDob', $a['dob_label'], 'date', 'bday' );
 	}
 	if ( ew_trial_on( $a['show_loc'] ) ) {
 		$h .= $field( 'ewtrLoc', $a['loc_label'], 'text', 'address-level2' );
@@ -306,6 +318,9 @@ function ew_trial_css() {
 .ewtr-two .ewtr-lab{margin-top:18px}
 .ewtr .ewtr-in{width:100%;height:52px;border:1px solid rgba(255,255,255,.35);border-radius:8px;background:#111;color:#fff;font:inherit;font-size:17px;padding:0 14px}
 .ewtr .ewtr-in:focus{outline:none;border-color:#fff}
+/* The native date picker draws its own icon and panel; without this it
+   paints a light-theme control on the dark field and the icon vanishes. */
+.ewtr .ewtr-in[type=date]{color-scheme:dark}
 .ewtr .ewtr-tick{display:flex;gap:10px;align-items:flex-start;margin:20px 0 0;font-size:15px;line-height:1.45;color:#fff;cursor:pointer}
 .ewtr .ewtr-tick input{margin:3px 0 0;width:18px;height:18px}
 .ewtr .ewtr-err{margin:12px 0 0;min-height:1.2em;font-size:14px;color:#ff6b6b}
