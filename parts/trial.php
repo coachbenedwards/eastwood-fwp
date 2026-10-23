@@ -360,6 +360,7 @@ function ew_trial_js() {
    .then(function(x){
      if(!x.ok){ err.textContent = (x.j && x.j.message) || W.failed; btn.disabled = false; return; }
      form.hidden = true; root.querySelector('.ewtr-done').hidden = false;
+     if(window.ewTrack) ewTrack('Lead', {what: 'Academy trial'});
    })
    .catch(function(){ err.textContent = W.failed; btn.disabled = false; });
  });

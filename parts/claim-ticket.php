@@ -762,6 +762,7 @@ function ew_claim_js() {
      if(!res.ok || !res.j.html){ err(s2, (res.j && res.j.message) || W.failed); go.disabled = false; return; }
      root.querySelector('.ewc-big').hidden = true; root.querySelector('.ewc-month').hidden = true;
      s2.hidden = true; s3.hidden = false;
+     if(window.ewTrack) ewTrack('Lead', {what: 'School tickets'});
      if(res.j.offer && window.ewcOffer){
        /* The shirt offer first; No thanks goes to the pass. */
        s3.innerHTML = res.j.offer; window.ewcOffer(s3.querySelector('.ewc-offer'), res.j.html);

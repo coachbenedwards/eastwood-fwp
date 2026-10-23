@@ -1112,6 +1112,9 @@ function ew_shirt_mark_paid( $session_id, $hook ) {
 	if ( function_exists( 'ew_tix_crm' ) ) {
 		ew_tix_crm( $hook, $bid, 'paid' );
 	}
+	if ( function_exists( 'ew_track_purchase' ) ) {
+		ew_track_purchase( $bid );
+	}
 }
 
 add_action( 'rest_api_init', function () {

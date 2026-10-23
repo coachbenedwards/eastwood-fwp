@@ -248,6 +248,7 @@ function ew_halftime_js() {
    .then(function(x){
      if(!x.ok){ err.textContent = (x.j && x.j.message) || W.failed; btn.disabled = false; return; }
      form.hidden = true; root.querySelector('.ewh-done').hidden = false;
+     if(window.ewTrack) ewTrack('Lead', {what: 'Half-time show'});
    })
    .catch(function(){ err.textContent = W.failed; btn.disabled = false; });
  });

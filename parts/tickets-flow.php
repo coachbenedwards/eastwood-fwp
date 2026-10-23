@@ -280,6 +280,9 @@ function ew_tix_after_pay( $page_id, $a, $session_id ) {
 			wp_update_post( array( 'ID' => $bid, 'post_title' => $who ) );
 		}
 		ew_tix_crm( $a['crm_hook'], $bid, 'paid' );
+		if ( function_exists( 'ew_track_purchase' ) ) {
+			ew_track_purchase( $bid );
+		}
 	}
 
 	$h  = '<div class="ewt-after">';

@@ -757,6 +757,7 @@ function ew_cm_js() {
    .then(function(res){
      if(!res.ok || !res.j.ok){ err.textContent = (res.j && res.j.message) || W.failed; go.disabled = false; return; }
      form.hidden = true; sent.hidden = false;
+     if(window.ewTrack) ewTrack('Lead', {what: 'Community tickets'});
      sent.querySelector('.ewcm-line').textContent = res.j.line;
      sent.querySelector('.ewcm-note2').textContent = res.j.note;
      root.scrollIntoView({behavior:'smooth', block:'start'});
