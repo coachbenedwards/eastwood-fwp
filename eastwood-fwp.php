@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.31.0
+ * Version: 3.32.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -3318,6 +3318,11 @@ add_shortcode( 'eastwood_teams', 'ew_teams_shortcode' );
  * Squad at the bottom, so nobody is ever dropped for want of an entry.
  */
 function ew_squad_details() {
+	// The Squad screen in wp-admin is now the list. What follows is the list
+	// as it stood when that screen arrived, kept as the record it was seeded from.
+	if ( function_exists( 'ew_squad_store_details' ) ) {
+		return ew_squad_store_details();
+	}
 	return array(
 		// Positions as Ben gave them, 19 October 2026, and the squad numbers
 		// the same day. He gave the numbers by the names the dressing room
@@ -3369,7 +3374,8 @@ function ew_squad_details() {
  * the same character, because the feed uses the curly one.
  */
 function ew_squad_departed() {
-	return array(
+	$marked = function_exists( 'ew_squad_store_departed' ) ? ew_squad_store_departed() : array();
+	return array_merge( $marked, array(
 		'Steven Johnson-Fikula',
 		'Revarnelle James',
 		'Kieren Fenton',
@@ -3382,7 +3388,7 @@ function ew_squad_departed() {
 		// and position: the squad itself comes from the league feed, so a
 		// player who has left has to be named here or he keeps appearing.
 		'Theo Sackey-Mensah',
-	);
+	) );
 }
 
 /** The position half of the list, for the grouping. */
@@ -3753,7 +3759,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.31.0';
+const EW_FWP_VERSION = '3.32.0';
 
 /*
  * Parts loader.
