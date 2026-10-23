@@ -92,6 +92,9 @@ add_action( 'ew_tix_step', function ( $booking_id, $step ) {
 	if ( ! in_array( $step, array( 'paid', 'reminder' ), true ) || ! ew_om_on() ) {
 		return;
 	}
+	if ( apply_filters( 'ew_om_skip', false, $booking_id, $step ) ) {
+		return;
+	}
 	$to = (string) get_post_meta( $booking_id, '_ewt_email', true );
 	if ( ! is_email( $to ) ) {
 		return;
