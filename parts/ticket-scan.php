@@ -11,9 +11,13 @@
  *
  * Reuses the existing ewt_booking records (paid tickets + free claims).
  *
- * Set the scan secret once (must equal the app build's EXPO_PUBLIC_SCAN_SECRET):
- *   wp option update ew_scan_secret '02be2f0e444a7321a1b8dbf8da19087ad3122112ef8dc42a'
+ * The check-in secret defaults to the value baked into the app build below, so
+ * nothing needs setting up. To rotate it later, set the ew_scan_secret option
+ * (and change EXPO_PUBLIC_SCAN_SECRET in the app build to match).
  */
+
+/** Shared secret for the check-in write. Default matches the app build. */
+const EW_SCAN_SECRET_DEFAULT = '02be2f0e444a7321a1b8dbf8da19087ad3122112ef8dc42a';
 
 add_action('rest_api_init', function () {
 	register_rest_route('eastwood/v1', '/ticket/verify', [
@@ -89,7 +93,7 @@ function ew_ticket_verify(WP_REST_Request $r) {
 }
 
 function ew_ticket_checkin(WP_REST_Request $r) {
-	$secret = get_option('ew_scan_secret', '');
+	$secret = get_option('ew_scan_secret', '') ?: EW_SCAN_SECRET_DEFAULT;
 	$given  = $r->get_header('x_scan_secret'); // WP maps X-Scan-Secret -> x_scan_secret
 	if (!$secret || !hash_equals((string) $secret, (string) $given)) {
 		return new WP_REST_Response(['status' => 'error', 'message' => 'Not authorised'], 401);
