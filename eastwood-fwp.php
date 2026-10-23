@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.28.0
+ * Version: 3.29.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -543,7 +543,7 @@ function ew_fwp_settings_page() {
 	 * to go looking at the list to find out.
 	 * ------------------------------------------------------------------ */
 
-	$notify_kinds = function_exists( 'ew_notify_kinds' ) ? ew_notify_kinds() : array();
+	$notify_kinds = function_exists( 'ew_notify_routes' ) ? ew_notify_routes() : array();
 
 	if ( isset( $_POST['ew_notify_save'] ) && check_admin_referer( 'ew_notify_save' ) ) {
 		update_option( 'ew_notify_to',
@@ -575,9 +575,10 @@ function ew_fwp_settings_page() {
 			: 'Nobody is being told at the moment.' ) );
 	/* On top of the list above, per kind. Left empty, that kind just
 	   goes to the main list. */
-	echo '<h3>Anyone else, by kind</h3>';
-	echo '<p>Told as well as the addresses above, for that one kind only.'
-		. ' Leave empty and it simply goes to the list above.</p>';
+	echo '<h3>Where each thing goes</h3>';
+	echo '<p>Told as well as the addresses above, for that one thing only.'
+		. ' Several addresses on a line, separated by commas, all get it.'
+		. ' Leave a line empty and that thing only goes to the list above.</p>';
 	echo '<table class="form-table"><tbody>';
 	foreach ( $notify_kinds as $k => $label ) {
 		printf(
@@ -3752,7 +3753,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.28.0';
+const EW_FWP_VERSION = '3.29.0';
 
 /*
  * Parts loader.

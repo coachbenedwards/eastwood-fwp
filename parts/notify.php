@@ -39,17 +39,62 @@ function ew_notify_to() {
 }
 
 /**
- * Everyone to tell about one kind of booking.
+ * The things that can be routed somewhere of their own, and what each
+ * is called on the settings screen.
  *
- * The main list hears about all of them. Each kind can name people on
- * top -- the Academy trial registrations go to whoever runs the academy
- * as well as to the shop, without the academy hearing about every shirt.
+ * Finer than the statuses: a paid booking is either a shirt or a seat,
+ * and the club has a different inbox for each. Everything else is one
+ * status, one thing.
  *
- * @param string $kind The booking status.
+ * @return array<string,string>
+ */
+function ew_notify_routes() {
+	return array(
+		'paid_shop'  => 'Shirt order paid',
+		'paid_event' => 'Ticket paid',
+		'claimed'    => 'School ticket claimed',
+		'halftime'   => 'Half-time show sign-up',
+		'trial'      => 'Academy trial registration',
+		'community'  => 'Community ticket request',
+	);
+}
+
+/**
+ * Which route one booking takes.
+ *
+ * Shirt orders are marked when they are made. Older ones, and anything
+ * the shop wrote before that mark existed, are recognised by the word
+ * in the line that says what was bought.
+ *
+ * @param int    $id     The booking.
+ * @param string $status Its status.
+ * @return string
+ */
+function ew_notify_route_for( $id, $status ) {
+	if ( 'paid' !== $status ) {
+		return $status;
+	}
+	$kind = (string) get_post_meta( $id, '_ewt_kind', true );
+	if ( 'shop' === $kind ) {
+		return 'paid_shop';
+	}
+	$what = (string) get_post_meta( $id, '_ewt_event', true );
+	return ( false !== stripos( $what, 'shirt' ) ) ? 'paid_shop' : 'paid_event';
+}
+
+/**
+ * Everyone to tell about one booking.
+ *
+ * The main list hears about all of them -- somebody wants to watch the
+ * whole thing tick over. Each route names people on top of that, so
+ * trial registrations reach whoever runs the academy without the
+ * academy hearing about every shirt.
+ *
+ * @param string $route The route key.
  * @return string[]
  */
-function ew_notify_to_kind( $kind ) {
-	$extra = ew_notify_parse( get_option( 'ew_notify_to_' . $kind, '' ) );
+function ew_notify_to_route( $route ) {
+	$extra = ew_notify_parse( get_option( 'ew_notify_to_' . $route, '' ) );
 	return array_values( array_unique( array_merge( ew_notify_to(), $extra ) ) );
 }
 
@@ -121,7 +166,7 @@ function ew_notify_booking( $id ) {
 	if ( get_post_meta( $id, '_ewt_notified', true ) ) {
 		return;
 	}
-	$to = ew_notify_to_kind( $status );
+	$to = ew_notify_to_route( ew_notify_route_for( $id, $status ) );
 	if ( ! $to ) {
 		return;
 	}
