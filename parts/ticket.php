@@ -38,6 +38,34 @@ function ew_ticket_money( $pence ) {
 		: number_format_i18n( $pence / 100, 2 ) );
 }
 
+/* --- The photograph ----------------------------------------------------- */
+
+/** The club's ticket photograph, in one place. */
+const EW_TICKET_BG = 'claim/ticket-bg.jpg';
+
+/**
+ * The picture behind a ticket.
+ *
+ * Every ticket the club prints or shows has the same photograph behind it,
+ * so it is the default here rather than something each funnel has to
+ * remember to pass -- forgetting it is precisely how the fixture card
+ * ended up flat black. A funnel may pass its own (a path inside assets, or
+ * a full URL), or false for none at all.
+ */
+function ew_ticket_bg( $v = null ) {
+	if ( false === $v ) {
+		return '';
+	}
+	$v = trim( (string) ( null === $v ? '' : $v ) );
+	if ( '' === $v ) {
+		$v = EW_TICKET_BG;
+	}
+	if ( preg_match( '#^(https?:)?//#', $v ) || 0 === strpos( $v, '/' ) ) {
+		return $v;
+	}
+	return function_exists( 'ew_hb_asset' ) ? ew_hb_asset( $v ) : '';
+}
+
 /* --- The rows a funnel hands over --------------------------------------- */
 
 /**
@@ -85,7 +113,7 @@ function ew_ticket( $a ) {
 	$mode = in_array( $mode, array( 'link', 'pay', 'event' ), true ) ? $mode : 'link';
 
 	$class = trim( 'ewt ' . (string) ( $a['class'] ?? '' ) );
-	$bg    = (string) ( $a['bg'] ?? '' );
+	$bg    = ew_ticket_bg( array_key_exists( 'bg', $a ) ? $a['bg'] : null );
 	$stub  = (string) ( $a['stub_width'] ?? '' );
 
 	$style = array();
