@@ -253,79 +253,72 @@ function ew_sales_any( $id ) {
  */
 function ew_sales_words() {
 	return array(
-		'tix_off'   => 'Not announced yet',
-		'tix_soon'  => 'Tickets {when}',
-		'tix_out'   => 'Sold out',
-		'tix_url'   => '/tickets/',
-		'tix_head'  => 'Tickets',
-		'tix_step'  => 'Step 1 of 2',
-		'tix_who'   => "Who's coming?",
-		'tix_free'  => 'Free',
-		'tix_none'  => 'Nobody yet',
-		'tix_left'  => '{n} left of this release',
-		'tix_go'    => 'Continue',
-		'tix_back'  => 'Back to the fixture',
-		'tix_swap'  => 'Lunch and a table instead?',
-		'tix_less'  => 'One fewer',
-		'tix_more'  => 'One more',
-		'hosp_soon' => 'Hospitality {when}',
-		'hosp_out'  => 'Hospitality full',
+		'tix_off'     => 'Not announced yet',
+		'tix_off_sub' => "Tickets for this game haven't been released. They appear here the moment they are.",
+		'tix_soon'    => 'On sale {when}',
+		'tix_soon_sub' => 'Come back then and this is where you buy them.',
+		'tix_out'     => 'Sold out',
+		'tix_out_sub' => 'This release has gone.',
+		'tix_gate'    => 'You can always pay on the gate on the day. Under-16s come in free with a paying adult.',
+		'tix_url'     => '/tickets/',
+		'tix_head'    => 'Tickets',
+		'tix_step'    => 'Step 1 of 2',
+		'tix_who'     => "Who's coming?",
+		'tix_free'    => 'Free',
+		'tix_none'    => 'Nobody yet',
+		'tix_left'    => '{n} left of this release',
+		'tix_go'      => 'Continue',
+		'tix_back'    => 'Back to the fixture',
+		'tix_swap'    => 'Lunch and a table instead?',
+		'tix_less'    => 'One fewer',
+		'tix_more'    => 'One more',
 	);
 }
 
 /**
  * What a home fixture offers, as the row of actions under the crests.
  *
- * Four states each for tickets and hospitality, and the button is only a
- * button in one of them. The rest say what is true -- not announced, the
- * day it drops, sold out -- because a disabled button with no explanation
- * reads as the site being broken.
+ * Both buttons, on every home game, always -- which is the thing Forest get
+ * right and the first version of this got wrong. Replacing the button with
+ * the words "not announced yet" takes away the only thing on the card worth
+ * pressing, and a fixture with nothing to press looks like a fixture nobody
+ * is doing anything about.
+ *
+ * So the button stays and the card answers. Press it and the fixture turns
+ * over, and the other side says what is true: the counters if the game is
+ * selling, the day it drops if it is not yet, sold out if it has gone. The
+ * state is never a reason to show less; it only changes what is behind the
+ * press.
  */
 function ew_sales_actions( $m, $a, $class = 'ewp-rowCta' ) {
 	$id = (int) ( $m['id'] ?? 0 );
 	if ( ! $id ) {
 		return '';
 	}
-	$tix  = ew_sales_state( $id, 'tix' );
-	$hosp = ew_sales_state( $id, 'hosp' );
 	$ico  = function_exists( 'ew_hb_icon' ) ? 'ew_hb_icon' : null;
-	$bits = array();
-	$hosp_bit = '';
-	$tix_bit  = '';
+	$hosp = '';
+	$tix  = '';
 
-	if ( 'on' === $hosp['state'] && '' !== (string) ( $a['hosp'] ?? '' ) ) {
-		$hosp_bit = '<a href="' . esc_url( home_url( (string) ( $a['hosp_url'] ?? '/hospitality/' ) ) ) . '">'
+	if ( '' !== (string) ( $a['hosp'] ?? '' ) ) {
+		$hosp = '<a href="' . esc_url( home_url( (string) ( $a['hosp_url'] ?? '/hospitality/' ) ) ) . '">'
 			. ( $ico ? $ico( 'dine' ) : '' )
 			. '<span>' . esc_html( (string) $a['hosp'] ) . '</span></a>';
-	} elseif ( 'off' !== $hosp['state'] ) {
-		$say = ew_sales_say( $hosp, $a, 'hosp' );
-		if ( '' !== $say ) {
-			$hosp_bit = '<span class="' . ( 'soon' === $hosp['state'] ? 'ewf-soon' : 'ewf-dead' ) . '">'
-				. ( $ico ? $ico( 'dine' ) : '' ) . '<span>' . esc_html( $say ) . '</span></span>';
-		}
 	}
 
-	if ( 'on' === $tix['state'] && '' !== (string) ( $a['cta'] ?? '' ) ) {
-		// Still an anchor to the tickets page, so it works with no
-		// JavaScript and can be opened in a new tab; the turn intercepts it.
-		$tix_bit = '<a class="is-primary" data-ewf-open href="'
+	if ( '' !== (string) ( $a['cta'] ?? '' ) ) {
+		// An anchor, not a button: it works with JavaScript off and can be
+		// opened in a new tab. The turn intercepts the click when it can.
+		$tix = '<a class="is-primary" data-ewf-open href="'
 			. esc_url( add_query_arg( 'fx', $id, home_url( (string) ( $a['tix_url'] ?? '/tickets/' ) ) ) ) . '">'
 			. ( $ico ? $ico( 'ticket' ) : '' )
 			. '<span>' . esc_html( (string) $a['cta'] ) . '</span></a>';
-	} else {
-		$say = ew_sales_say( $tix, $a, 'tix' );
-		if ( '' !== $say ) {
-			$tix_bit = '<span class="' . ( 'soon' === $tix['state'] ? 'ewf-soon' : 'ewf-dead' ) . '">'
-				. ( $ico ? $ico( 'ticket' ) : '' ) . '<span>' . esc_html( $say ) . '</span></span>';
-		}
 	}
 
 	// The hero leads with tickets and the rows lead with hospitality. That
-	// is how both read today, and the states should not quietly reorder them.
-	$bits = 'ewp-bannerCta' === $class
-		? array( $tix_bit, $hosp_bit )
-		: array( $hosp_bit, $tix_bit );
-	$bits = array_filter( $bits );
+	// is how both read today, and nothing here should quietly reorder them.
+	$bits = array_filter( 'ewp-bannerCta' === $class
+		? array( $tix, $hosp )
+		: array( $hosp, $tix ) );
 
 	return $bits ? '<p class="' . esc_attr( $class ) . '">' . implode( '', $bits ) . '</p>' : '';
 }
@@ -346,10 +339,10 @@ function ew_sales_actions( $m, $a, $class = 'ewp-rowCta' ) {
  */
 function ew_sales_panel( $m, $a ) {
 	$id = (int) ( $m['id'] ?? 0 );
-	$st = ew_sales_state( $id, 'tix' );
-	if ( 'on' !== $st['state'] ) {
+	if ( ! $id ) {
 		return '';
 	}
+	$st = ew_sales_state( $id, 'tix' );
 
 	$home = (array) ( $m['home-team'] ?? array() );
 	$away = (array) ( $m['away-team'] ?? array() );
@@ -373,6 +366,27 @@ function ew_sales_panel( $m, $a ) {
 	$h .= '</div>';
 
 	$h .= '<div class="ewf-tkStub">';
+
+	// Not selling: the stub says so and why, rather than showing counters
+	// that cannot add up to anything. The card still turned, so the press
+	// was answered -- which is the whole point of keeping the button.
+	if ( 'on' !== $st['state'] ) {
+		$word = 'soon' === $st['state'] ? 'tix_soon' : ( 'out' === $st['state'] ? 'tix_out' : 'tix_off' );
+		$h   .= '<p class="ewf-tkHead"><span>' . esc_html( (string) ( $a['tix_head'] ?? 'Tickets' ) ) . '</span></p>';
+		$h   .= '<p class="ewf-tkState">' . esc_html( ew_sales_say( $st, $a, 'tix' ) ) . '</p>';
+		$sub  = (string) ( $a[ $word . '_sub' ] ?? '' );
+		if ( '' !== $sub ) {
+			$h .= '<p class="ewf-tkSub">' . esc_html( $sub ) . '</p>';
+		}
+		if ( '' !== (string) ( $a['tix_gate'] ?? '' ) ) {
+			$h .= '<p class="ewf-tkSub ewf-tkGate">' . esc_html( (string) $a['tix_gate'] ) . '</p>';
+		}
+		$h .= '<div class="ewf-tkFill"></div>';
+		$h .= '<p class="ewf-tkBack"><button type="button" data-ewf-back>'
+			. esc_html( (string) ( $a['tix_back'] ?? 'Back to the fixture' ) ) . '</button></p>';
+		return $h . '</div></div>';
+	}
+
 	$h .= '<p class="ewf-tkHead"><span>' . esc_html( (string) ( $a['tix_head'] ?? 'Tickets' ) ) . '</span>'
 		. '<small>' . esc_html( (string) ( $a['tix_step'] ?? 'Step 1 of 2' ) ) . '</small></p>';
 	$h .= '<p class="ewf-tkLab">' . esc_html( (string) ( $a['tix_who'] ?? "Who's coming?" ) ) . '</p>';
@@ -398,8 +412,8 @@ function ew_sales_panel( $m, $a ) {
 	$h .= '<button type="button" class="ewf-tkGo" data-ewf-go disabled>'
 		. esc_html( (string) ( $a['tix_go'] ?? 'Continue' ) ) . '</button>';
 
-	$hosp = ew_sales_state( $id, 'hosp' );
-	if ( 'on' === $hosp['state'] && '' !== (string) ( $a['tix_swap'] ?? '' ) ) {
+	$hosp_st = ew_sales_state( $id, 'hosp' );
+	if ( 'on' === $hosp_st['state'] && '' !== (string) ( $a['tix_swap'] ?? '' ) ) {
 		$h .= '<p class="ewf-tkSwap"><span>' . esc_html( (string) $a['tix_swap'] ) . '</span>'
 			. '<a href="' . esc_url( home_url( (string) ( $a['hosp_url'] ?? '/hospitality/' ) ) ) . '">'
 			. esc_html( (string) ( $a['hosp'] ?? 'Book hospitality' ) ) . '</a></p>';
@@ -441,14 +455,6 @@ function ew_sales_css() {
 .ewf-off{display:none}
 @media (prefers-reduced-motion:reduce){.ewf-card .ewf-face{transition:none}}
 
-.ewf-dead,.ewf-soon{display:inline-flex;align-items:center;gap:10px;border-radius:6px;
- padding:14px 22px;font-size:15px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
-.ewf-dead{color:#9a9a9a;border:2px solid #e6e6e6;background:#fafafa}
-.ewf-soon{color:#101010;border:2px dashed #CC0000;background:#fff}
-.ewf-dead .ewp-ico,.ewf-soon .ewp-ico{width:24px;height:24px;flex:none}
-/* The hero is dark, so the same two states have to be read off it. */
-.ewp-bannerCta .ewf-dead{color:rgba(255,255,255,.55);border-color:rgba(255,255,255,.22);background:none}
-.ewp-bannerCta .ewf-soon{color:#fff;border-color:#fff;background:none}
 .ewp-bannerWrap.ewf-card{perspective:2600px}
 
 .ewf-tk{display:grid;grid-template-columns:minmax(0,1fr) 380px;background:#101010;color:#fff;
@@ -489,6 +495,12 @@ function ew_sales_css() {
 .ewf-tkSwap{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:14px 0 0;
  border-top:1px solid rgba(255,255,255,.18);padding-top:12px;font-size:13.5px;color:rgba(255,255,255,.65)}
 .ewf-tkSwap a{color:#fff;font-weight:700}
+.ewf-tkState{margin:18px 0 10px;font-family:Anton,Impact,sans-serif;font-weight:400;font-size:34px;
+ line-height:1.02;text-transform:uppercase;letter-spacing:.5px}
+.ewf-tkSub{margin:0 0 10px;font-size:14.5px;line-height:1.6;color:rgba(255,255,255,.72)}
+.ewf-tkGate{color:rgba(255,255,255,.5);font-size:13.5px}
+.ewf-tkFill{flex:1 1 auto;min-height:10px}
+.ewf-tkStub{display:flex;flex-direction:column}
 .ewf-tkBack{margin:12px 0 0;text-align:center}
 .ewf-tkBack button{appearance:none;background:none;border:0;padding:0;font:inherit;font-size:13px;
  color:rgba(255,255,255,.6);text-decoration:underline;cursor:pointer}

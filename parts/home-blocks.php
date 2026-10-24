@@ -366,8 +366,7 @@ function ew_hb_panel( $m, $opts = array() ) {
 	// behave the same way without either knowing about the other.
 	$ewf = ! $opts['done']
 		&& function_exists( 'ew_sales_panel' )
-		&& (int) ( ( (array) ( $m['home-team'] ?? array() ) )['id'] ?? 0 ) === (int) EW_TEAM
-		&& 'on' === ew_sales_state( (int) ( $m['id'] ?? 0 ), 'tix' )['state'];
+		&& (int) ( ( (array) ( $m['home-team'] ?? array() ) )['id'] ?? 0 ) === (int) EW_TEAM;
 
 	$home    = (array) ( $m['home-team'] ?? array() );
 	$away    = (array) ( $m['away-team'] ?? array() );
@@ -634,7 +633,7 @@ add_shortcode( 'eastwood_home_hero', 'ew_hb_hero_sc' );
 function ew_hb_banner_sc( $atts ) {
 	$atts = shortcode_atts(
 		array(
-			'cta'            => 'Buy Tickets',
+			'cta'            => 'Unlock Ticket Access',
 			'cta_url'        => '/tickets/',
 			'hosp'           => 'Book Hospitality',
 			'hosp_url'       => '/hospitality/',
@@ -675,9 +674,7 @@ function ew_hb_banner_sc( $atts ) {
 	// looking at is the game you want a ticket for, so nothing should
 	// navigate. The photo belongs to the front, so the two faces wrap the
 	// whole card rather than its inside.
-	$ewf = $at_home
-		&& function_exists( 'ew_sales_panel' )
-		&& 'on' === ew_sales_state( $match_id, 'tix' )['state'];
+	$ewf = $at_home && $match_id && function_exists( 'ew_sales_panel' );
 
 	ob_start();
 	?>
@@ -820,7 +817,7 @@ function ew_hb_fixtures_sc( $atts, $content = '' ) {
 			'open'       => 'fixtures',
 			'layout'     => 'list',
 			'hero'       => 'no',
-			'cta'        => 'Buy Tickets',
+			'cta'        => 'Unlock Ticket Access',
 			'cta_url'    => '/tickets/',
 			'hosp'       => 'Book Hospitality',
 			'hosp_url'   => '/hospitality/',
