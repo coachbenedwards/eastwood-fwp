@@ -386,7 +386,7 @@ function ew_sales_panel( $m, $a ) {
 			$h .= '<p class="ewf-tkSub ewf-tkGate">' . esc_html( (string) $a['tix_gate'] ) . '</p>';
 		}
 		$h .= '<div class="ewf-tkFill"></div>';
-		$h .= '<p class="ewf-tkBack"><button type="button" data-ewf-back>'
+		$h .= '<p class="ewf-tkBack"><button type="button" data-ewf-close>'
 			. esc_html( (string) ( $a['tix_back'] ?? 'Back to the fixture' ) ) . '</button></p>';
 		return $h . '</div></div>';
 	}
@@ -423,7 +423,7 @@ function ew_sales_panel( $m, $a ) {
 			. esc_html( (string) ( $a['hosp'] ?? 'Book hospitality' ) ) . '</a></p>';
 	}
 
-	$h .= '<p class="ewf-tkBack"><button type="button" data-ewf-back>'
+	$h .= '<p class="ewf-tkBack"><button type="button" data-ewf-close>'
 		. esc_html( (string) ( $a['tix_back'] ?? 'Back to the fixture' ) ) . '</button></p>';
 	$h .= '</div>';
 
@@ -596,7 +596,7 @@ function ew_sales_js() {
    return;
   }
 
-  var back = e.target.closest('[data-ewf-back]');
+  var back = e.target.closest('[data-ewf-close]');
   if(back){
    row = back.closest('.ewf-card');
    if(row){ turn(row, false); }
