@@ -358,8 +358,16 @@ function ew_hb_panel( $m, $opts = array() ) {
 			'featured_label' => '',
 			'featured_note'  => '',
 		),
+		function_exists( 'ew_sales_words' ) ? ew_sales_words() : array(),
 		$opts
 	);
+	// A home game that has something to sell turns over instead of
+	// navigating. One flag here, so the hero and every row in the list
+	// behave the same way without either knowing about the other.
+	$ewf = ! $opts['done']
+		&& function_exists( 'ew_sales_panel' )
+		&& (int) ( ( (array) ( $m['home-team'] ?? array() ) )['id'] ?? 0 ) === (int) EW_TEAM
+		&& 'on' === ew_sales_state( (int) ( $m['id'] ?? 0 ), 'tix' )['state'];
 
 	$home    = (array) ( $m['home-team'] ?? array() );
 	$away    = (array) ( $m['away-team'] ?? array() );
@@ -372,7 +380,8 @@ function ew_hb_panel( $m, $opts = array() ) {
 
 	ob_start();
 	?>
-<li class="ewp-row">
+<li class="ewp-row<?php echo $ewf ? ' ewf-card' : ''; ?>">
+	<?php if ( $ewf ) : ?><div class="ewf-face"><div data-ewf-front><?php endif; ?>
 	<div class="ewp-rowTop">
 		<?php if ( '' !== $badge ) : ?>
 		<span class="ewp-rowBadge"><img src="<?php echo esc_url( $badge ); ?>" alt=""
@@ -421,20 +430,26 @@ function ew_hb_panel( $m, $opts = array() ) {
 			<span class="ewp-tieName"><?php echo esc_html( (string) ( $away['name'] ?? '' ) ); ?></span>
 		</div>
 
-		<?php if ( ! $opts['done'] && $at_home && ( '' !== $opts['cta'] || '' !== $opts['hosp'] ) ) : ?>
-		<p class="ewp-rowCta">
-			<?php if ( '' !== $opts['hosp'] ) : ?>
-			<a href="<?php echo esc_url( home_url( $opts['hosp_url'] ) ); ?>"><?php
-				echo ew_hb_icon( 'dine' ); // phpcs:ignore ?><span><?php
-				echo esc_html( $opts['hosp'] ); ?></span></a>
-			<?php endif; ?>
-			<?php if ( '' !== $opts['cta'] ) : ?>
-			<a class="is-primary" href="<?php echo esc_url( home_url( $opts['cta_url'] ) ); ?>"><?php
-				echo ew_hb_icon( 'ticket' ); // phpcs:ignore ?><span><?php
-				echo esc_html( $opts['cta'] ); ?></span></a>
-			<?php endif; ?>
-		</p>
-		<?php endif; ?>
+		<?php
+		if ( ! $opts['done'] && $at_home ) {
+			if ( function_exists( 'ew_sales_actions' ) ) {
+				echo ew_sales_actions( $m, $opts ); // phpcs:ignore
+			} elseif ( '' !== $opts['cta'] || '' !== $opts['hosp'] ) {
+				echo '<p class="ewp-rowCta">';
+				if ( '' !== $opts['hosp'] ) {
+					echo '<a href="' . esc_url( home_url( $opts['hosp_url'] ) ) . '">'
+						. ew_hb_icon( 'dine' ) // phpcs:ignore
+						. '<span>' . esc_html( $opts['hosp'] ) . '</span></a>';
+				}
+				if ( '' !== $opts['cta'] ) {
+					echo '<a class="is-primary" href="' . esc_url( home_url( $opts['cta_url'] ) ) . '">'
+						. ew_hb_icon( 'ticket' ) // phpcs:ignore
+						. '<span>' . esc_html( $opts['cta'] ) . '</span></a>';
+				}
+				echo '</p>';
+			}
+		}
+		?>
 
 		<?php if ( '' !== $opts['centre'] ) : ?>
 		<p class="ewp-rowCentre"><a href="<?php
@@ -458,6 +473,12 @@ function ew_hb_panel( $m, $opts = array() ) {
 		<i><?php echo esc_html( $opts['featured_note'] ); ?></i>
 		<?php endif; ?>
 	</div>
+	<?php endif; ?>
+
+	<?php if ( $ewf ) : ?>
+	</div><div data-ewf-back class="ewf-off"><?php
+		echo ew_sales_panel( $m, $opts ); // phpcs:ignore
+	?></div></div>
 	<?php endif; ?>
 </li>
 	<?php
@@ -628,7 +649,7 @@ function ew_hb_banner_sc( $atts ) {
 			// Which home games are streamed is not published yet, so the card
 			// says so rather than implying every tie is covered.
 			'featured_note'  => 'Not announced yet',
-		),
+		) + ( function_exists( 'ew_sales_words' ) ? ew_sales_words() : array() ),
 		$atts,
 		'eastwood_home_banner'
 	);
@@ -650,9 +671,18 @@ function ew_hb_banner_sc( $atts ) {
 	$comp_id  = (int) ( $next['competition']['id'] ?? 0 );
 	$match_id = (int) ( $next['id'] ?? 0 );
 
+	// The hero turns over too, and for the same reason: the game you are
+	// looking at is the game you want a ticket for, so nothing should
+	// navigate. The photo belongs to the front, so the two faces wrap the
+	// whole card rather than its inside.
+	$ewf = $at_home
+		&& function_exists( 'ew_sales_panel' )
+		&& 'on' === ew_sales_state( $match_id, 'tix' )['state'];
+
 	ob_start();
 	?>
-<section class="ewp ewp-bannerWrap">
+<section class="ewp ewp-bannerWrap<?php echo $ewf ? ' ewf-card' : ''; ?>">
+	<?php if ( $ewf ) : ?><div class="ewf-face"><div data-ewf-front><?php endif; ?>
 	<div class="ewp-banner<?php echo '' !== $atts['image'] ? ' has-img' : ''; ?>"<?php
 	echo '' !== $atts['image']
 		? ' style="background-image:url(' . esc_url( $atts['image'] ) . ')"'
@@ -706,18 +736,26 @@ function ew_hb_banner_sc( $atts ) {
 		</div>
 		<?php endif; ?>
 
-		<p class="ewp-bannerCta">
-			<?php if ( $at_home && '' !== $atts['cta'] ) : ?>
-			<a class="is-primary" href="<?php echo esc_url( home_url( $atts['cta_url'] ) ); ?>"><?php
-				echo ew_hb_icon( 'ticket' ); // phpcs:ignore ?><span><?php
-				echo esc_html( $atts['cta'] ); ?></span></a>
-			<?php endif; ?>
-			<?php if ( $at_home && '' !== $atts['hosp'] ) : ?>
-			<a href="<?php echo esc_url( home_url( $atts['hosp_url'] ) ); ?>"><?php
-				echo ew_hb_icon( 'dine' ); // phpcs:ignore ?><span><?php
-				echo esc_html( $atts['hosp'] ); ?></span></a>
-			<?php endif; ?>
-		</p>
+		<?php
+		if ( $at_home ) {
+			if ( function_exists( 'ew_sales_actions' ) ) {
+				echo ew_sales_actions( $next, $atts, 'ewp-bannerCta' ); // phpcs:ignore
+			} else {
+				echo '<p class="ewp-bannerCta">';
+				if ( '' !== $atts['cta'] ) {
+					echo '<a class="is-primary" href="' . esc_url( home_url( $atts['cta_url'] ) ) . '">'
+						. ew_hb_icon( 'ticket' ) // phpcs:ignore
+						. '<span>' . esc_html( $atts['cta'] ) . '</span></a>';
+				}
+				if ( '' !== $atts['hosp'] ) {
+					echo '<a href="' . esc_url( home_url( $atts['hosp_url'] ) ) . '">'
+						. ew_hb_icon( 'dine' ) // phpcs:ignore
+						. '<span>' . esc_html( $atts['hosp'] ) . '</span></a>';
+				}
+				echo '</p>';
+			}
+		}
+		?>
 
 		<?php if ( $match_id && '' !== $atts['centre'] ) : ?>
 		<p class="ewp-bannerCentre"><a href="<?php
@@ -753,6 +791,11 @@ function ew_hb_banner_sc( $atts ) {
 		<?php endif; ?>
 	</div>
 	</div>
+	<?php if ( $ewf ) : ?>
+	</div><div data-ewf-back class="ewf-off"><?php
+		echo ew_sales_panel( $next, $atts ); // phpcs:ignore
+	?></div></div>
+	<?php endif; ?>
 </section>
 	<?php
 	return ob_get_clean();
@@ -789,7 +832,7 @@ function ew_hb_fixtures_sc( $atts, $content = '' ) {
 			// Which home games are streamed is not published yet, so the card
 			// says so rather than implying every tie is covered.
 			'featured_note'  => 'Not announced yet',
-		),
+		) + ( function_exists( 'ew_sales_words' ) ? ew_sales_words() : array() ),
 		$atts,
 		'eastwood_home_fixtures'
 	);
@@ -809,6 +852,9 @@ function ew_hb_fixtures_sc( $atts, $content = '' ) {
 		'featured_label' => $atts['featured_label'],
 		'featured_note'  => $atts['featured_note'],
 	);
+	if ( function_exists( 'ew_sales_words' ) ) {
+		$opts += array_intersect_key( $atts, ew_sales_words() );
+	}
 
 	$tabs = array( 'fixtures' => 'Fixtures', 'results' => 'Results', 'table' => 'Table' );
 	$open = isset( $tabs[ $atts['open'] ] ) ? $atts['open'] : 'fixtures';
