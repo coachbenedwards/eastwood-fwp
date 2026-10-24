@@ -2113,7 +2113,7 @@ function ew_hb_css() {
  .ewp-bannerComp img{height:26px}
  .ewp-bannerRight{margin-left:0;width:100%;justify-content:space-between}
  .ewp-bannerCompName{white-space:normal;text-align:left}
- .ewp-bannerCta a{min-height:46px;padding:0 20px}
+ .ewp-bannerCta a{min-height:46px;padding:11px 13px;font-size:15px}
  .ewp-banner .ewp-bannerInner{padding:10px 16px 16px}
  .ewp-bannerFeat{margin-top:28px}
 }
@@ -2131,12 +2131,14 @@ function ew_hb_css() {
 .ewp-bannerWhen{margin:20px 0 22px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;
  color:rgba(255,255,255,.85)}
 .ewp-bannerWhen b{margin-left:6px}
-.ewp-bannerCta{margin:0;display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+.ewp-bannerCta{margin:0;display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 .ewp-bannerCta a{display:inline-flex;align-items:center;justify-content:center;gap:11px;
- min-height:50px;padding:0 28px;font-size:13px;font-weight:700;
- letter-spacing:.12em;text-transform:uppercase;text-decoration:none;color:#fff;
+ min-height:50px;padding:12px 14px;font-size:16px;font-weight:700;border-radius:8px;
+ letter-spacing:normal;text-transform:uppercase;text-decoration:none;color:#fff;
  border:1px solid rgba(255,255,255,.55)}
-.ewp-bannerCta a.is-primary{background:#fff;color:#CC0000;border-color:#fff}
+/* Red is the action, not the frame. On the photo the outline stays white,
+   where a red one would disappear into the background. */
+.ewp-bannerCta a.is-primary{background:#CC0000;color:#fff;border-color:#CC0000}
 .ewp-bannerFeat{display:flex;align-items:center;justify-content:center;gap:11px;margin:46px 0 0}
 .ewp-bannerFeat > span{font-size:10px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;
  color:rgba(255,255,255,.62)}

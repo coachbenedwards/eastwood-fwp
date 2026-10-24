@@ -318,11 +318,10 @@ function ew_sales_actions( $m, $a, $class = 'ewp-rowCta' ) {
 			. '<span>' . esc_html( (string) $a['cta'] ) . '</span></a>';
 	}
 
-	// The hero leads with tickets and the rows lead with hospitality. That
-	// is how both read today, and nothing here should quietly reorder them.
-	$bits = array_filter( 'ewp-bannerCta' === $class
-		? array( $tix, $hosp )
-		: array( $hosp, $tix ) );
+	// Hospitality first, everywhere. The hero used to lead with tickets and
+	// the rows with hospitality, so the same two buttons sat in a different
+	// order twice on one page.
+	$bits = array_filter( array( $hosp, $tix ) );
 
 	return $bits ? '<p class="' . esc_attr( $class ) . '">' . implode( '', $bits ) . '</p>' : '';
 }
