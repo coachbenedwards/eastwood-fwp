@@ -3444,7 +3444,7 @@ function ew_hb_js() {
  });
 
  /* next-match countdown */
- [].forEach.call(document.querySelectorAll('.ewp-bannerClock'), function(el){
+ [].forEach.call(document.querySelectorAll('.ewp-bannerClock,[data-ko]'), function(el){
   var ko = parseInt(el.getAttribute('data-ko'), 10) * 1000;
   if (!ko) { return; }
   function pad(n){ return (n<10?'0':'') + n; }

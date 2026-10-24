@@ -294,7 +294,7 @@ function ew_sales_words() {
  * state is never a reason to show less; it only changes what is behind the
  * press.
  */
-function ew_sales_actions( $m, $a, $class = 'ewp-rowCta' ) {
+function ew_sales_actions( $m, $a, $class = 'ewp-rowCta', $link = '' ) {
 	$id = (int) ( $m['id'] ?? 0 );
 	if ( ! $id ) {
 		return '';
@@ -303,8 +303,11 @@ function ew_sales_actions( $m, $a, $class = 'ewp-rowCta' ) {
 	$hosp = '';
 	$tix  = '';
 
+	$plain = '' !== $link ? ' class="' . esc_attr( $link ) . '"' : '';
+	$prime = '' !== $link ? ' class="' . esc_attr( $link ) . '"' : ' class="is-primary"';
+
 	if ( '' !== (string) ( $a['hosp'] ?? '' ) ) {
-		$hosp = '<a href="' . esc_url( home_url( (string) ( $a['hosp_url'] ?? '/hospitality/' ) ) ) . '">'
+		$hosp = '<a' . $plain . ' href="' . esc_url( home_url( (string) ( $a['hosp_url'] ?? '/hospitality/' ) ) ) . '">'
 			. ( $ico ? $ico( 'dine' ) : '' )
 			. '<span>' . esc_html( (string) $a['hosp'] ) . '</span></a>';
 	}
@@ -312,7 +315,7 @@ function ew_sales_actions( $m, $a, $class = 'ewp-rowCta' ) {
 	if ( '' !== (string) ( $a['cta'] ?? '' ) ) {
 		// An anchor, not a button: it works with JavaScript off and can be
 		// opened in a new tab. The turn intercepts the click when it can.
-		$tix = '<a class="is-primary" data-ewf-open href="'
+		$tix = '<a' . $prime . ' data-ewf-open href="'
 			. esc_url( add_query_arg( 'fx', $id, home_url( (string) ( $a['tix_url'] ?? '/tickets/' ) ) ) ) . '">'
 			. ( $ico ? $ico( 'ticket' ) : '' )
 			. '<span>' . esc_html( (string) $a['cta'] ) . '</span></a>';
