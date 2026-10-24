@@ -265,6 +265,7 @@ function ew_sales_words() {
 		'tix_out_sub' => 'This release has gone.',
 		'tix_gate'    => 'You can always pay on the gate on the day. Under-16s come in free with a paying adult.',
 		'tix_url'     => '/tickets/',
+		'tix_bg'      => 'claim/ticket-bg.jpg',
 		'tix_head'    => 'Tickets',
 		'tix_step'    => 'Step 1 of 2',
 		'tix_who'     => "Who's coming?",
@@ -355,7 +356,9 @@ function ew_sales_panel( $m, $a ) {
 	$ts   = strtotime( (string) ( $m['date'] ?? '' ) . ' ' . (string) ( $m['time'] ?? '15:00' ) );
 	$url  = home_url( (string) ( $a['tix_url'] ?? '/tickets/' ) );
 
-	$h  = '<div class="ewf-tk" data-ewf-panel data-fx="' . $id . '" data-url="' . esc_url( $url ) . '">';
+	$bg = function_exists( 'ew_hb_asset' ) ? ew_hb_asset( (string) ( $a['tix_bg'] ?? '' ) ) : '';
+	$h  = '<div class="ewf-tk" data-ewf-panel data-fx="' . $id . '" data-url="' . esc_url( $url ) . '"'
+		. ( '' !== $bg ? ' style="background-image:url(' . esc_url( $bg ) . ')"' : '' ) . '>';
 
 	$h .= '<div class="ewf-tkMatch">';
 	$h .= '<p class="ewf-tkTie"><span>' . esc_html( (string) ( $home['name'] ?? '' ) ) . '</span>'
@@ -463,9 +466,10 @@ function ew_sales_css() {
 
 .ewp-bannerWrap.ewf-card{perspective:2600px}
 
-.ewf-tk{display:grid;grid-template-columns:minmax(0,1fr) 380px;background:#101010;color:#fff;
- border-radius:10px;overflow:hidden;text-align:left}
-.ewf-tkMatch{padding:30px 32px;display:flex;flex-direction:column;justify-content:center;gap:18px}
+.ewf-tk{display:grid;grid-template-columns:minmax(0,1fr) 380px;color:#fff;border:2px solid #fff;
+ border-radius:10px;overflow:hidden;text-align:left;background:#101010 left center/cover no-repeat}
+.ewf-tkMatch{padding:30px 32px;display:flex;flex-direction:column;justify-content:center;gap:18px;
+ background:rgba(0,0,0,.35)}
 .ewf-tkTie{margin:0;display:flex;flex-direction:column;gap:4px;font-family:Anton,Impact,sans-serif;
  font-weight:400;font-size:46px;line-height:.98;text-transform:uppercase;letter-spacing:.5px}
 .ewf-tkTie em{font-family:Georgia,serif;font-style:italic;font-size:26px;color:#e01b1b;line-height:1}
@@ -473,7 +477,7 @@ function ew_sales_css() {
 .ewf-tkWhen b{font-size:16px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
 .ewf-tkWhen i{font-family:Anton,Impact,sans-serif;font-style:normal;font-size:30px;color:#e01b1b}
 .ewf-tkLeft{margin:0;font-size:13.5px;color:rgba(255,255,255,.6)}
-.ewf-tkStub{border-left:3px dashed rgba(255,255,255,.85);padding:24px 26px;background:rgba(255,255,255,.04)}
+.ewf-tkStub{border-left:3px dashed rgba(255,255,255,.85);padding:24px 26px;background:rgba(0,0,0,.8)}
 .ewf-tkHead{margin:0 0 16px;display:flex;align-items:baseline;justify-content:space-between;gap:12px;
  border-bottom:1px solid rgba(255,255,255,.18);padding-bottom:10px}
 .ewf-tkHead span{font-family:Anton,Impact,sans-serif;font-size:24px;text-transform:uppercase;letter-spacing:.5px}

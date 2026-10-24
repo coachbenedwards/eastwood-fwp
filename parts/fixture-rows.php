@@ -182,8 +182,8 @@ function ew_fxr_css() {
  border-radius:8px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.18)}
 .ewhx-lab{flex:0 0 130px;display:flex;align-items:center;padding:18px;font-size:14px;
  font-weight:700;color:var(--ink)}
-.ewhx-when{flex:0 0 228px;display:flex;align-items:center;gap:12px;padding:18px 10px}
-.ewhx-comp{display:flex;flex-direction:column;align-items:center;gap:5px;flex:0 0 104px;
+.ewhx-when{flex:0 0 270px;display:flex;align-items:center;gap:12px;padding:18px 10px}
+.ewhx-comp{display:flex;flex-direction:column;align-items:center;gap:5px;flex:0 0 146px;
  min-width:0;text-align:center}
 .ewhx-comp img{width:28px;height:40px;object-fit:contain}
 .ewhx-comp em{font-style:normal;font-size:10px;line-height:1.2;font-weight:700;letter-spacing:.04em;
