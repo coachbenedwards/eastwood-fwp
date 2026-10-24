@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.33.0
+ * Version: 3.34.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -3759,7 +3759,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.33.0';
+const EW_FWP_VERSION = '3.34.0';
 
 /*
  * Parts loader.
@@ -5468,9 +5468,11 @@ add_shortcode( 'eastwood_sponsors', 'ew_sponsors_shortcode' );
 
 function ew_tickets_content() {
 	return <<<'HTML'
+[eastwood_match_tickets]
+
 <div class="ew-prose">
 
-<p class="ew-lede">Pay on the gate at Coronation Park — there is no need to buy in advance. Under-16s get in free with an adult.</p>
+<p class="ew-lede">You can still pay on the gate at Coronation Park, same price. Buying here means you walk straight in and we know to expect you. Under-16s get in free with an adult.</p>
 
 <p>Coming to a game for the first time? <a href="/matchday/">Everything you need for matchday</a> — where we are, parking, and what to expect when you get here.</p>
 
