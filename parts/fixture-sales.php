@@ -48,31 +48,34 @@ function ew_sales_opt() {
 	return is_array( $o ) ? $o : array();
 }
 
-/** The ticket types, in the order they are offered, priced in pence. */
+/**
+ * The ticket types, in the order they are offered, priced in pence.
+ *
+ * The option holds what somebody typed -- pounds, as "7.00" -- and pence is
+ * worked out here. That is deliberate: WordPress runs a registered
+ * setting's sanitise callback more than once on the save that first creates
+ * the option, so anything the callback CHANGES gets changed twice. Pounds
+ * in and pounds out survives that; pounds in and pence out multiplied every
+ * price by a hundred the first time this was saved.
+ */
 function ew_sales_types() {
 	$p = (array) ( ew_sales_opt()['prices'] ?? array() );
+	$of = function ( $key, $fallback ) use ( $p ) {
+		return isset( $p[ $key ] ) && '' !== $p[ $key ]
+			? ew_sales_pence( $p[ $key ] ) : $fallback;
+	};
 	return array(
-		'adult'   => array(
-			'label' => 'Adult',
-			'note'  => '',
-			'pence' => isset( $p['adult'] ) ? max( 0, (int) $p['adult'] ) : 700,
-		),
-		'conc'    => array(
-			'label' => 'Concession',
-			'note'  => '65 and over',
-			'pence' => isset( $p['conc'] ) ? max( 0, (int) $p['conc'] ) : 500,
-		),
-		'student' => array(
-			'label' => 'Student',
-			'note'  => 'With valid ID on the gate',
-			'pence' => isset( $p['student'] ) ? max( 0, (int) $p['student'] ) : 500,
-		),
-		'u16'     => array(
-			'label' => 'Under 16',
-			'note'  => 'Free with a paying adult',
-			'pence' => isset( $p['u16'] ) ? max( 0, (int) $p['u16'] ) : 0,
-		),
+		'adult'   => array( 'label' => 'Adult', 'note' => '', 'pence' => $of( 'adult', 700 ) ),
+		'conc'    => array( 'label' => 'Concession', 'note' => '65 and over', 'pence' => $of( 'conc', 500 ) ),
+		'student' => array( 'label' => 'Student', 'note' => 'With valid ID on the gate', 'pence' => $of( 'student', 500 ) ),
+		'u16'     => array( 'label' => 'Under 16', 'note' => 'Free with a paying adult', 'pence' => $of( 'u16', 0 ) ),
 	);
+}
+
+/** What somebody typed, as a settled "0.00" string. Running it again is safe. */
+function ew_sales_pounds( $v ) {
+	$v = preg_replace( '/[^0-9.]/', '', trim( (string) $v ) );
+	return '' === $v ? '' : number_format( (float) $v, 2, '.', '' );
 }
 
 /**
@@ -96,8 +99,9 @@ function ew_sales_rooms_std() {
 		$out[ $key ] = array(
 			'name'  => (string) ( $r['name'] ?? $key ),
 			'note'  => (string) ( $r['note'] ?? '' ),
-			'pence' => max( 0, (int) ( $r['pence'] ?? 0 ) ),
+			'pence' => ew_sales_pence( $r['pence'] ?? 0 ),
 			'qty'   => max( 0, (int) ( $r['qty'] ?? 0 ) ),
+			'raw'   => (string) ( $r['pence'] ?? '' ),
 		);
 	}
 	return $out;
@@ -203,7 +207,7 @@ function ew_sales_rooms( $id ) {
 			continue;
 		}
 		$r['pence'] = isset( $on[ $key ]['pence'] ) && '' !== $on[ $key ]['pence']
-			? max( 0, (int) $on[ $key ]['pence'] ) : $r['pence'];
+			? ew_sales_pence( $on[ $key ]['pence'] ) : $r['pence'];
 		$r['qty']   = isset( $on[ $key ]['qty'] ) && '' !== $on[ $key ]['qty']
 			? max( 0, (int) $on[ $key ]['qty'] ) : $r['qty'];
 		$out[ $key ] = $r;
@@ -689,7 +693,7 @@ function ew_sales_sanitise( $in ) {
 
 	foreach ( array( 'adult', 'conc', 'student', 'u16' ) as $k ) {
 		if ( isset( $in['prices'][ $k ] ) ) {
-			$out['prices'][ $k ] = ew_sales_pence( $in['prices'][ $k ] );
+			$out['prices'][ $k ] = ew_sales_pounds( $in['prices'][ $k ] );
 		}
 	}
 
@@ -711,7 +715,7 @@ function ew_sales_sanitise( $in ) {
 		$out['rooms'][ $key ] = array(
 			'name'  => $nm,
 			'note'  => sanitize_text_field( (string) ( $r['note'] ?? '' ) ),
-			'pence' => ew_sales_pence( $r['pence'] ?? 0 ),
+			'pence' => ew_sales_pounds( $r['pence'] ?? '' ),
 			'qty'   => max( 0, (int) ( $r['qty'] ?? 0 ) ),
 		);
 	}
@@ -727,9 +731,11 @@ function ew_sales_sanitise( $in ) {
 			$row[ $kind . '_state' ] = in_array( $st, array( 'off', 'soon', 'on', 'out' ), true ) ? $st : 'off';
 			$d = trim( (string) ( $f[ $kind . '_date' ] ?? '' ) );
 			$t = trim( (string) ( $f[ $kind . '_time' ] ?? '' ) );
-			$row[ $kind . '_when' ] = '' !== $d
-				? (int) strtotime( $d . ' ' . ( '' !== $t ? $t : '09:00' ) )
-				: 0;
+			if ( '' !== $d ) {
+				$row[ $kind . '_when' ] = (int) strtotime( $d . ' ' . ( '' !== $t ? $t : '09:00' ) );
+			} else {
+				$row[ $kind . '_when' ] = (int) ( $f[ $kind . '_when' ] ?? 0 );
+			}
 			$row[ $kind . '_cap' ] = max( 0, (int) ( $f[ $kind . '_cap' ] ?? 0 ) );
 		}
 		$rooms = array();
@@ -740,7 +746,7 @@ function ew_sales_sanitise( $in ) {
 			}
 			$rooms[ $key ] = array(
 				'on'    => ! empty( $r['on'] ) ? 1 : 0,
-				'pence' => '' === trim( (string) ( $r['pence'] ?? '' ) ) ? '' : ew_sales_pence( $r['pence'] ),
+				'pence' => ew_sales_pounds( $r['pence'] ?? '' ),
 				'qty'   => '' === trim( (string) ( $r['qty'] ?? '' ) ) ? '' : max( 0, (int) $r['qty'] ),
 			);
 		}
@@ -812,7 +818,7 @@ function ew_sales_admin() {
 			<?php echo esc_html( $t['label'] ); ?>
 			&nbsp;£<input type="text" size="5"
 				name="ew_sales[prices][<?php echo esc_attr( $k ); ?>]"
-				value="<?php echo esc_attr( number_format( $t['pence'] / 100, 2, '.', '' ) ); ?>">
+				value="<?php echo esc_attr( ew_sales_pounds( $t['pence'] / 100 ) ); ?>">
 			</label>
 		<?php endforeach; ?>
 			<p class="description">Every game uses these unless it says otherwise.</p>
@@ -835,7 +841,7 @@ function ew_sales_admin() {
 				value="<?php echo esc_attr( $r['note'] ); ?>">
 			£<input type="text" size="6"
 				name="ew_sales[rooms][<?php echo esc_attr( $key ); ?>][pence]"
-				value="<?php echo esc_attr( $r['pence'] ? number_format( $r['pence'] / 100, 2, '.', '' ) : '' ); ?>">
+				value="<?php echo esc_attr( $r['pence'] ? ew_sales_pounds( $r['pence'] / 100 ) : '' ); ?>">
 			<input type="number" min="0" style="width:72px" placeholder="places"
 				name="ew_sales[rooms][<?php echo esc_attr( $key ); ?>][qty]"
 				value="<?php echo esc_attr( $r['qty'] ? $r['qty'] : '' ); ?>">
@@ -928,8 +934,8 @@ function ew_sales_admin() {
 				</td>
 				<td style="padding:2px 6px 2px 0">£<input type="text" size="6"
 					name="ew_sales[fixtures][<?php echo (int) $id; ?>][rooms][<?php echo esc_attr( $key ); ?>][pence]"
-					value="<?php echo esc_attr( '' === ( $mine['pence'] ?? '' ) ? '' : number_format( ( (int) $mine['pence'] ) / 100, 2, '.', '' ) ); ?>"
-					placeholder="<?php echo esc_attr( number_format( $r['pence'] / 100, 2, '.', '' ) ); ?>"></td>
+					value="<?php echo esc_attr( (string) ( $mine['pence'] ?? '' ) ); ?>"
+					placeholder="<?php echo esc_attr( ew_sales_pounds( $r['pence'] / 100 ) ); ?>"></td>
 				<td style="padding:2px 0"><input type="number" min="0" style="width:76px"
 					name="ew_sales[fixtures][<?php echo (int) $id; ?>][rooms][<?php echo esc_attr( $key ); ?>][qty]"
 					value="<?php echo esc_attr( '' === ( $mine['qty'] ?? '' ) ? '' : (int) $mine['qty'] ); ?>"
