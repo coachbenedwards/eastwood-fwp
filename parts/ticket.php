@@ -112,7 +112,12 @@ function ew_ticket( $a ) {
 	$mode = (string) ( $a['mode'] ?? 'link' );
 	$mode = in_array( $mode, array( 'link', 'pay', 'event' ), true ) ? $mode : 'link';
 
-	$class = trim( 'ewt ' . (string) ( $a['class'] ?? '' ) );
+	// One design, two sizes. 'full' is the claim ticket exactly as it is
+	// drawn today; 'compact' is the same ticket -- same white counters,
+	// same round buttons, same red month, same everything -- at the size a
+	// fixture row can hold. Nothing but the measurements differs.
+	$size  = 'compact' === (string) ( $a['size'] ?? 'full' ) ? ' is-compact' : '';
+	$class = trim( 'ewt' . $size . ' ' . (string) ( $a['class'] ?? '' ) );
 	$bg    = ew_ticket_bg( array_key_exists( 'bg', $a ) ? $a['bg'] : null );
 	$stub  = (string) ( $a['stub_width'] ?? '' );
 
@@ -152,6 +157,7 @@ function ew_ticket( $a ) {
 		. ( $style ? ' style="' . esc_attr( implode( ';', $style ) ) . '"' : '' ) . '>';
 	$h .= ew_ticket_face( $a );
 	$h .= '<div class="ewt-stub">';
+	$h .= ew_ticket_date( $a );
 	$h .= ew_ticket_head( $a );
 
 	// Not selling: say so, hold the stub's height, and leave whatever the
@@ -197,23 +203,63 @@ function ew_ticket( $a ) {
 	return $h . '</div>';
 }
 
-/** The left-hand face: who is playing, when, where. */
+/**
+ * The left-hand face: who is playing, their crests, and when.
+ *
+ * Laid out as the claim ticket lays it out -- the names large and stacked,
+ * the crests in a column beside them, and the day, date and kick-off along
+ * the bottom with the time set big on the right.
+ */
 function ew_ticket_face( $a ) {
 	$h = '<div class="ewt-face">';
 
+	$h .= '<div class="ewt-teams"><div class="ewt-names">';
 	if ( '' !== (string) ( $a['title'] ?? '' ) ) {
-		$h .= '<p class="ewt-title">' . esc_html( (string) $a['title'] ) . '</p>';
+		$h .= '<p class="ewt-team">' . esc_html( (string) $a['title'] ) . '</p>';
 	} else {
 		$tie = (array) ( $a['tie'] ?? array() );
-		$h  .= '<p class="ewt-tie"><span>' . esc_html( (string) ( $tie['home'] ?? '' ) ) . '</span>'
-			. '<em>' . esc_html( (string) ( $tie['v'] ?? 'v' ) ) . '</em>'
-			. '<span>' . esc_html( (string) ( $tie['away'] ?? '' ) ) . '</span></p>';
+		$h  .= '<p class="ewt-team">' . esc_html( (string) ( $tie['home'] ?? '' ) ) . '</p>';
+		$h  .= '<p class="ewt-v">' . esc_html( (string) ( $tie['v'] ?? 'v' ) ) . '</p>';
+		$h  .= '<p class="ewt-team">' . esc_html( (string) ( $tie['away'] ?? '' ) ) . '</p>';
+	}
+	$h .= '</div>';
+
+	$crests = (array) ( $a['crests'] ?? array() );
+	$shown  = '';
+	foreach ( array( 'home', 'away' ) as $side ) {
+		$src = ew_ticket_bg( isset( $crests[ $side ] ) && '' !== $crests[ $side ] ? $crests[ $side ] : false );
+		if ( '' !== $src ) {
+			$tie    = (array) ( $a['tie'] ?? array() );
+			$shown .= '<img src="' . esc_url( $src ) . '" alt="' . esc_attr( (string) ( $tie[ $side ] ?? '' ) ) . '"'
+				. ' width="128" height="128" loading="lazy">';
+		}
+	}
+	if ( '' !== $shown ) {
+		$h .= '<div class="ewt-crests">' . $shown . '</div>';
+	}
+	$h .= '</div>';
+
+	$day  = (string) ( $a['day'] ?? '' );
+	$date = (string) ( $a['date'] ?? '' );
+	$time = (string) ( $a['time'] ?? '' );
+	if ( '' !== $day || '' !== $date || '' !== $time ) {
+		$h .= '<div class="ewt-when"><div>';
+		if ( '' !== $day ) {
+			$h .= '<p class="ewt-day">' . esc_html( $day ) . '</p>';
+		}
+		if ( '' !== $date ) {
+			$h .= '<p class="ewt-date">' . esc_html( $date ) . '</p>';
+		}
+		$h .= '</div>';
+		if ( '' !== $time ) {
+			$h .= '<p class="ewt-time">' . esc_html( $time ) . '</p>';
+		}
+		$h .= '</div>';
 	}
 
-	if ( '' !== (string) ( $a['when'] ?? '' ) || '' !== (string) ( $a['time'] ?? '' ) ) {
-		$h .= '<p class="ewt-when"><b>' . esc_html( (string) ( $a['when'] ?? '' ) ) . '</b>'
-			. '<i>' . esc_html( (string) ( $a['time'] ?? '' ) ) . '</i></p>';
-	}
+	// The venue and what is left of a release are not on a claim ticket,
+	// because a claim has neither. They sit quietly under the date where a
+	// funnel does have them to say.
 	foreach ( array( 'at' => 'ewt-at', 'note' => 'ewt-note' ) as $k => $cls ) {
 		if ( '' !== (string) ( $a[ $k ] ?? '' ) ) {
 			$h .= '<p class="' . $cls . '">' . esc_html( (string) $a[ $k ] ) . '</p>';
@@ -221,6 +267,17 @@ function ew_ticket_face( $a ) {
 	}
 
 	return $h . '</div>';
+}
+
+/** The stub's own date: the day as a number, then the month in red. */
+function ew_ticket_date( $a ) {
+	$big   = (string) ( $a['big'] ?? '' );
+	$month = (string) ( $a['month'] ?? '' );
+	if ( '' === $big && '' === $month ) {
+		return '';
+	}
+	return ( '' !== $big ? '<p class="ewt-big">' . esc_html( $big ) . '</p>' : '' )
+		. ( '' !== $month ? '<p class="ewt-month">' . esc_html( $month ) . '</p>' : '' );
 }
 
 /** The stub's heading, and the step marker beside it. */
@@ -266,63 +323,117 @@ function ew_ticket_row_html( $r, $a ) {
  */
 function ew_ticket_css() {
 	return '
-.ewt{--ewt-stub:380px;display:grid;grid-template-columns:minmax(0,1fr) var(--ewt-stub);color:#fff;
- border:2px solid #fff;border-radius:10px;overflow:hidden;text-align:left;
- background:#101010 left center/cover no-repeat}
-.ewt-face{padding:30px 32px;display:flex;flex-direction:column;justify-content:center;gap:18px;
- background:rgba(0,0,0,.35)}
-.ewt-tie,.ewt-title{margin:0;display:flex;flex-direction:column;gap:4px;font-family:Anton,Impact,sans-serif;
- font-weight:400;font-size:46px;line-height:.98;text-transform:uppercase;letter-spacing:.5px}
-.ewt-tie em{font-family:Georgia,serif;font-style:italic;font-size:26px;color:#e01b1b;line-height:1}
-.ewt-when{margin:0;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
-.ewt-when b{font-size:16px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
-.ewt-when i{font-family:Anton,Impact,sans-serif;font-style:normal;font-size:30px;color:#e01b1b}
-.ewt-at,.ewt-note{margin:0;font-size:13.5px;color:rgba(255,255,255,.6)}
-.ewt-stub{display:flex;flex-direction:column;border-left:3px dashed rgba(255,255,255,.85);
- padding:24px 26px;background:rgba(0,0,0,.8)}
-.ewt-head{margin:0 0 16px;display:flex;align-items:baseline;justify-content:space-between;gap:12px;
- border-bottom:1px solid rgba(255,255,255,.18);padding-bottom:10px}
-.ewt-head span{font-family:Anton,Impact,sans-serif;font-size:24px;text-transform:uppercase;letter-spacing:.5px}
-.ewt-head small{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.5)}
-.ewt-lab{margin:0 0 10px;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
- color:rgba(255,255,255,.55)}
-.ewt-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 0;
- border-top:1px solid rgba(255,255,255,.1)}
-.ewt-row:first-child{border-top:0}
-.ewt-who b{display:block;font-size:15px;font-weight:700}
-.ewt-who small{display:block;font-size:12px;color:rgba(255,255,255,.5);margin-top:1px}
-.ewt-pick{display:flex;align-items:center;gap:14px;flex:none}
-.ewt-p{font-size:15px;font-weight:700;min-width:42px;text-align:right}
-.ewt-pm{display:inline-flex;align-items:center;gap:2px;border:1px solid rgba(255,255,255,.3);border-radius:5px}
-.ewt-pm button{appearance:none;background:none;border:0;color:#fff;font:inherit;font-size:17px;
- line-height:1;width:32px;height:32px;cursor:pointer}
-.ewt-pm button[disabled]{color:rgba(255,255,255,.28);cursor:default}
-.ewt-pm output{min-width:24px;text-align:center;font-size:15px;font-weight:700}
-.ewt-sum{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:16px 0 0;
- border-top:1px solid rgba(255,255,255,.18);padding-top:12px;font-size:14px}
-.ewt-sum span:last-child{font-family:Anton,Impact,sans-serif;font-size:26px}
-.ewt-go{display:block;width:100%;margin:14px 0 0;appearance:none;border:0;border-radius:6px;
- background:#CC0000;color:#fff;font:inherit;font-size:15px;font-weight:700;letter-spacing:.05em;
- text-transform:uppercase;padding:15px;cursor:pointer}
-.ewt-go[disabled]{background:rgba(255,255,255,.14);color:rgba(255,255,255,.45);cursor:default}
-.ewt-msg{margin:10px 0 0;font-size:13.5px;color:#ff9a9a;min-height:1px}
-.ewt-msg:empty{margin:0}
-.ewt-say{margin:18px 0 10px;font-family:Anton,Impact,sans-serif;font-weight:400;font-size:34px;
- line-height:1.02;text-transform:uppercase;letter-spacing:.5px}
-.ewt-sub{margin:0 0 10px;font-size:14.5px;line-height:1.6;color:rgba(255,255,255,.72)}
-.ewt-gate{color:rgba(255,255,255,.5);font-size:13.5px}
-.ewt-fill{flex:1 1 auto;min-height:10px}
-.ewt-swap{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:14px 0 0;
- border-top:1px solid rgba(255,255,255,.18);padding-top:12px;font-size:13.5px;color:rgba(255,255,255,.65)}
+.ewt{--ewt-stub:470px;--ewt-min:660px;font-family:"Instrument Sans",system-ui,sans-serif;
+ display:grid;grid-template-columns:minmax(0,1fr) var(--ewt-stub);min-height:var(--ewt-min);
+ border-radius:14px;overflow:hidden;color:#fff;background:#000 left center/cover no-repeat;
+ text-align:left}
+.ewt *{box-sizing:border-box}
+.ewt [hidden]{display:none!important}
+
+/* The match */
+.ewt-face{background:rgba(0,0,0,.35);padding:56px 52px 44px;display:flex;flex-direction:column;
+ justify-content:space-between;gap:32px}
+.ewt-teams{display:flex;gap:32px;align-items:center}
+.ewt-names{flex:1 1 auto;min-width:0}
+.ewt .ewt-team{margin:0;font-family:Anton,Impact,sans-serif;font-size:96px;line-height:.95;
+ text-transform:uppercase;color:#fff;overflow-wrap:break-word}
+.ewt .ewt-v{margin:2px 0;font-family:Georgia,serif;font-style:italic;font-size:52px;line-height:1;color:#e01b1b}
+.ewt-crests{flex:0 0 auto;display:flex;flex-direction:column;gap:30px}
+.ewt-crests img{width:128px;height:128px;object-fit:contain}
+.ewt-when{display:flex;justify-content:space-between;align-items:flex-end;gap:16px}
+.ewt .ewt-day{margin:0 0 4px;font-size:18px;font-weight:700;letter-spacing:.4em;text-transform:uppercase;color:#e01b1b}
+.ewt .ewt-date{margin:0;font-size:34px;text-transform:uppercase;color:#fff}
+.ewt .ewt-time{margin:0;font-family:Anton,Impact,sans-serif;font-size:72px;line-height:1;color:#fff}
+.ewt .ewt-at,.ewt .ewt-note{margin:0;font-size:15px;line-height:1.5;color:#e6e6e6}
+
+/* The stub */
+.ewt-stub{background:rgba(0,0,0,.8);border-left:3px dashed rgba(255,255,255,.85);padding:40px 44px;
+ display:flex;flex-direction:column}
+.ewt .ewt-big{margin:0;font-family:Anton,Impact,sans-serif;font-size:72px;line-height:1;text-align:center;color:#fff}
+.ewt .ewt-month{margin:0 0 18px;font-family:Anton,Impact,sans-serif;font-size:26px;color:#e01b1b;
+ text-align:center;text-transform:uppercase}
+.ewt-head{display:flex;justify-content:space-between;align-items:baseline;
+ border-top:1px solid rgba(255,255,255,.25);padding-top:14px;margin-bottom:16px}
+.ewt-head span{font-family:Anton,Impact,sans-serif;font-size:28px;text-transform:uppercase}
+.ewt-head small{font-size:13px;font-weight:700;color:#cfcfcf}
+.ewt .ewt-lab{display:block;margin:0 0 8px;font-size:14px;font-weight:700;color:#fff}
+
+/* What is being bought, on white, as a claim ticket counts its seats */
+.ewt-rows{background:#fff;color:#101010;border-radius:8px;margin-bottom:22px}
+.ewt-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:10px 16px}
+.ewt-row+.ewt-row{border-top:1px solid #ececec}
+.ewt-who{min-width:0}
+.ewt-who b{display:block;font-weight:600}
+.ewt-who small{display:block;font-size:13px;color:#555}
+.ewt-pick{display:flex;align-items:center;gap:16px;flex:none}
+.ewt-p{font-weight:700;font-size:15px;min-width:42px;text-align:right;color:#101010}
+.ewt-pm{display:flex;align-items:center;gap:14px}
+.ewt-pm button{width:40px;height:40px;border-radius:999px;border:1.5px solid #101010;background:#fff;
+ color:#101010;font:inherit;font-size:20px;cursor:pointer;padding:0}
+.ewt-pm button:disabled{border-color:#cfcfcf;color:#9a9a9a;cursor:default}
+.ewt-pm output{font-family:Anton,Impact,sans-serif;font-size:22px;width:22px;text-align:center}
+
+/* The running total, and the way on */
+.ewt-sum{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:14px;
+ color:#e6e6e6;border-top:1px solid rgba(255,255,255,.25);border-bottom:1px solid rgba(255,255,255,.25);
+ padding:12px 0;margin:0 0 18px}
+.ewt-go{display:block;width:100%;background:#CC0000;color:#fff;border:0;border-radius:6px;padding:15px;
+ text-align:center;font:inherit;font-size:15px;font-weight:700;letter-spacing:.4px;cursor:pointer}
+.ewt-go:hover{background:#b30000}
+.ewt-go[disabled]{opacity:.6;cursor:default}
+.ewt .ewt-msg{margin:12px 0 0;font-size:14px;font-weight:600;color:#ff8a8a}
+.ewt .ewt-msg:empty{display:none}
+
+/* A game with nothing to sell says why, in the stub it would have used */
+.ewt .ewt-say{margin:0 0 12px;font-family:Anton,Impact,sans-serif;font-weight:400;font-size:44px;
+ line-height:1.02;text-transform:uppercase;color:#fff}
+.ewt .ewt-sub{margin:0 0 10px;font-size:15px;line-height:1.5;color:#e6e6e6}
+.ewt .ewt-gate{color:#bdbdbd}
+.ewt-fill{flex:1 1 auto;min-height:16px}
+.ewt-swap{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:16px 0 0;
+ border-top:1px solid rgba(255,255,255,.25);padding-top:12px;font-size:14px;color:#e6e6e6}
 .ewt-swap a{color:#fff;font-weight:700}
-.ewt-back{margin:12px 0 0;text-align:center}
-.ewt-back button,.ewt-back a{appearance:none;background:none;border:0;padding:0;font:inherit;
- font-size:13px;color:rgba(255,255,255,.6);text-decoration:underline;cursor:pointer}
-.ewt-pay{margin:22px 0 0}
-@media (max-width:860px){
-.ewt{grid-template-columns:minmax(0,1fr)}
-.ewt-stub{border-left:0;border-top:3px dashed rgba(255,255,255,.85)}
-.ewt-tie,.ewt-title{font-size:34px}
+.ewt-back{margin:16px 0 0;text-align:center}
+.ewt-back button,.ewt-back a{background:none;border:0;padding:0;color:#fff;font:inherit;font-size:13px;
+ text-decoration:underline;cursor:pointer}
+.ewt-pay{margin:28px 0 0}
+
+/* The same ticket at the size a fixture row can hold. Only measurements. */
+.ewt.is-compact{--ewt-stub:380px;--ewt-min:0;border-radius:10px;border:2px solid #fff}
+/* The claim ticket has no border, and needs none -- it sits on a white
+   page. The compact one sits on the black hospitality section, where
+   without an edge it merges into the page. */
+.ewt.is-compact .ewt-face{padding:30px 32px;gap:22px;justify-content:center}
+.ewt.is-compact .ewt-teams{gap:20px}
+.ewt.is-compact .ewt-team{font-size:46px}
+.ewt.is-compact .ewt-v{font-size:26px}
+.ewt.is-compact .ewt-crests{gap:14px}
+.ewt.is-compact .ewt-crests img{width:64px;height:64px}
+.ewt.is-compact .ewt-day{font-size:13px;letter-spacing:.3em}
+.ewt.is-compact .ewt-date{font-size:20px}
+.ewt.is-compact .ewt-time{font-size:44px}
+.ewt.is-compact .ewt-at,.ewt.is-compact .ewt-note{font-size:13.5px}
+.ewt.is-compact .ewt-stub{padding:24px 26px}
+.ewt.is-compact .ewt-big{font-size:44px}
+.ewt.is-compact .ewt-month{font-size:18px;margin-bottom:12px}
+.ewt.is-compact .ewt-head{padding-top:10px;margin-bottom:12px}
+.ewt.is-compact .ewt-head span{font-size:22px}
+.ewt.is-compact .ewt-rows{margin-bottom:16px}
+.ewt.is-compact .ewt-row{padding:8px 13px}
+.ewt.is-compact .ewt-pm{gap:10px}
+.ewt.is-compact .ewt-pm button{width:32px;height:32px;font-size:17px}
+.ewt.is-compact .ewt-pm output{font-size:18px;width:18px}
+.ewt.is-compact .ewt-say{font-size:34px}
+
+@media(max-width:1100px){.ewt .ewt-team{font-size:68px}.ewt-crests img{width:96px;height:96px}}
+@media(max-width:900px){
+ .ewt{grid-template-columns:minmax(0,1fr);min-height:0}
+ .ewt-face{padding:28px 24px;gap:22px}
+ .ewt .ewt-team{font-size:44px}.ewt .ewt-v{font-size:30px}
+ .ewt-crests{gap:14px}.ewt-crests img{width:64px;height:64px}
+ .ewt .ewt-date{font-size:22px}.ewt .ewt-time{font-size:44px}
+ .ewt-stub{border-left:0;border-top:3px dashed rgba(255,255,255,.85);padding:28px 22px}
+ .ewt .ewt-big{font-size:52px}
 }';
 }
 
