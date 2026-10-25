@@ -158,7 +158,8 @@ add_action( 'phpmailer_init', function ( $mail ) {
 	// The site's emails are written "from info@"; they go from the send-as
 	// address (orders@) instead, and replies come back to it.
 	$from = strtolower( (string) $mail->From );
-	if ( '' === $from || 'info@eastwoodfc.com' === $from || false !== strpos( $from, 'wordpress@' ) ) {
+	$ok_from = function_exists( 'ew_eb_froms' ) ? array_map( 'strtolower', ew_eb_froms() ) : array();
+	if ( '' === $from || ! in_array( $from, $ok_from, true ) ) {
 		$mail->setFrom( ew_smtp_from(), 'Eastwood FC', false );
 	}
 	$mail->clearReplyTos();
@@ -195,6 +196,7 @@ add_action( 'ew_fwp_after_settings', function () {
 	if ( isset( $_POST['ew_smtp_user'] ) && check_admin_referer( 'ew_smtp_save' ) ) {
 		update_option( 'ew_smtp_user', sanitize_email( wp_unslash( $_POST['ew_smtp_user'] ) ) );
 		update_option( 'ew_smtp_from', sanitize_email( wp_unslash( $_POST['ew_smtp_from'] ?? '' ) ) );
+		update_option( 'ew_smtp_aliases', sanitize_text_field( wp_unslash( $_POST['ew_smtp_aliases'] ?? '' ) ) );
 		$pass = preg_replace( '/\s+/', '', (string) wp_unslash( $_POST['ew_smtp_pass'] ?? '' ) );
 		if ( '' !== $pass ) {
 			update_option( 'ew_smtp_pass', $pass, false );
@@ -216,6 +218,7 @@ add_action( 'ew_fwp_after_settings', function () {
 	wp_nonce_field( 'ew_smtp_save' );
 	echo '<p><label>Mailbox<br><input type="email" name="ew_smtp_user" size="40" value="' . esc_attr( ew_smtp_user() ) . '"></label></p>';
 	echo '<p><label>Send as<br><input type="email" name="ew_smtp_from" size="40" value="' . esc_attr( ew_smtp_from() ) . '"></label></p>';
+	echo '<p><label>Also send as (only addresses confirmed as "Send mail as" on the mailbox, comma separated)<br><input type="text" name="ew_smtp_aliases" size="60" value="' . esc_attr( (string) get_option( 'ew_smtp_aliases', '' ) ) . '"></label></p>';
 	echo '<p><label>App password' . ( '' !== (string) get_option( 'ew_smtp_pass', '' ) ? ' (saved; leave blank to keep it)' : '' ) . '<br><input type="password" name="ew_smtp_pass" size="40" autocomplete="new-password" value=""></label></p>';
 	echo '<p><label><input type="checkbox" name="ew_smtp_clear" value="1"> Remove the saved app password</label></p>';
 	submit_button( 'Save Google mailbox' );
