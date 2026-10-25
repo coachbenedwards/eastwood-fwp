@@ -50,6 +50,68 @@ function ew_squad_positions() {
 	);
 }
 
+/**
+ * The club's sides, as the Teams page already names them.
+ *
+ * A player belongs to as many of these as he plays for, so an academy lad
+ * who gets into the first team is ticked for both rather than typed in
+ * twice. Two copies of a name is how one of them ends up with the wrong
+ * number, or on a wage sheet he was never meant to be on.
+ *
+ * Editable on the Squad screen, so a side the club adds -- a girls' team,
+ * a second development side -- needs no code.
+ */
+function ew_squad_teams() {
+	$saved = get_option( 'ew_squad_teams', null );
+	if ( is_array( $saved ) && $saved ) {
+		return $saved;
+	}
+	return array(
+		'first'       => "Men's First Team",
+		'women'       => "Women's First Team",
+		'development' => 'Development',
+		'u21'         => 'Under 21s',
+		'academy'     => 'Academy',
+		'grassroots'  => 'Grassroots',
+	);
+}
+
+/**
+ * A slug for a side the club has just named.
+ *
+ * sanitize_key() drops spaces rather than bridging them, which would turn
+ * "Girls Under 15s" into girlsunder15s -- legible enough, but a word break
+ * reads better in a URL, so spaces become hyphens first.
+ */
+function ew_squad_team_slug( $label, $taken = array() ) {
+	$slug = strtolower( str_replace( "'", '', (string) $label ) );
+	$slug = trim( preg_replace( '/[^a-z0-9]+/', '-', $slug ), '-' );
+	if ( '' === $slug ) {
+		return '';
+	}
+	$try = $slug;
+	$n   = 2;
+	while ( isset( $taken[ $try ] ) ) {
+		$try = $slug . '-' . $n;
+		++$n;
+	}
+	return $try;
+}
+
+/**
+ * The sides a row belongs to.
+ *
+ * A row written before sides existed is a first-team player, because the
+ * first team is the only list there was.
+ */
+function ew_squad_row_teams( $row ) {
+	$teams = $row['teams'] ?? null;
+	if ( ! is_array( $teams ) ) {
+		return array( 'first' );
+	}
+	return array_values( array_intersect( array_keys( ew_squad_teams() ), $teams ) );
+}
+
 /** What a row can say about a player. */
 function ew_squad_statuses() {
 	return array(
@@ -157,15 +219,28 @@ add_action( 'rest_api_init', function () {
 function ew_squad_feed( $request ) {
 	$pos    = ew_squad_positions();
 	$status = ew_squad_statuses();
+	$teams  = ew_squad_teams();
+
+	// ?team=academy gives that side alone. No team named gives the lot, so
+	// anything reading this feed before sides existed reads it unchanged.
+	$want = trim( (string) $request->get_param( 'team' ) );
+	$want = isset( $teams[ $want ] ) ? $want : '';
 
 	$lines   = array();
-	$lines[] = array( 'Name', 'Squad no.', 'Position', 'Status' );
+	$lines[] = array( 'Name', 'Squad no.', 'Position', 'Status', 'Teams' );
 	foreach ( ew_squad_list() as $row ) {
+		$in = ew_squad_row_teams( $row );
+		if ( '' !== $want && ! in_array( $want, $in, true ) ) {
+			continue;
+		}
 		$lines[] = array(
 			$row['name'],
 			isset( $row['number'] ) && null !== $row['number'] ? (string) $row['number'] : '',
 			$pos[ $row['pos'] ?? '' ] ?? '',
 			$status[ $row['status'] ?? 'squad' ] ?? '',
+			implode( ', ', array_map( function ( $k ) use ( $teams ) {
+				return $teams[ $k ];
+			}, $in ) ),
 		);
 	}
 
@@ -202,6 +277,33 @@ add_action( 'admin_post_ew_squad_save', function () {
 	$in     = isset( $_POST['ew_squad'] ) ? (array) wp_unslash( $_POST['ew_squad'] ) : array();
 	$out    = array();
 
+	// The sides first, because the rows are checked against them.
+	//
+	// A side keeps the slug it already had, matched on its label, because
+	// every player's ticks point at that slug. Minting fresh slugs from the
+	// labels on each save would empty every side the first time anybody
+	// pressed Save -- so only a line that is genuinely new gets a new slug.
+	$was   = ew_squad_teams();
+	$byLab = array_flip( $was );
+	$sides = array();
+	foreach ( preg_split( '/\r\n|\r|\n/', (string) wp_unslash( $_POST['ew_squad_teams'] ?? '' ) ) as $line ) {
+		$label = trim( sanitize_text_field( $line ) );
+		if ( '' === $label ) {
+			continue;
+		}
+		if ( in_array( $label, $sides, true ) ) {
+			continue;   // the same side typed twice is one side, not two
+		}
+		$slug = $byLab[ $label ] ?? ew_squad_team_slug( $label, $sides );
+		if ( '' !== $slug && ! isset( $sides[ $slug ] ) ) {
+			$sides[ $slug ] = $label;
+		}
+	}
+	if ( $sides ) {
+		update_option( 'ew_squad_teams', $sides, false );
+	}
+	$teams = ew_squad_teams();
+
 	foreach ( $in as $row ) {
 		$row  = (array) $row;
 		$name = trim( sanitize_text_field( (string) ( $row['name'] ?? '' ) ) );
@@ -211,11 +313,16 @@ add_action( 'admin_post_ew_squad_save', function () {
 		$num = trim( (string) ( $row['number'] ?? '' ) );
 		$p   = (string) ( $row['pos'] ?? '' );
 		$s   = (string) ( $row['status'] ?? 'squad' );
+		$t   = array_values( array_intersect(
+			array_keys( $teams ),
+			array_map( 'strval', (array) ( $row['teams'] ?? array() ) )
+		) );
 		$out[] = array(
 			'name'   => $name,
 			'number' => ( '' !== $num && ctype_digit( $num ) ) ? (int) $num : null,
 			'pos'    => isset( $pos[ $p ] ) ? $p : '',
 			'status' => isset( $status[ $s ] ) ? $s : 'squad',
+			'teams'  => $t,
 		);
 	}
 
@@ -234,10 +341,16 @@ function ew_squad_admin_page() {
 	$list   = ew_squad_list();
 	$pos    = ew_squad_positions();
 	$status = ew_squad_statuses();
+	$teams  = ew_squad_teams();
 
-	// Three empty rows at the bottom for new signings.
+	// Three empty rows at the bottom for new signings. Nothing is ticked on
+	// them: an existing row with no sides recorded predates them and is a
+	// first-team player, but a NEW row left untouched must not quietly
+	// become one. Forgetting to tick leaves a player off a list, which is
+	// visible; a wrong tick puts an academy lad on a wage sheet, which is
+	// not.
 	for ( $i = 0; $i < 3; $i++ ) {
-		$list[] = array( 'name' => '', 'number' => null, 'pos' => '', 'status' => 'squad' );
+		$list[] = array( 'name' => '', 'number' => null, 'pos' => '', 'status' => 'squad', 'teams' => array() );
 	}
 	?>
 	<div class="wrap">
@@ -268,10 +381,11 @@ function ew_squad_admin_page() {
 			<?php wp_nonce_field( 'ew_squad_save' ); ?>
 			<table class="widefat striped" style="max-width:900px;margin-top:18px">
 				<thead><tr>
-					<th style="width:40%">Name</th>
-					<th style="width:12%">Squad no.</th>
-					<th style="width:22%">Position</th>
-					<th style="width:26%">Status</th>
+					<th style="width:24%">Name</th>
+					<th style="width:8%">Squad no.</th>
+					<th style="width:15%">Position</th>
+					<th style="width:17%">Status</th>
+					<th>Teams</th>
 				</tr></thead>
 				<tbody>
 				<?php foreach ( $list as $i => $row ) : ?>
@@ -294,10 +408,30 @@ function ew_squad_admin_page() {
 								selected( (string) ( $row['status'] ?? 'squad' ), $k ); ?>><?php echo esc_html( $label ); ?></option>
 							<?php endforeach; ?>
 						</select></td>
+						<td><?php
+							$mine = ew_squad_row_teams( $row );
+							foreach ( $teams as $k => $label ) : ?>
+							<label style="display:inline-block;margin:0 14px 4px 0;white-space:nowrap">
+								<input type="checkbox" value="<?php echo esc_attr( $k ); ?>"
+									name="ew_squad[<?php echo (int) $i; ?>][teams][]"
+									<?php checked( in_array( $k, $mine, true ) ); ?>>
+								<?php echo esc_html( $label ); ?>
+							</label>
+							<?php endforeach; ?>
+						</td>
 					</tr>
 				<?php endforeach; ?>
 				</tbody>
 			</table>
+
+			<h2 style="margin-top:28px">The club's sides</h2>
+			<p style="font-size:14px;max-width:760px">One per line. Adding a side here puts it against
+				every player as something to tick. A player is ticked for as many as he plays
+				for &mdash; an academy lad in the first team is both, not two rows &mdash; so he keeps
+				one squad number and appears on one wage sheet.</p>
+			<textarea name="ew_squad_teams" rows="7" style="width:360px;font-size:14px"><?php
+				echo esc_textarea( implode( "\n", array_values( $teams ) ) ); ?></textarea>
+
 			<?php submit_button( 'Save squad' ); ?>
 		</form>
 	</div>
