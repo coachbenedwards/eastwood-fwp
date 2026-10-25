@@ -411,17 +411,18 @@ function ew_squad_admin_page() {
 								selected( (string) ( $row['status'] ?? 'squad' ), $k ); ?>><?php echo esc_html( $label ); ?></option>
 							<?php endforeach; ?>
 						</select></td>
-						<td><?php
+						<td><div style="display:grid;gap:2px 18px;
+							grid-template-columns:repeat(auto-fit,minmax(170px,1fr))"><?php
 							$mine = ew_squad_row_teams( $row );
 							foreach ( $teams as $k => $label ) : ?>
-							<label style="display:inline-block;margin:0 14px 4px 0;white-space:nowrap">
+							<label style="white-space:nowrap">
 								<input type="checkbox" value="<?php echo esc_attr( $k ); ?>"
 									name="ew_squad[<?php echo (int) $i; ?>][teams][]"
 									<?php checked( in_array( $k, $mine, true ) ); ?>>
 								<?php echo esc_html( $label ); ?>
 							</label>
 							<?php endforeach; ?>
-						</td>
+						</div></td>
 					</tr>
 				<?php endforeach; ?>
 				</tbody>
