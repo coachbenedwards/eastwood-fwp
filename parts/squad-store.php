@@ -356,7 +356,10 @@ function ew_squad_admin_page() {
 	<div class="wrap">
 		<h1>Squad</h1>
 		<p style="max-width:48em;font-size:14px">
-			The first-team squad. A change here reaches the squad page on the
+			Everybody who plays for the club, whichever side they play for.
+			Tick a player for each one &mdash; an academy lad in the first team
+			is both, not two rows, so he keeps one squad number and sits on
+			one wage sheet. A change here reaches the squad page on the
 			website, the managers&rsquo; team sheet and the finance sheet.
 			<b>When a player leaves, set him to &ldquo;Left the club&rdquo;
 			rather than deleting his name</b> &mdash; the managers&rsquo; sheet
