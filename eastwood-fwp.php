@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.50.0
+ * Version: 3.50.1
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -2021,6 +2021,25 @@ add_action( 'init', function () {
 	}
 } );
 
+// Lye Town came into the fixtures twice: once hand-typed with the stand-in
+// id 990101 while the feed did not carry the tie, and again from the feed
+// under its real id 860 once it did. The crest was fetched against 990101,
+// so the feed's copy showed the initials disc. Once, on upgrade: the file and
+// its remembered source move across to 860, and the stand-in is left alone.
+add_action( 'init', function () {
+	if ( get_option( 'ew_badge_lye_moved' ) ) { return; }
+	$dir  = ew_badge_dir();
+	if ( ! file_exists( $dir . '860.png' ) && file_exists( $dir . '990101.png' ) ) {
+		@copy( $dir . '990101.png', $dir . '860.png' );
+		$meta = (array) get_option( 'ew_badge_sources', array() );
+		if ( ! empty( $meta[990101] ) && empty( $meta[860] ) ) {
+			$meta[860] = $meta[990101];
+			update_option( 'ew_badge_sources', $meta, false );
+		}
+	}
+	update_option( 'ew_badge_lye_moved', 1, false );
+}, 40 );
+
 add_action( 'ew_badge_refresh', function () {
 	$meta = get_option( 'ew_badge_sources', array() );
 	foreach ( $meta as $team => $row ) {
@@ -3869,7 +3888,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.50.0';
+const EW_FWP_VERSION = '3.50.1';
 
 /*
  * Parts loader.
