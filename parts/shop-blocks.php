@@ -982,6 +982,25 @@ function ewStripeCheckout(stripe, opts){
   if(done){ done.addEventListener('click', function(){ chosen(); step('pick'); }); }
   wirePrint.mode = function(){ return mode; };
   count(); preview(); doneLabel(); chosen();
+
+  /* The app's player profile links here as ?player=RAWSON&number=10. When
+     the surname is one of the squad's, the shirt arrives already wearing
+     it: Players mode on, that player picked, nothing to type. An unknown
+     name is simply ignored and the page is the ordinary shop. */
+  try {
+   var q = new URLSearchParams(window.location.search), want = (q.get('player') || '').toUpperCase().replace(/[^A-Z '-]/g, '');
+   if(want && squad.length && pick){
+    var idx = -1;
+    squad.forEach(function(pl, i){
+     if(idx < 0 && pl.w.split(' ').pop().toUpperCase().replace(/[^A-Z '-]/g, '') === want){ idx = i; }
+    });
+    if(idx >= 0){
+     setMode('player');
+     pick.value = String(idx);
+     pick.dispatchEvent(new Event('change'));
+    }
+   }
+  } catch(e) {}
  }
 
  function openDetails(){
