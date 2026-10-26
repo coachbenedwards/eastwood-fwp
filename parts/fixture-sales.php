@@ -1002,3 +1002,52 @@ function ew_sales_state_fields( $id, $kind, $row ) {
 		}
 	}
 }
+
+/* --- Read for the app ---------------------------------------------------- */
+
+/**
+ * GET /wp-json/eastwood/v1/sales?fx=<fixture id>
+ *
+ * The Team EastwoodFC app's Buy tickets reads the SAME settings the site's
+ * fixture card reads -- the ticket types and prices, and what state the game
+ * is in now -- so there is one place a price or a release lives. Nothing
+ * here sells; the app sends buyers to the site's own checkout.
+ */
+add_action( 'rest_api_init', function () {
+	register_rest_route( 'eastwood/v1', '/sales', array(
+		'methods'             => 'GET',
+		'permission_callback' => '__return_true',
+		'callback'            => 'ew_sales_rest',
+	) );
+} );
+
+function ew_sales_rest( $req ) {
+	$fx = (int) $req->get_param( 'fx' );
+	if ( ! $fx ) {
+		return new WP_Error( 'ew_sales_fx', 'Say which fixture (fx).', array( 'status' => 400 ) );
+	}
+	$a    = ew_sales_words();
+	$tix  = ew_sales_state( $fx, 'tix' );
+	$hosp = ew_sales_state( $fx, 'hosp' );
+	$types = array();
+	foreach ( ew_sales_types() as $key => $t ) {
+		$types[] = array(
+			'key'   => $key,
+			'label' => $t['label'],
+			'note'  => $t['note'],
+			'pence' => (int) $t['pence'],
+		);
+	}
+	$out = array(
+		'fixtureId'   => $fx,
+		'tickets'     => $tix['state'],
+		'ticketsFrom' => $tix['when'] ? gmdate( 'c', (int) $tix['when'] ) : null,
+		'ticketsLeft' => $tix['cap'] ? (int) $tix['left'] : null,
+		'hospitality' => $hosp['state'],
+		'types'       => $types,
+		'ticketsSay'  => ew_sales_say( $tix, $a, 'tix' ),
+	);
+	$res = rest_ensure_response( $out );
+	$res->header( 'Cache-Control', 'public, max-age=60' );
+	return $res;
+}
