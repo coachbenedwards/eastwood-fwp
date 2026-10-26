@@ -669,6 +669,9 @@ function ew_hb_banner_sc( $atts ) {
 	$comp     = (string) ( $next['competition']['name'] ?? '' );
 	$comp_id  = (int) ( $next['competition']['id'] ?? 0 );
 	$match_id = (int) ( $next['id'] ?? 0 );
+	// Remembered so a list drawn under this banner can start from the game
+	// after it, rather than showing the same tie twice.
+	$GLOBALS['ew_hb_banner_match'] = $match_id;
 
 	// The hero turns over too, and for the same reason: the game you are
 	// looking at is the game you want a ticket for, so nothing should
@@ -918,6 +921,14 @@ function ew_hb_fixtures_sc( $atts, $content = '' ) {
 					// the list — inside Fixtures, not above the whole section.
 					if ( 'no' !== $atts['hero'] && (int) $team['id'] === (int) EW_TEAM ) {
 						echo ew_hb_banner_sc( array() ); // phpcs:ignore
+						// The banner IS the next game, so the list carries on
+						// from the one after it rather than repeating it.
+						$hero_id = (int) ( $GLOBALS['ew_hb_banner_match'] ?? 0 );
+						if ( $hero_id ) {
+							$todo = array_values( array_filter( $todo, function ( $m ) use ( $hero_id ) {
+								return (int) ( $m['id'] ?? 0 ) !== $hero_id;
+							} ) );
+						}
 					}
 					$show = $n ? array_slice( $todo, 0, $n ) : $todo;
 					echo $list // phpcs:ignore
