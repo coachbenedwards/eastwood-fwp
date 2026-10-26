@@ -56,6 +56,9 @@ function ew_notify_routes() {
 		'halftime'   => 'Half-time show sign-up',
 		'trial'      => 'Academy trial registration',
 		'community'  => 'Community ticket request',
+		'question'   => 'Academy question',
+		'interest'   => 'Academy interest registered',
+		'meeting'    => 'Academy 1:1 booked',
 	);
 }
 
@@ -106,6 +109,9 @@ function ew_notify_kinds() {
 		'halftime' => 'Half-time show sign-up',
 		'trial'    => 'Academy trial registration',
 		'community' => 'Community ticket request',
+		'question'  => 'Academy question',
+		'interest'  => 'Academy interest registered',
+		'meeting'   => 'Academy 1:1 booked',
 	);
 }
 
@@ -115,6 +121,11 @@ function ew_notify_body( $id, $kind ) {
 		return trim( (string) get_post_meta( $id, '_ewt_' . $k, true ) );
 	};
 	$lines = array( $kind, '' );
+	// An interest is waiting on somebody: the button to press goes first.
+	if ( 'interest' === $m( 'status' ) && function_exists( 'ew_acad_accept_url' ) ) {
+		$lines[] = 'Accept and invite them to a 1:1: ' . ew_acad_accept_url( $id );
+		$lines[] = '';
+	}
 	$pairs = array(
 		'What'     => $m( 'event' ),
 		'Name'     => $m( 'name' ),
@@ -127,6 +138,9 @@ function ew_notify_body( $id, $kind ) {
 		'Adults'   => $m( 'adults' ),
 		'Children' => $m( 'children' ),
 		'Code'     => $m( 'code' ),
+		'Date of birth' => $m( 'dob' ),
+		'Current club'  => $m( 'club' ),
+		'1:1 booked for' => $m( 'slot_label' ),
 	);
 	$paid = (int) $m( 'paid' );
 	if ( $paid > 0 ) {
