@@ -31,9 +31,14 @@
 
 defined( 'ABSPATH' ) || exit;
 
-/** Shortcodes this channel is willing to write. Nothing else is accepted. */
+/**
+ * Shortcodes this channel is willing to write. Nothing else is accepted.
+ * Another plugin adds its own through the ew_blocks_allowed filter, so a
+ * block that lives outside this plugin (the subs sign-up, say) can still be
+ * laid out as an editable widget rather than pasted into an HTML box.
+ */
 function ew_blocks_allowed() {
-	return array(
+	return (array) apply_filters( 'ew_blocks_allowed', array(
 		'eastwood_home_strip', 'eastwood_promo_bar', 'eastwood_home_hero',
 		'eastwood_home_banner', 'eastwood_home_fixtures', 'eastwood_home_upcoming',
 		'eastwood_home_news', 'eastwood_home_discover', 'eastwood_home_shop',
@@ -43,7 +48,7 @@ function ew_blocks_allowed() {
 		'eastwood_sponsor_cards', 'eastwood_shop', 'eastwood_shirt',
 		'eastwood_tickets', 'eastwood_claim', 'eastwood_halftime', 'eastwood_community_games', 'eastwood_community_request',
 		'eastwood_trial', 'eastwood_match_tickets', 'eastwood_fixture_rows',
-	);
+	) );
 }
 
 /** The page being addressed, by slug or by id. */
