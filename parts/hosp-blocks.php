@@ -421,12 +421,16 @@ function ew_hosp_css() {
 .ewhp-lab{margin:0;font-size:11.5px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#8a8a8a}
 .ewhp-run h2{margin:9px 0 0;font-family:Anton,Impact,sans-serif;font-weight:400;font-size:40px;line-height:1;
  text-transform:uppercase;color:#101010}
-.ewhp-run ol{list-style:none;margin:24px 0 0;padding:0}
+.ewhp ol,.ewhp ul{list-style:none!important}
+.ewhp li{list-style:none!important}
+.ewhp li::marker{content:""}
+.ewhp-run ol{margin:24px 0 0;padding:0}
 .ewhp-run li{position:relative;display:grid;grid-template-columns:96px minmax(0,1fr);gap:26px;padding:18px 0;
  border-top:1px solid #ececec}
 .ewhp-run li:first-child{border-top:0}
-.ewhp-run li:before{content:"";position:absolute;left:127px;top:30px;bottom:-25px;width:1px;background:#e0e0e0}
-.ewhp-run li:last-child:before{display:none}
+.ewhp-run li:before{content:none}
+.ewhp-run li:after{content:"";position:absolute;left:127px;top:30px;bottom:-25px;width:1px;background:#e0e0e0}
+.ewhp-run li:last-child:after{display:none}
 .ewhp-t{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:29px;line-height:1;text-align:right;
  color:#101010;padding-top:2px}
 .ewhp-t.is-word{font-family:"Instrument Sans",system-ui,sans-serif;font-size:11.5px;font-weight:700;
@@ -452,13 +456,13 @@ function ew_hosp_css() {
  font-size:15px;font-weight:700;white-space:nowrap}
 .ewhp-foot a.is-plain{background:transparent;color:#101010;border:1.5px solid #101010}
 .ewhp-body{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:26px;align-items:start}
-.ewhp-inc{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:12px 22px}
+.ewhp-inc{margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:12px 22px}
 .ewhp-inc li{position:relative;padding-left:20px;font-size:15.5px;line-height:1.5;color:#222}
 .ewhp-inc li:before{content:"";position:absolute;left:0;top:10px;width:10px;height:2px;background:#CC0000}
 .ewhp-card{background:#fff;border:1px solid #e2e2e2;border-radius:10px;padding:22px 24px}
 .ewhp-card h3{margin:0 0 14px;font-family:Anton,Impact,sans-serif;font-weight:400;font-size:24px;
  text-transform:uppercase;color:#101010}
-.ewhp-spec{list-style:none;margin:0;padding:0}
+.ewhp-spec{margin:0;padding:0}
 .ewhp-spec li{display:flex;justify-content:space-between;gap:14px;padding:10px 0;font-size:14.5px;
  border-top:1px solid #ececec;color:#666}
 .ewhp-spec li:first-child{border-top:0}
@@ -479,7 +483,7 @@ function ew_hosp_css() {
  .ewhp-foot{grid-template-columns:1fr}
  .ewhp-run{padding:24px 20px}
  .ewhp-run li{grid-template-columns:76px minmax(0,1fr);gap:16px}
- .ewhp-run li:before{left:97px}
+ .ewhp-run li:after{left:97px}
 }
 @media(max-width:560px){
  .ewhp-strip{grid-template-columns:1fr}
