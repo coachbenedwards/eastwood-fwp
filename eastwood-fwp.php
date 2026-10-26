@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.48.0
+ * Version: 3.49.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -884,30 +884,92 @@ function ew_moved_matches() {
  * and then sorted with the rest, so one entry here reaches the strip, the
  * homepage, the matches page and the hospitality page together.
  *
- * Ids are ours and start well above anything the feed issues, so they can
- * never collide with a real match. Take one out once the feed carries it.
+ * They used to be typed into this file. The first one (Lye Town in the
+ * Vase) outlived its purpose -- the feed picked the tie up and the site
+ * showed it twice -- and taking it out needed a release. So they now live
+ * in an option that the Fixtures screen writes, next to the corrections,
+ * and a game is added or removed there. Ids are ours and start well above
+ * anything the feed issues, so they can never collide with a real match;
+ * team ids for a club the feed does not carry start at 990101 and are the
+ * crest file name, so a club with id 0 can never have a crest.
  */
 function ew_fixture_adds() {
-	return array(
-		array(
-			'id'          => 990001,
-			'date'        => '2026-10-31',
-			'time'        => '15:00',
+	$rows = (array) get_option( 'ew_fixture_adds', array() );
+	$out  = array();
+	foreach ( $rows as $r ) {
+		$r = (array) $r;
+		if ( empty( $r['id'] ) || empty( $r['date'] ) || '' === trim( (string) ( $r['opp'] ?? '' ) ) ) {
+			continue;
+		}
+		$home = ! empty( $r['home'] );
+		$us   = array( 'id' => (int) EW_TEAM, 'name' => 'Eastwood FC' );
+		$them = array( 'id' => (int) ( $r['opp_id'] ?? 0 ), 'name' => (string) $r['opp'] );
+		$out[] = array(
+			'id'          => (int) $r['id'],
+			'date'        => (string) $r['date'],
+			'time'        => (string) ( $r['time'] ?: '15:00' ),
 			'status'      => array( 'short' => '' ),
-			'venue'       => 'The Sports Ground (Lye)',
-			// 30 is the FA Vase. The id is what puts the competition badge
-			// on a fixture -- assets/comps/30.png -- so a cup tie added by
-			// hand needs it as much as a game the feed carries, or it is
-			// the one fixture on the site with a blank corner.
-			'competition' => array( 'id' => 30, 'name' => 'FA Vase Second Round' ),
-			// Team ids for a club the feed does not carry start at 990101, so
-			// they sit clear of both the feed and the 9900xx fixture ids. The
-			// id is the crest file name, so a club with id 0 can never have
-			// one: it falls back to the initials disc for good.
-			'home-team'   => array( 'id' => 990101, 'name' => 'Lye Town' ),
-			'away-team'   => array( 'id' => (int) EW_TEAM, 'name' => 'Eastwood FC' ),
-		),
-	);
+			'venue'       => (string) ( $r['venue'] ?? '' ),
+			'competition' => array( 'id' => (int) ( $r['comp_id'] ?? 0 ), 'name' => (string) ( $r['comp'] ?? '' ) ),
+			'home-team'   => $home ? $us : $them,
+			'away-team'   => $home ? $them : $us,
+			'ew-added'    => true,
+		);
+	}
+	return $out;
+}
+
+/**
+ * Keep only the hand-added games somebody actually filled in, and give a
+ * new one its ids. A row with its "remove" box ticked, or with no date or
+ * opponent, is dropped. Fixture ids run from 990001; a club the feed does
+ * not know gets a team id from 990101, kept once given so its crest file
+ * (assets/ew-badges/<id>.png) stays attached across edits.
+ */
+function ew_fixture_adds_sanitise( $in ) {
+	$was  = (array) get_option( 'ew_fixture_adds', array() );
+	$max  = 990000;
+	$tmax = 990100;
+	foreach ( $was as $r ) {
+		$max  = max( $max, (int) ( $r['id'] ?? 0 ) );
+		$tmax = max( $tmax, (int) ( $r['opp_id'] ?? 0 ) >= 990101 ? (int) $r['opp_id'] : 0 );
+	}
+	$out = array();
+	foreach ( (array) $in as $r ) {
+		$r = (array) $r;
+		if ( ! empty( $r['remove'] ) ) {
+			continue;
+		}
+		$date = trim( (string) ( $r['date'] ?? '' ) );
+		$opp  = trim( (string) ( $r['opp'] ?? '' ) );
+		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) || '' === $opp ) {
+			continue;
+		}
+		$time = trim( (string) ( $r['time'] ?? '' ) );
+		if ( ! preg_match( '/^\d{2}:\d{2}$/', $time ) ) {
+			$time = '15:00';
+		}
+		$id = (int) ( $r['id'] ?? 0 );
+		if ( $id < 990001 ) {
+			$id = ++$max;
+		}
+		$opp_id = (int) ( $r['opp_id'] ?? 0 );
+		if ( $opp_id <= 0 ) {
+			$opp_id = ++$tmax;
+		}
+		$out[] = array(
+			'id'      => $id,
+			'date'    => $date,
+			'time'    => $time,
+			'home'    => empty( $r['home'] ) ? 0 : 1,
+			'opp'     => $opp,
+			'opp_id'  => $opp_id,
+			'comp_id' => (int) ( $r['comp_id'] ?? 0 ),
+			'comp'    => trim( (string) ( $r['comp'] ?? '' ) ),
+			'venue'   => trim( (string) ( $r['venue'] ?? '' ) ),
+		);
+	}
+	return $out;
 }
 
 /**
@@ -1233,6 +1295,11 @@ add_action( 'admin_init', function () {
 		'sanitize_callback' => 'ew_fixture_fixes_sanitise',
 		'default'           => array(),
 	) );
+	register_setting( 'ew_fixtures_group', 'ew_fixture_adds', array(
+		'type'              => 'array',
+		'sanitize_callback' => 'ew_fixture_adds_sanitise',
+		'default'           => array(),
+	) );
 } );
 
 add_filter( 'option_page_capability_ew_fixtures_group', function () {
@@ -1506,6 +1573,49 @@ function ew_fixtures_admin_page() {
 				because a date the feed cannot read would throw the fixture to
 				the wrong end of the season.
 			</p>
+			<h2 style="margin-top:34px">Games the feed doesn&rsquo;t carry</h2>
+			<p class="description" style="max-width:48em">A cup tie the league feed hasn&rsquo;t got yet goes here
+				so the Saturday isn&rsquo;t blank. It shows everywhere a feed game does. <strong>Tick
+				&ldquo;remove&rdquo; the moment the feed carries the real one</strong>, or the site shows it twice.
+				A club the feed doesn&rsquo;t know gets its own crest id; drop its badge in
+				<code>assets/ew-badges/&lt;id&gt;.png</code>.</p>
+			<?php
+			$adds = (array) get_option( 'ew_fixture_adds', array() );
+			$adds[] = array(); // one blank row to add a game
+			$ew_comps = array( 30 => 'FA Vase', 143 => 'United Counties League Premier Division North', 168 => 'Sports Ground Development UCL Cup', 0 => 'Other (type it)' );
+			?>
+			<table class="widefat striped" style="max-width:1100px;margin-top:12px">
+				<thead><tr>
+					<th style="width:11%">Date</th>
+					<th style="width:8%">Kick-off</th>
+					<th style="width:7%">Home?</th>
+					<th style="width:17%">Opponent</th>
+					<th style="width:8%">Crest id</th>
+					<th style="width:22%">Competition</th>
+					<th style="width:19%">Venue</th>
+					<th style="width:8%">Remove</th>
+				</tr></thead>
+				<tbody>
+				<?php foreach ( $adds as $i => $r ) : $r = (array) $r; $new = empty( $r['id'] ); ?>
+				<tr>
+					<td><input type="hidden" name="ew_fixture_adds[<?php echo (int) $i; ?>][id]" value="<?php echo (int) ( $r['id'] ?? 0 ); ?>">
+						<input type="text" style="width:100%" placeholder="2026-11-28" name="ew_fixture_adds[<?php echo (int) $i; ?>][date]" value="<?php echo esc_attr( $r['date'] ?? '' ); ?>"></td>
+					<td><input type="text" style="width:100%" placeholder="15:00" name="ew_fixture_adds[<?php echo (int) $i; ?>][time]" value="<?php echo esc_attr( $r['time'] ?? '' ); ?>"></td>
+					<td style="text-align:center"><input type="checkbox" name="ew_fixture_adds[<?php echo (int) $i; ?>][home]" value="1" <?php checked( ! empty( $r['home'] ) ); ?>></td>
+					<td><input type="text" style="width:100%" placeholder="Club name" name="ew_fixture_adds[<?php echo (int) $i; ?>][opp]" value="<?php echo esc_attr( $r['opp'] ?? '' ); ?>"></td>
+					<td><input type="text" style="width:100%" placeholder="auto" name="ew_fixture_adds[<?php echo (int) $i; ?>][opp_id]" value="<?php echo $new ? '' : (int) ( $r['opp_id'] ?? 0 ); ?>"></td>
+					<td><select name="ew_fixture_adds[<?php echo (int) $i; ?>][comp_id]" style="width:48%">
+						<?php foreach ( $ew_comps as $cid => $cname ) : ?>
+						<option value="<?php echo (int) $cid; ?>" <?php selected( (int) ( $r['comp_id'] ?? 30 ), (int) $cid ); ?>><?php echo esc_html( $cname ); ?></option>
+						<?php endforeach; ?>
+						</select>
+						<input type="text" style="width:50%" placeholder="e.g. FA Vase Second Round" name="ew_fixture_adds[<?php echo (int) $i; ?>][comp]" value="<?php echo esc_attr( $r['comp'] ?? '' ); ?>"></td>
+					<td><input type="text" style="width:100%" name="ew_fixture_adds[<?php echo (int) $i; ?>][venue]" value="<?php echo esc_attr( $r['venue'] ?? '' ); ?>"></td>
+					<td style="text-align:center"><?php if ( ! $new ) : ?><input type="checkbox" name="ew_fixture_adds[<?php echo (int) $i; ?>][remove]" value="1"><?php else : ?><em>new</em><?php endif; ?></td>
+				</tr>
+				<?php endforeach; ?>
+				</tbody>
+			</table>
 			<?php submit_button( 'Save the corrections' ); ?>
 		</form>
 		<?php endif; ?>
@@ -3759,7 +3869,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.48.0';
+const EW_FWP_VERSION = '3.49.0';
 
 /*
  * Parts loader.
