@@ -177,7 +177,8 @@ function ew_fxr_ball() {
 function ew_fxr_css() {
 	return '
 .ewhx{--ink:#101010;--red:#CC0000;--line:rgba(17,17,17,.12);
- font-family:"Instrument Sans",system-ui,sans-serif}
+ font-family:"Instrument Sans",system-ui,sans-serif;
+ max-width:1180px;margin:0 auto;padding:0 20px}
 .ewhx-row{display:flex;align-items:stretch;background:#fff;margin:0 0 24px;min-height:136px;
  border-radius:8px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.18)}
 .ewhx-lab{flex:0 0 130px;display:flex;align-items:center;padding:18px;font-size:14px;
