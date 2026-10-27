@@ -694,7 +694,29 @@ function ewStripeCheckout(stripe, opts){
    fit = have[0];
    $('ewshNote').textContent = '';
    drawFits(have); drawSizes(); drawFul(); drawPay(); showGuide();
+   arrive(have);
   }).catch(function(){ $('ewshNote').textContent = W.failed; });
+ }
+
+ /* The app's shop screen lets somebody choose the shirt on their phone and
+    hands them here to pay: ?fit=ADULT&size=ADULT%20M&post=1&pname=&pnum=&go=details.
+    A choice that is still in stock is simply made for them and the page
+    carries on at the details step; anything that does not fit is ignored
+    and the page is the ordinary shop. */
+ function arrive(have){
+  try {
+   var q = new URLSearchParams(window.location.search);
+   var f = (q.get('fit') || '').toUpperCase(), sz = q.get('size') || '';
+   if(!f || have.indexOf(f) < 0) return;
+   fit = f; size = null; post = false;
+   var ok = model[fit].sizes.some(function(x){ return x.size === sz && x.stock; });
+   if(ok) size = sz;
+   post = ('1' === q.get('post')) && Number(model[fit].postage) > 0;
+   drawFits(have); drawSizes(); drawFul(); drawPay(); showGuide();
+   var nm = (q.get('pname') || '').toUpperCase().replace(/[^A-Z '-]/g, ''), nu = (q.get('pnum') || '').replace(/[^0-9]/g, '');
+   if((nm || nu) && wirePrint.custom){ wirePrint.custom(nm, nu); }
+   if(size && 'details' === q.get('go')){ openDetails(); }
+  } catch(e) {}
  }
 
  function drawFits(have){
@@ -981,6 +1003,12 @@ function ewStripeCheckout(stripe, opts){
   if(open){ open.addEventListener('click', function(){ step('print'); }); }
   if(done){ done.addEventListener('click', function(){ chosen(); step('pick'); }); }
   wirePrint.mode = function(){ return mode; };
+  /* The app hands over a name and number already typed. */
+  wirePrint.custom = function(name, num){
+   setMode('custom');
+   nm.value = name; nu.value = num;
+   count(); preview(); doneLabel(); chosen(); drawPay();
+  };
   count(); preview(); doneLabel(); chosen();
 
   /* The app's player profile links here as ?player=RAWSON&number=10. When
