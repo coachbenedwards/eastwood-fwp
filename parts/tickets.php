@@ -190,6 +190,7 @@ function ew_tix_shortcode( $atts, $content = null ) {
 		'thanks'   => 'You are in. Your receipt is on its way to your email.',
 		'cap'      => '',
 		'promos'   => '',
+		'stripe_products' => '',
 		'soldout'  => 'Sold out',
 		'feature'     => '',
 		'banner'      => '',
@@ -393,7 +394,14 @@ add_action( 'rest_api_init', function () {
 				$body[ "line_items[$k][quantity]" ]                          = (string) $qty;
 				$body[ "line_items[$k][price_data][currency]" ]              = 'gbp';
 				$body[ "line_items[$k][price_data][unit_amount]" ]           = (string) $tix[ $i ]['pence'];
-				$body[ "line_items[$k][price_data][product_data][name]" ]    = trim( $event . ' · ' . $tix[ $i ]['name'], ' ·' );
+				// A ticket can be tied to a Stripe product (field stripe_products, one prod_ id per ticket line,
+				// in line order, separated by ;) so a discount code can be limited to that ticket alone.
+				$prods = array_map( 'trim', explode( ';', (string) ( $block['fields']['stripe_products'] ?? '' ) ) );
+				if ( ! empty( $prods[ $i ] ) && preg_match( '/^prod_[A-Za-z0-9]+$/', $prods[ $i ] ) ) {
+					$body[ "line_items[$k][price_data][product]" ] = $prods[ $i ];
+				} else {
+					$body[ "line_items[$k][price_data][product_data][name]" ] = trim( $event . ' · ' . $tix[ $i ]['name'], ' ·' );
+				}
 				$k++;
 			}
 			if ( ! $count || $count > 100 ) {
