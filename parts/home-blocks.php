@@ -96,7 +96,7 @@ function ew_home_blocks_present() {
 	foreach ( array( 'eastwood_home_banner', 'eastwood_home_hero', 'eastwood_home_fixtures',
 		'eastwood_home_upcoming', 'eastwood_home_shop', 'eastwood_home_tiles',
 		'eastwood_home_sponsors', 'eastwood_home_discover', 'eastwood_home_news',
-		'eastwood_home_player', 'eastwood_home_tv',
+		'eastwood_home_player', 'eastwood_home_tv', 'eastwood_home_show',
 		'eastwood_home_strip', 'eastwood_home_live',
 		'eastwood_matches', 'eastwood_teams', 'eastwood_squad' ) as $tag ) {
 		foreach ( $hay as $text ) {
@@ -623,6 +623,124 @@ function ew_hb_hero_sc( $atts ) {
 	return ob_get_clean();
 }
 add_shortcode( 'eastwood_home_hero', 'ew_hb_hero_sc' );
+
+/* ------------------------------------------------------------------
+ * [eastwood_home_show]
+ *
+ * The newest episode of the club documentary, first thing on the
+ * homepage. It reads the same YouTube channel as the Eastwood TV rows
+ * further down, keeps the newest upload whose title carries the series
+ * name, and so turns over by itself when the Thursday 7pm episode goes
+ * up (the channel is re-read every half hour). Every word is a field:
+ *
+ *   series="This Is Eastwood"     the phrase that marks an episode
+ *   tag="This Is Eastwood"        the red label
+ *   sub="New episode every Thursday · 7pm"
+ *   watch="Watch on YouTube"      the main button; goes to the episode
+ *   subscribe="Subscribe"         subscribe_url for where it goes
+ *   all="All episodes on Eastwood TV" all_url="/eastwood-tv/"
+ *   channel="@eastwoodfootballclub"
+ *
+ * The buttons and the picture go to YouTube rather than playing here,
+ * so every view counts on the channel. If no episode can be found the
+ * block draws nothing, and the news grid below carries on as before.
+ * ------------------------------------------------------------------ */
+
+function ew_hb_show_sc( $atts ) {
+	$atts = shortcode_atts(
+		array(
+			'series'        => 'This Is Eastwood',
+			'tag'           => 'This Is Eastwood',
+			'sub'           => 'New episode every Thursday · 7pm',
+			'watch'         => 'Watch on YouTube',
+			'subscribe'     => 'Subscribe',
+			'subscribe_url' => 'https://www.youtube.com/@eastwoodfootballclub?sub_confirmation=1',
+			'all'           => 'All episodes on Eastwood TV',
+			'all_url'       => '/eastwood-tv/',
+			'channel'       => '@eastwoodfootballclub',
+		),
+		$atts,
+		'eastwood_home_show'
+	);
+
+	if ( ! function_exists( 'ew_yt_videos' ) || '' === trim( $atts['series'] ) ) {
+		return '';
+	}
+
+	$ep = null;
+	foreach ( ew_yt_videos( $atts['channel'], 40 ) as $clip ) {
+		if ( ! empty( $clip['short'] ) ) {
+			continue;
+		}
+		if ( false === stripos( $clip['title'], $atts['series'] ) ) {
+			continue;
+		}
+		$ep = $clip;
+		break;
+	}
+	if ( ! $ep ) {
+		return '';
+	}
+
+	/* "This Is Eastwood | Episode 13 | Nail Biting Penalty Drama" is
+	   read as a first line (Episode 13) and the episode name under it. */
+	$read  = ew_yt_label( $ep['title'], array( $atts['series'] => '' ), true );
+	$bits  = array_values( array_filter( array_map( 'trim', explode( '|', $read['title'] ) ), 'strlen' ) );
+	$line1 = $bits ? array_shift( $bits ) : $ep['title'];
+	$line2 = implode( ' · ', $bits );
+
+	$img = 'https://i.ytimg.com/vi/' . rawurlencode( $ep['id'] ) . '/maxresdefault.jpg';
+	$alt = $ep['img'];
+	$all = 0 === strpos( $atts['all_url'], 'http' ) ? $atts['all_url'] : home_url( $atts['all_url'] );
+
+	$meta = array_filter( array( $ep['time'], $ep['when'] ), 'strlen' );
+
+	ob_start();
+	?>
+<section class="ewp ewp-show">
+	<div class="ewp-showCopy">
+		<?php if ( '' !== $atts['tag'] ) : ?>
+		<span class="ewp-showTag"><?php echo esc_html( $atts['tag'] ); ?></span>
+		<?php endif; ?>
+		<?php if ( '' !== $atts['sub'] ) : ?>
+		<p class="ewp-showSub"><?php echo esc_html( $atts['sub'] ); ?></p>
+		<?php endif; ?>
+		<h2 class="ewp-showTitle"><?php echo esc_html( $line1 ); ?><?php
+			if ( '' !== $line2 ) : ?><br><?php echo esc_html( $line2 ); ?><?php endif; ?></h2>
+		<?php if ( $meta ) : ?>
+		<p class="ewp-showMeta"><?php echo esc_html( implode( ' · ', $meta ) ); ?></p>
+		<?php endif; ?>
+		<p class="ewp-showBtns">
+			<?php if ( '' !== $atts['watch'] ) : ?>
+			<a class="ewp-showWatch" href="<?php echo esc_url( $ep['url'] ); ?>" target="_blank" rel="noopener"><svg
+				width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path
+				d="M7 4l13 8-13 8z"/></svg><span><?php echo esc_html( $atts['watch'] ); ?></span></a>
+			<?php endif; ?>
+			<?php if ( '' !== $atts['subscribe'] && '' !== $atts['subscribe_url'] ) : ?>
+			<a class="ewp-showSubBtn" href="<?php echo esc_url( $atts['subscribe_url'] ); ?>" target="_blank"
+				rel="noopener"><?php echo esc_html( $atts['subscribe'] ); ?></a>
+			<?php endif; ?>
+		</p>
+		<?php if ( '' !== $atts['all'] ) : ?>
+		<a class="ewp-showAll" href="<?php echo esc_url( $all ); ?>"><?php echo esc_html( $atts['all'] ); ?>
+			<span aria-hidden="true">&rarr;</span></a>
+		<?php endif; ?>
+	</div>
+	<a class="ewp-showShot" href="<?php echo esc_url( $ep['url'] ); ?>" target="_blank" rel="noopener"
+		aria-label="<?php echo esc_attr( $atts['watch'] . ': ' . $ep['title'] ); ?>">
+		<img src="<?php echo esc_url( $img ); ?>" alt="" decoding="async" fetchpriority="high"
+			onerror="this.onerror=null;this.src='<?php echo esc_js( esc_url( $alt ) ); ?>'">
+		<span class="ewp-showPlay" aria-hidden="true"><svg width="34" height="34" viewBox="0 0 24 24"
+			fill="currentColor"><path d="M8 5l12 7-12 7z"/></svg></span>
+		<?php if ( '' !== $ep['time'] ) : ?>
+		<i class="ewp-showTime"><?php echo esc_html( $ep['time'] ); ?></i>
+		<?php endif; ?>
+	</a>
+</section>
+	<?php
+	return ob_get_clean();
+}
+add_shortcode( 'eastwood_home_show', 'ew_hb_show_sc' );
 
 /* ------------------------------------------------------------------
  * [eastwood_home_banner cta="Buy Tickets" cta_url="/tickets/"]
@@ -2221,6 +2339,37 @@ function ew_hb_css() {
  line-height:1.02;color:#fff;margin:0 0 10px;max-width:16ch;text-transform:uppercase}
 .ewp-heroText i{font-style:normal;font-size:13px;color:#d6d6d6}
 
+.ewp-show{display:flex;align-items:stretch;background:#0b0a09;min-height:520px}
+.ewp-showCopy{flex:1 1 auto;min-width:0;box-sizing:border-box;display:flex;flex-direction:column;
+ justify-content:center;align-items:flex-start;gap:16px;
+ padding:40px 48px 40px max(16px,calc((100vw - 1248px) / 2 - 10px))}
+.ewp-showTag{display:inline-block;font-family:Anton,sans-serif;font-size:11px;letter-spacing:.14em;
+ text-transform:uppercase;color:#fff;background:#CC0000;padding:4px 10px}
+.ewp-show .ewp-showSub{margin:0;font-family:Anton,sans-serif;font-size:14px;letter-spacing:.1em;
+ text-transform:uppercase;color:rgba(255,255,255,.7)}
+.ewp-show .ewp-showTitle{margin:0;font-family:Anton,"Instrument Sans",sans-serif;font-weight:400;
+ font-size:56px;line-height:.98;color:#fff;text-transform:uppercase}
+.ewp-show .ewp-showMeta{margin:0;font-size:14px;color:rgba(255,255,255,.7)}
+.ewp-show .ewp-showBtns{margin:6px 0 0;display:flex;flex-wrap:wrap;gap:12px}
+.ewp-showBtns a{display:inline-flex;align-items:center;gap:10px;min-height:50px;box-sizing:border-box;
+ padding:0 22px;font-family:Anton,sans-serif;font-size:17px;text-transform:uppercase;
+ text-decoration:none;color:#fff}
+.ewp-showWatch{background:#CC0000}
+.ewp-showWatch:hover{background:#a80000;color:#fff}
+.ewp-showSubBtn{border:1px solid rgba(255,255,255,.5)}
+.ewp-showSubBtn:hover{border-color:#fff;color:#fff}
+.ewp-showAll{font-size:14px;color:rgba(255,255,255,.75);text-decoration:underline}
+.ewp-showAll:hover{color:#fff}
+.ewp-showShot{position:relative;display:block;flex:0 0 auto;width:min(924px,64%);
+ aspect-ratio:16/9;align-self:center;overflow:hidden;background:#000}
+.ewp-showShot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.ewp-showPlay{position:absolute;left:50%;top:50%;width:96px;height:96px;margin:-48px 0 0 -48px;
+ border-radius:50%;background:rgba(255,255,255,.92);color:#111;display:flex;align-items:center;
+ justify-content:center;transition:transform .15s}
+.ewp-showShot:hover .ewp-showPlay{transform:scale(1.06)}
+.ewp-showTime{position:absolute;right:14px;bottom:14px;background:rgba(0,0,0,.8);color:#fff;
+ font-style:normal;font-size:13px;padding:3px 7px}
+
 .ewp-fixtures{background:#f3f3f3}
 .ewp-fixturesBody{padding:36px 0 48px}
 
@@ -3140,6 +3289,10 @@ a.ewp-comingCard:hover{background:#b00000}
 
 @media(max-width:820px){
  .ewp-hero a{min-height:380px}
+ .ewp-show{flex-direction:column-reverse;min-height:0}
+ .ewp-showShot{width:100%}
+ .ewp-showCopy{padding:24px 16px 28px;gap:12px}
+ .ewp-show .ewp-showTitle{font-size:34px}
  .ewp-heroText b{font-size:30px;max-width:none}
  .ewp-h2{font-size:30px;line-height:30px;margin-bottom:24px}
  .ewp-news{padding:32px 0 36px}

@@ -39,7 +39,7 @@ defined( 'ABSPATH' ) || exit;
  */
 function ew_blocks_allowed() {
 	return (array) apply_filters( 'ew_blocks_allowed', array(
-		'eastwood_home_strip', 'eastwood_promo_bar', 'eastwood_home_hero',
+		'eastwood_home_strip', 'eastwood_promo_bar', 'eastwood_home_hero', 'eastwood_home_show',
 		'eastwood_home_banner', 'eastwood_home_fixtures', 'eastwood_home_upcoming',
 		'eastwood_home_news', 'eastwood_home_discover', 'eastwood_home_shop',
 		'eastwood_home_tiles', 'eastwood_home_sponsors', 'eastwood_home_live',
