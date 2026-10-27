@@ -1499,6 +1499,11 @@ add_shortcode( 'eastwood_home_tv', 'ew_hb_tv_sc' );
  * this site yet, so the tiles are typed in and point wherever the shirts
  * are actually being sold. Price and image are both optional — a tile
  * with neither still renders as a link.
+ *
+ * A fifth part says which part of the picture to keep when the square
+ * tile crops it: top, bottom, or a position such as 50% 15%. Left
+ * empty the picture is cropped about its middle, which takes the head
+ * off a tall photo of a player.
  * ------------------------------------------------------------------ */
 
 function ew_hb_shop_sc( $atts, $content = '' ) {
@@ -1549,6 +1554,7 @@ function ew_hb_shop_sc( $atts, $content = '' ) {
 			$url,
 			isset( $parts[2] ) ? $parts[2] : '',
 			isset( $parts[3] ) ? $parts[3] : '',
+			isset( $parts[4] ) ? $parts[4] : '',
 		);
 	}
 
@@ -1589,7 +1595,11 @@ function ew_hb_shop_sc( $atts, $content = '' ) {
 					<a href="<?php echo esc_url( $item[1] ); ?>">
 						<span class="ewp-shopImg">
 							<?php if ( '' !== $item[3] ) : ?>
-							<img src="<?php echo esc_url( $item[3] ); ?>" alt="" loading="lazy"
+							<img src="<?php echo esc_url( $item[3] ); ?>" alt="" loading="lazy"<?php
+								$focus = preg_replace( '#[^a-z0-9%. \-]#i', '', (string) $item[4] );
+								if ( '' !== trim( $focus ) ) {
+									echo ' style="object-position:' . esc_attr( trim( $focus ) ) . '"';
+								} ?>
 								onerror="this.style.display='none'">
 							<?php endif; ?>
 						</span>
@@ -3005,7 +3015,7 @@ function ew_hb_css() {
    Elementor column it came out 1148, because the column pads itself, so
    this band steps out to the window the way the news and discover bands
    do and takes its width from its own wrap. */
-.ewp-picker{padding:0 0 8px;width:100vw;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw)}
+.ewp-picker{padding:0 0 32px;width:100vw;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw)}
 /* The shared wrap on this page is 1180. The reference column is 1248,
    which is what the panel is measured against, so this band carries its
    own wrap the way the news band does rather than moving everyone. */
