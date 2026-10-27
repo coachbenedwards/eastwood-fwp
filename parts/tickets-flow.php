@@ -223,7 +223,7 @@ add_action( 'ew_tix_remind', function ( $id ) {
 		if ( empty( $s['id'] ) ) {
 			return; // Stripe could not be asked; better no nudge than a wrong one.
 		}
-		if ( 'paid' === ( $s['payment_status'] ?? '' ) ) {
+		if ( ew_tix_is_paid( $s ) ) {
 			return;
 		}
 	}
@@ -240,6 +240,18 @@ function ew_tix_booking_for( $session ) {
 /* --- After paying ------------------------------------------------------- */
 
 /**
+ * A session counts as a booking once Stripe has it complete: paid, or
+ * brought to £0 by a promotion code (Stripe then says no_payment_required).
+ */
+function ew_tix_is_paid( $s ) {
+	$ps = (string) ( $s['payment_status'] ?? '' );
+	if ( 'paid' === $ps ) {
+		return true;
+	}
+	return 'no_payment_required' === $ps && 'complete' === (string) ( $s['status'] ?? '' );
+}
+
+/**
  * A Booking whose Stripe session is paid becomes paid -- once.
  *
  * Shared by every flow that comes back from Stripe (event tickets, food
@@ -252,7 +264,7 @@ function ew_tix_mark_paid( $bid, $s, $hook ) {
 	if ( ! $bid || 'started' !== get_post_meta( $bid, '_ewt_status', true ) ) {
 		return false;
 	}
-	if ( 'paid' !== ( $s['payment_status'] ?? '' ) ) {
+	if ( ! ew_tix_is_paid( $s ) ) {
 		return false;
 	}
 	update_post_meta( $bid, '_ewt_status', 'paid' );
@@ -298,7 +310,7 @@ function ew_tix_after_pay( $page_id, $a, $session_id ) {
 	if ( empty( $s['id'] ) || (string) ( $s['metadata']['page'] ?? '' ) !== (string) (int) $page_id ) {
 		return '';
 	}
-	if ( 'paid' !== ( $s['payment_status'] ?? '' ) ) {
+	if ( ! ew_tix_is_paid( $s ) ) {
 		return '';
 	}
 	$bid = ew_tix_booking_for( $s );

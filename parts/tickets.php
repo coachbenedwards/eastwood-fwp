@@ -99,7 +99,7 @@ function ew_tix_sold( $page_id ) {
 		}
 		$j = json_decode( (string) wp_remote_retrieve_body( $res ), true );
 		foreach ( (array) ( $j['data'] ?? array() ) as $cs ) {
-			if ( (string) ( $cs['metadata']['page'] ?? '' ) === (string) (int) $page_id && 'paid' === ( $cs['payment_status'] ?? '' ) ) {
+			if ( (string) ( $cs['metadata']['page'] ?? '' ) === (string) (int) $page_id && ( function_exists( 'ew_tix_is_paid' ) ? ew_tix_is_paid( $cs ) : 'paid' === ( $cs['payment_status'] ?? '' ) ) ) {
 				$sold += (int) ( $cs['metadata']['seats'] ?? 0 );
 			}
 			$after = (string) $cs['id'];
@@ -189,6 +189,7 @@ function ew_tix_shortcode( $atts, $content = null ) {
 		'off'      => 'Online booking opens soon.',
 		'thanks'   => 'You are in. Your receipt is on its way to your email.',
 		'cap'      => '',
+		'promos'   => '',
 		'soldout'  => 'Sold out',
 		'feature'     => '',
 		'banner'      => '',
@@ -407,6 +408,11 @@ add_action( 'rest_api_init', function () {
 				}
 			}
 			$body['metadata[seats]'] = (string) $seats;
+			// Stripe's own discount-code box (field promos="yes"). A code can take the total to £0;
+			// the booking is still recorded and counted (ew_tix_is_paid).
+			if ( in_array( strtolower( (string) ( $block['fields']['promos'] ?? '' ) ), array( 'yes', 'true', '1', 'on' ), true ) ) {
+				$body['allow_promotion_codes'] = 'true';
+			}
 
 			// The booker is saved before the card form opens.
 			$hook = (string) ( $block['fields']['crm_hook'] ?? '' );
@@ -420,8 +426,11 @@ add_action( 'rest_api_init', function () {
 				'metadata[booking]' => (string) $bid,
 			) ) : array();
 			if ( ! empty( $cus['id'] ) ) {
-				$body['customer']                                = $cus['id'];
-				$body['payment_intent_data[setup_future_usage]'] = 'off_session';
+				$body['customer'] = $cus['id'];
+				// The card is kept only for the one-tap upsell; a free (£0) booking has no card to keep.
+				if ( '' !== trim( (string) ( $block['fields']['upsell'] ?? '' ) ) ) {
+					$body['payment_intent_data[setup_future_usage]'] = 'off_session';
+				}
 				if ( $bid ) {
 					update_post_meta( $bid, '_ewt_customer', $cus['id'] );
 				}
