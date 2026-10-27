@@ -601,7 +601,7 @@ function ewStripeCheckout(stripe, opts){
       msg.textContent=root.dataset.loading;
       var stripe=window.Stripe(root.dataset.pk);
       ewStripeCheckout(stripe,{fetchClientSecret:function(){
-        return fetch(root.dataset.rest,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:+root.dataset.page,ev:root.dataset.ev||'',items:q,name:name,email:email})})
+        return fetch(root.dataset.rest,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:+root.dataset.page,ev:root.dataset.ev||'',items:q,name:name,email:email,r:window.ewR||''})})
           .then(function(r){return r.json();}).then(function(j){if(!j.clientSecret)throw new Error(j.message||'error');return j.clientSecret;});
       }}).then(function(c){checkout=c;msg.textContent='';who.hidden=true;c.mount(mount);})
         .catch(function(err){msg.textContent=(err&&err.message)||root.dataset.off;});
