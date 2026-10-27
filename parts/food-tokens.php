@@ -848,7 +848,9 @@ add_action( 'wp_enqueue_scripts', function () {
 
 function ew_food_css() {
 	return <<<'CSS'
-.ewft{max-width:1180px;margin:0 auto;padding:40px 16px 64px;color:#111;font-family:'Instrument Sans',system-ui,sans-serif;box-sizing:border-box}
+/* The same 1248px column as every page on the site, and the same 16px
+   gutter once the window is narrower than that. */
+.ewft{max-width:none;margin:0;padding:40px max(16px,calc((100% - 1248px) / 2)) 64px;color:#111;font-family:'Instrument Sans',system-ui,sans-serif;box-sizing:border-box}
 .ewft *{box-sizing:border-box}
 .ewft p{margin:0}
 .ewft .ewft-step{font-family:Anton,Impact,sans-serif;font-weight:400;text-transform:uppercase;font-size:30px;line-height:1.1;color:#111;margin:0 0 18px;background:none;padding:0}
