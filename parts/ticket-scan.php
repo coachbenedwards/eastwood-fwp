@@ -32,8 +32,19 @@ add_action('rest_api_init', function () {
 	]);
 });
 
-/** Find a booking by its short code (_ewt_code) or opaque key (_ewt_key). */
+/**
+ * Find a booking by its short code (_ewt_code) or opaque key (_ewt_key).
+ *
+ * A food token pass is a paid Booking with a code too, but it is not a way
+ * through the turnstile, so the gate scanner is never shown one.
+ */
 function ew_ticket_find($ref) {
+	$id = ew_ticket_find_any($ref);
+	if ($id && 'food' === get_post_meta($id, '_ewt_kind', true)) return null;
+	return $id;
+}
+
+function ew_ticket_find_any($ref) {
 	$ref = trim((string) $ref);
 	if ($ref === '') return null;
 	foreach (['_ewt_code', '_ewt_key'] as $meta) {

@@ -239,6 +239,39 @@ function ew_tix_booking_for( $session ) {
 
 /* --- After paying ------------------------------------------------------- */
 
+/**
+ * A Booking whose Stripe session is paid becomes paid -- once.
+ *
+ * Shared by every flow that comes back from Stripe (event tickets, food
+ * tokens), so the status, the amount, the name off the card, the CRM call
+ * and the purchase tracking happen the same way whichever page sold it.
+ * Returns true only the first time, so a caller can do its own one-off
+ * work (a pass, an email) without doing it twice.
+ */
+function ew_tix_mark_paid( $bid, $s, $hook ) {
+	if ( ! $bid || 'started' !== get_post_meta( $bid, '_ewt_status', true ) ) {
+		return false;
+	}
+	if ( 'paid' !== ( $s['payment_status'] ?? '' ) ) {
+		return false;
+	}
+	update_post_meta( $bid, '_ewt_status', 'paid' );
+	update_post_meta( $bid, '_ewt_paid', (int) ( $s['amount_total'] ?? 0 ) );
+	update_post_meta( $bid, '_ewt_session', $s['id'] );
+	// Only the email is asked for, so the name comes from the card.
+	$who = trim( (string) ( $s['customer_details']['name'] ?? '' ) );
+	if ( '' !== $who ) {
+		update_post_meta( $bid, '_ewt_name', $who );
+		wp_update_post( array( 'ID' => $bid, 'post_title' => $who ) );
+	}
+	ew_tix_crm( $hook, $bid, 'paid' );
+	if ( function_exists( 'ew_track_purchase' ) ) {
+		ew_track_purchase( $bid );
+	}
+	do_action( 'ew_tix_paid', (int) $bid, $s );
+	return true;
+}
+
 /** The upsell options written on the block: "label|price|note; ...". */
 function ew_tix_upsells( $raw ) {
 	$out = array();
@@ -269,21 +302,7 @@ function ew_tix_after_pay( $page_id, $a, $session_id ) {
 		return '';
 	}
 	$bid = ew_tix_booking_for( $s );
-	if ( $bid && 'started' === get_post_meta( $bid, '_ewt_status', true ) ) {
-		update_post_meta( $bid, '_ewt_status', 'paid' );
-		update_post_meta( $bid, '_ewt_paid', (int) ( $s['amount_total'] ?? 0 ) );
-		update_post_meta( $bid, '_ewt_session', $s['id'] );
-		// Only the email is asked for, so the name comes from the card.
-		$who = trim( (string) ( $s['customer_details']['name'] ?? '' ) );
-		if ( '' !== $who ) {
-			update_post_meta( $bid, '_ewt_name', $who );
-			wp_update_post( array( 'ID' => $bid, 'post_title' => $who ) );
-		}
-		ew_tix_crm( $a['crm_hook'], $bid, 'paid' );
-		if ( function_exists( 'ew_track_purchase' ) ) {
-			ew_track_purchase( $bid );
-		}
-	}
+	ew_tix_mark_paid( $bid, $s, $a['crm_hook'] );
 
 	$h  = '<div class="ewt-after">';
 	$h .= '<p class="ewt-thanks">' . esc_html( $a['thanks'] ) . '</p>';

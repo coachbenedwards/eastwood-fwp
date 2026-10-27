@@ -210,6 +210,9 @@ function ew_tix_shortcode( $atts, $content = null ) {
 		'upsell_note'   => '',
 		'upsell_skip'   => '',
 		'upsell_done'   => 'Added to your booking.',
+		// Set by a page that sells for more than one event (food tokens);
+		// sent back with the checkout so the server prices the right one.
+		'ev'            => '',
 	), $atts, 'eastwood_tickets' );
 
 	$tix = ew_tix_lines( $content );
@@ -226,6 +229,7 @@ function ew_tix_shortcode( $atts, $content = null ) {
 	$left = $cap > 0 ? max( 0, $cap - ew_tix_sold( $page ) ) : PHP_INT_MAX;
 
 	$h  = '<section class="ewt" id="tickets" data-page="' . (int) $page . '" data-rest="' . esc_url( rest_url( 'eastwood/v1/tickets/checkout' ) ) . '"';
+	$h .= '' !== $a['ev'] ? ' data-ev="' . esc_attr( $a['ev'] ) . '"' : '';
 	$h .= ' data-pk="' . esc_attr( ew_tix_pk() ) . '" data-off="' . esc_attr( $a['off'] ) . '" data-loading="' . esc_attr( $a['loading'] ) . '" data-need="' . esc_attr( $a['need'] ) . '" data-done="' . esc_attr( $a['upsell_done'] ) . '">';
 	if ( $paid ) {
 		$after = function_exists( 'ew_tix_after_pay' ) ? ew_tix_after_pay( $page, $a, sanitize_text_field( wp_unslash( $_GET['ewt_paid'] ) ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
@@ -294,8 +298,16 @@ add_shortcode( 'eastwood_tickets', 'ew_tix_shortcode' );
 
 /* --- Checkout --------------------------------------------------------- */
 
-/** The tickets block on a page, read from the page itself. */
-function ew_tix_block_on( $post ) {
+/**
+ * The tickets block on a page, read from the page itself.
+ *
+ * $ev names one event on a page that sells for more than one (food
+ * tokens). Such a page has no [eastwood_tickets] of its own; the
+ * ew_tix_block filter hands back the same shape -- fields and lines --
+ * built from wherever that page keeps its prices, so the checkout below
+ * stays the one checkout.
+ */
+function ew_tix_block_on( $post, $ev = '' ) {
 	$found = null;
 	$data  = json_decode( (string) get_post_meta( $post->ID, '_elementor_data', true ), true );
 	if ( is_array( $data ) ) {
@@ -319,7 +331,7 @@ function ew_tix_block_on( $post ) {
 	if ( ! $found && preg_match( '/\[eastwood_tickets[^\]]*\].*?\[\/eastwood_tickets\]/s', (string) $post->post_content, $m ) ) {
 		$found = ew_blocks_parse( $m[0] );
 	}
-	return $found;
+	return apply_filters( 'ew_tix_block', $found, $post, (string) $ev );
 }
 
 add_action( 'rest_api_init', function () {
@@ -335,7 +347,8 @@ add_action( 'rest_api_init', function () {
 			if ( ! $post || 'publish' !== $post->post_status ) {
 				return new WP_Error( 'ewt_page', 'No such event.', array( 'status' => 404 ) );
 			}
-			$block = ew_tix_block_on( $post );
+			$ev    = sanitize_key( (string) $req->get_param( 'ev' ) );
+			$block = ew_tix_block_on( $post, $ev );
 			if ( ! $block ) {
 				return new WP_Error( 'ewt_block', 'This page sells no tickets.', array( 'status' => 404 ) );
 			}
@@ -350,11 +363,17 @@ add_action( 'rest_api_init', function () {
 			$body  = array(
 				'ui_mode'                         => 'embedded_page',
 				'mode'                            => 'payment',
-				'return_url'                      => add_query_arg( 'ewt_paid', '{CHECKOUT_SESSION_ID}', get_permalink( $post ) ) . '#tickets',
+				'return_url'                      => add_query_arg( array_filter( array( 'ewt_paid' => '{CHECKOUT_SESSION_ID}', 'ev' => $ev ) ), get_permalink( $post ) ) . '#tickets',
 				'phone_number_collection[enabled]' => 'true',
 				'metadata[page]'                  => (string) $post->ID,
 				'metadata[event]'                 => $event,
 			);
+			if ( '' !== $ev ) {
+				$body['metadata[ev]'] = $ev;
+			}
+			if ( '' !== (string) ( $block['fields']['kind'] ?? '' ) ) {
+				$body['metadata[kind]'] = (string) $block['fields']['kind'];
+			}
 			$count = 0;
 			$seats = 0;
 			$k     = 0;
@@ -392,6 +411,9 @@ add_action( 'rest_api_init', function () {
 			// The booker is saved before the card form opens.
 			$hook = (string) ( $block['fields']['crm_hook'] ?? '' );
 			$bid  = function_exists( 'ew_tix_booking_start' ) ? ew_tix_booking_start( $post, $event, $name, $email, implode( ', ', $said ), $total, $hook, (string) ( $block['fields']['greeting'] ?? '' ) ) : 0;
+			if ( $bid ) {
+				do_action( 'ew_tix_started', (int) $bid, $block, $ev, $req );
+			}
 			$cus  = function_exists( 'ew_tix_stripe' ) ? ew_tix_stripe( 'POST', 'customers', array(
 				'name'              => $name,
 				'email'             => $email,
@@ -426,6 +448,7 @@ add_action( 'rest_api_init', function () {
 			}
 			if ( $bid && ! empty( $j['id'] ) ) {
 				update_post_meta( $bid, '_ewt_open_session', (string) $j['id'] );
+				do_action( 'ew_tix_session', (int) $bid, (string) $j['id'] );
 			}
 			return array( 'clientSecret' => $j['client_secret'] );
 		},
@@ -561,7 +584,7 @@ function ewStripeCheckout(stripe, opts){
       msg.textContent=root.dataset.loading;
       var stripe=window.Stripe(root.dataset.pk);
       ewStripeCheckout(stripe,{fetchClientSecret:function(){
-        return fetch(root.dataset.rest,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:+root.dataset.page,items:q,name:name,email:email})})
+        return fetch(root.dataset.rest,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:+root.dataset.page,ev:root.dataset.ev||'',items:q,name:name,email:email})})
           .then(function(r){return r.json();}).then(function(j){if(!j.clientSecret)throw new Error(j.message||'error');return j.clientSecret;});
       }}).then(function(c){checkout=c;msg.textContent='';who.hidden=true;c.mount(mount);})
         .catch(function(err){msg.textContent=(err&&err.message)||root.dataset.off;});
@@ -594,7 +617,7 @@ add_action( 'wp_enqueue_scripts', function () {
 		return;
 	}
 	$post = get_post();
-	if ( ! $post || ! ew_post_contains( $post, 'eastwood_tickets' ) ) {
+	if ( ! $post || ! ( ew_post_contains( $post, 'eastwood_tickets' ) || ew_post_contains( $post, 'eastwood_food_tokens' ) ) ) {
 		return;
 	}
 	wp_register_style( 'ew-tix', false, array(), EW_FWP_VERSION );
