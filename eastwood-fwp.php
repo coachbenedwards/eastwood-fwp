@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.58.0
+ * Version: 3.59.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -3792,6 +3792,9 @@ function build(apps,gls){
   // often for a player the club has not given one to yet.
   var issued=NUM[nkey(r.name)];
   if(issued){r.shirt=issued;}
+  // On the Squad screen with no number yet: show none, rather than a shirt
+  // he borrowed in a game, which can be somebody else's number.
+  else if(exact[nkey(r.name)]){r.shirt=null;}
  });
 
  var GONE={};
@@ -3918,7 +3921,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.58.0';
+const EW_FWP_VERSION = '3.59.0';
 
 /*
  * Parts loader.
