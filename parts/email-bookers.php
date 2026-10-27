@@ -91,6 +91,9 @@ function ew_eb_page() {
 	$subj   = sanitize_text_field( wp_unslash( $_POST['subject'] ?? '' ) );
 	$body   = sanitize_textarea_field( wp_unslash( $_POST['body'] ?? '' ) );
 	$step   = sanitize_key( $_POST['step'] ?? '' );
+	if ( isset( $_POST['step_send'] ) ) {
+		$step = 'send';
+	}
 	if ( ! in_array( $from, $froms, true ) ) {
 		$from = $froms[0];
 	}
@@ -139,6 +142,29 @@ function ew_eb_page() {
 		$step = '';
 	}
 
+	// A test: the email exactly as the first person on the list would get it,
+	// sent to any address (club ones included). The link carries a dummy code
+	// that is stored nowhere, so it opens the page but counts as no one's click.
+	if ( 'test' === $step && check_admin_referer( 'ew_eb_send' ) && $event && $subj && $body ) {
+		$to     = sanitize_email( wp_unslash( $_POST['test_to'] ?? '' ) );
+		$people = ew_eb_people( $event );
+		$first  = $people ? reset( $people ) : array( 'name' => '' );
+		$as     = ew_eb_first( $first['name'] );
+		if ( is_email( $to ) ) {
+			$msg = ew_eb_render( str_replace( '{first_name}', $as, $body ), 'testtest' );
+			$alt = function ( $mail ) use ( $msg ) {
+				$mail->AltBody = $msg['text'];
+			};
+			add_action( 'phpmailer_init', $alt, 99 );
+			$ok = wp_mail( $to, '[Test] ' . $subj, $msg['html'], array( 'From: Eastwood FC <' . $from . '>', 'Content-Type: text/html; charset=UTF-8' ) );
+			remove_action( 'phpmailer_init', $alt, 99 );
+			echo '<div class="notice notice-' . ( $ok ? 'success' : 'error' ) . '"><p>' . ( $ok ? 'Test sent to ' . esc_html( $to ) . ', written as ' . esc_html( $first['name'] ? $first['name'] : 'someone with no name' ) . ' would get it ("' . esc_html( $as ) . '").' : 'The test could not be sent.' ) . '</p></div>';
+		} else {
+			echo '<div class="notice notice-error"><p>Add an address to send the test to.</p></div>';
+		}
+		$step = 'preview';
+	}
+
 	echo '<form method="post">';
 	echo '<table class="form-table"><tr><th>Event</th><td><select name="event">';
 	foreach ( $events as $ev => $n ) {
@@ -177,8 +203,11 @@ function ew_eb_page() {
 		}
 		echo '<p>Untick anyone who should not get it.</p><table class="widefat striped"><thead><tr><th></th><th>Name</th><th>Email</th><th>Sent already</th><th>Clicked</th><th>Booked</th></tr></thead><tbody>' . $rows;
 		echo '</tbody></table>';
-		echo '<input type="hidden" name="step" value="send">';
-		submit_button( 'Send to the ticked people' );
+		$me = wp_get_current_user();
+		echo '<p style="margin-top:24px"><label>Send a test to <input type="email" name="test_to" value="' . esc_attr( $me ? $me->user_email : '' ) . '" class="regular-text"></label> '
+			. '<button type="submit" name="step" value="test" class="button">Send a test</button></p>';
+		echo '<p class="description">The test is written as the first person on the list would get it.</p>';
+		submit_button( 'Send to the ticked people', 'primary', 'step_send' );
 	} else {
 		echo '<input type="hidden" name="step" value="preview">';
 		submit_button( 'Show who it goes to' );
