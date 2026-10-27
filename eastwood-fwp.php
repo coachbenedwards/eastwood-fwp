@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.56.0
+ * Version: 3.57.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -3751,6 +3751,19 @@ function build(apps,gls){
 
  top.innerHTML='';
 
+ // The league records some players under a fuller name than the club uses
+ // (Samuel for Sam). A league name that matches nobody on the Squad screen
+ // is matched on first initial and surname instead, and shown under the
+ // club's name, so the same player is never listed twice.
+ function ikey(n){var w=nkey(n).split(' ');return w.length<2?'':w[0].charAt(0)+' '+w[w.length-1];}
+ var exact={},byInit={};
+ SQUAD.forEach(function(n){exact[nkey(n)]=n;var k=ikey(n);if(k){byInit[k]=byInit[k]===undefined?n:null;}});
+ rows.forEach(function(r){
+  if(exact[nkey(r.name)]){return;}
+  var m=byInit[ikey(r.name)];
+  if(m){r.name=m;}
+ });
+
  rows.sort(function(x,y){
   if(y.apps!==x.apps){return y.apps-x.apps;}
   return x.name<y.name?-1:1;
@@ -3905,7 +3918,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.56.0';
+const EW_FWP_VERSION = '3.57.0';
 
 /*
  * Parts loader.
