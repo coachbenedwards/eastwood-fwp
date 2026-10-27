@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.55.0
+ * Version: 3.56.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -3594,6 +3594,7 @@ function ew_squad_shortcode( $atts = array(), $content = '' ) {
 	data-positions="<?php echo esc_attr( (string) wp_json_encode( ew_player_positions() ) ); ?>"
 	data-departed="<?php echo esc_attr( (string) wp_json_encode( ew_squad_departed() ) ); ?>"
 	data-numbers="<?php echo esc_attr( (string) wp_json_encode( ew_player_numbers() ) ); ?>"
+	data-squad="<?php echo esc_attr( (string) wp_json_encode( function_exists( 'ew_squad_store_details' ) ? array_keys( ew_squad_store_details() ) : array() ) ); ?>"
 	data-groups="<?php echo esc_attr( (string) wp_json_encode( ew_squad_groups( $content ) ) ); ?>"
 	data-empty="<?php echo esc_attr( $atts['empty'] ); ?>">
 	<div class="ew-sq-top"><p class="ew-loading"><?php echo esc_html( $atts['loading'] ); ?></p></div>
@@ -3719,7 +3720,11 @@ function fail(msg){top.innerHTML='<p class="ew-loading">'+msg+'</p>';body.innerH
 
 function build(apps,gls){
  var players=(apps.players)||[];
- if(!players.length){return fail('No appearances have been recorded yet this season.');}
+ // Everyone on the Squad screen in wp-admin is in the squad, whether or not
+ // the league has recorded a game for him yet.
+ var SQUAD=[];
+ try{SQUAD=JSON.parse(root.getAttribute('data-squad')||'[]')||[];}catch(e){}
+ if(!players.length&&!SQUAD.length){return fail('No appearances have been recorded yet this season.');}
 
  var goals={};
  ((gls&&gls.players)||[]).forEach(function(p){goals[p.id]=(p.goals||[]).length;});
@@ -3780,6 +3785,12 @@ function build(apps,gls){
  try{(JSON.parse(root.getAttribute('data-departed')||'[]')||[])
    .forEach(function(n){GONE[nkey(n)]=1;});}catch(e){}
  rows=rows.filter(function(r){return !GONE[nkey(r.name)];});
+ var have={};
+ rows.forEach(function(r){have[nkey(r.name)]=1;});
+ SQUAD.forEach(function(n){
+  if(have[nkey(n)]||GONE[nkey(n)]){return;}
+  rows.push({name:n,shirt:NUM[nkey(n)]||null,apps:0,goals:0,cards:0,capt:0});
+ });
  if(!rows.length){return fail(root.getAttribute('data-empty')||'No squad to show just now.');}
 
  // The headings come off the element, so they are a field on the block
@@ -3843,7 +3854,13 @@ Promise.all([
  grab('goalscorers')
 ]).then(function(d){
  build(d[0].appearances||{},d[1].goalscorers||{});
-}).catch(function(){fail('Couldn\'t load the squad just now. Please try again shortly.');});
+}).catch(function(){
+ // The league feed being down should not empty the page: the squad itself
+ // is ours, so show it without the appearance figures.
+ var sq=[];try{sq=JSON.parse(root.getAttribute('data-squad')||'[]')||[];}catch(e){}
+ if(sq.length){build({},{});return;}
+ fail('Couldn\'t load the squad just now. Please try again shortly.');
+});
 })();
 JS;
 
@@ -3888,7 +3905,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.55.0';
+const EW_FWP_VERSION = '3.56.0';
 
 /*
  * Parts loader.
