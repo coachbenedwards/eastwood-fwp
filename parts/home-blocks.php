@@ -96,7 +96,7 @@ function ew_home_blocks_present() {
 	foreach ( array( 'eastwood_home_banner', 'eastwood_home_hero', 'eastwood_home_fixtures',
 		'eastwood_home_upcoming', 'eastwood_home_shop', 'eastwood_home_tiles',
 		'eastwood_home_sponsors', 'eastwood_home_discover', 'eastwood_home_news',
-		'eastwood_home_player', 'eastwood_home_tv', 'eastwood_home_show',
+		'eastwood_home_player', 'eastwood_home_tv', 'eastwood_home_show', 'eastwood_lost',
 		'eastwood_home_strip', 'eastwood_home_live',
 		'eastwood_matches', 'eastwood_teams', 'eastwood_squad' ) as $tag ) {
 		foreach ( $hay as $text ) {
@@ -741,6 +741,120 @@ function ew_hb_show_sc( $atts ) {
 	return ob_get_clean();
 }
 add_shortcode( 'eastwood_home_show', 'ew_hb_show_sc' );
+
+/* ------------------------------------------------------------------
+ * [eastwood_lost]
+ *
+ * The top of the page-not-found page: a match photograph, the words, the
+ * page somebody most likely meant, and a search box. Every word is a
+ * field; {address} is the address they typed and {page} the page the
+ * site thinks they meant.
+ *
+ * The guess is the useful part. Most wrong addresses are one or two
+ * letters out (foodtokenz, hosptality), so the closest published page by
+ * spelling is offered as the first button. When nothing is close enough
+ * the button is left off rather than sending somebody somewhere random.
+ * ------------------------------------------------------------------ */
+
+/** The published page closest to a mistyped address, or null. */
+function ew_lost_guess( $path ) {
+	$path = strtolower( trim( (string) $path, '/' ) );
+	if ( '' === $path ) {
+		return null;
+	}
+	$best  = null;
+	$score = PHP_INT_MAX;
+	$pages = get_posts( array(
+		'post_type'      => 'page',
+		'post_status'    => 'publish',
+		'numberposts'    => 300,
+		'no_found_rows'  => true,
+		'fields'         => 'ids',
+	) );
+	foreach ( $pages as $id ) {
+		$uri = strtolower( (string) get_page_uri( $id ) );
+		if ( '' === $uri || 'page-not-found' === $uri || (int) get_option( 'page_on_front' ) === (int) $id ) {
+			continue;
+		}
+		$d = levenshtein( $path, $uri );
+		// Somebody who typed the start of an address meant that address.
+		if ( strlen( $path ) >= 4 && 0 === strpos( $uri, $path ) ) {
+			$d = min( $d, 1 );
+		}
+		if ( $d < $score ) {
+			$score = $d;
+			$best  = $id;
+		}
+	}
+	if ( ! $best ) {
+		return null;
+	}
+	$limit = max( 2, (int) floor( strlen( $path ) / 4 ) );
+	if ( $score > $limit ) {
+		return null;
+	}
+	return array( 'title' => get_the_title( $best ), 'url' => get_permalink( $best ) );
+}
+
+function ew_hb_lost_sc( $atts ) {
+	$atts = shortcode_atts(
+		array(
+			'kicker'      => '404 · Page not found',
+			'heading'     => 'Offside.',
+			'lede'        => "There's nothing at {address}. Here's where you were most likely heading.",
+			'lede_none'   => "There's nothing at {address}. It may have moved, or there may be a typo in it.",
+			'go'          => '{page} →',
+			'search'      => 'Or search the site',
+			'search_go'   => 'Search',
+			'image'       => '/wp-content/uploads/2026/08/eastwood-3-3-afc-mansfield.jpg',
+		),
+		$atts,
+		'eastwood_lost'
+	);
+
+	$uri  = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+	$path = (string) wp_parse_url( $uri, PHP_URL_PATH );
+	$here = is_404() ? $path : '/foodtokenz/';
+	$addr = preg_replace( '#^https?://#', '', untrailingslashit( home_url( $here ) ) );
+	$best = ew_lost_guess( $here );
+
+	$img = $atts['image'];
+	if ( '' !== $img && 0 !== strpos( $img, 'http' ) ) {
+		$img = home_url( $img );
+	}
+	$say = $best ? $atts['lede'] : $atts['lede_none'];
+
+	ob_start();
+	?>
+<section class="ewp ewp-lost">
+	<?php if ( '' !== $img ) : ?>
+	<img class="ewp-lostBg" src="<?php echo esc_url( $img ); ?>" alt="" decoding="async">
+	<?php endif; ?>
+	<div class="ewp-lostIn">
+		<?php if ( '' !== $atts['kicker'] ) : ?>
+		<span class="ewp-lostTag"><?php echo esc_html( $atts['kicker'] ); ?></span>
+		<?php endif; ?>
+		<h1 class="ewp-lostH"><?php echo esc_html( $atts['heading'] ); ?></h1>
+		<p class="ewp-lostP"><?php echo esc_html( str_replace( '{address}', $addr, $say ) ); ?></p>
+		<div class="ewp-lostDo">
+			<?php if ( $best ) : ?>
+			<a class="ewp-lostGo" href="<?php echo esc_url( $best['url'] ); ?>"><?php
+				echo esc_html( str_replace( '{page}', $best['title'], $atts['go'] ) ); ?></a>
+			<?php endif; ?>
+			<form class="ewp-lostFind" role="search" method="get" action="<?php echo esc_url( home_url( '/' ) ); ?>">
+				<label class="screen-reader-text" for="ewp-lost-s"><?php echo esc_html( $atts['search'] ); ?></label>
+				<input id="ewp-lost-s" type="search" name="s" placeholder="<?php echo esc_attr( $atts['search'] ); ?>">
+				<button type="submit" aria-label="<?php echo esc_attr( $atts['search_go'] ); ?>"><svg aria-hidden="true" width="20"
+					height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11"
+					r="7"/><path d="M20 20l-4-4"/></svg></button>
+			</form>
+		</div>
+	</div>
+</section>
+	<?php
+	return ob_get_clean();
+}
+add_shortcode( 'eastwood_lost', 'ew_hb_lost_sc' );
 
 /* ------------------------------------------------------------------
  * [eastwood_home_banner cta="Buy Tickets" cta_url="/tickets/"]
@@ -2349,6 +2463,22 @@ function ew_hb_css() {
  line-height:1.02;color:#fff;margin:0 0 10px;max-width:16ch;text-transform:uppercase}
 .ewp-heroText i{font-style:normal;font-size:13px;color:#d6d6d6}
 
+.ewp-lost{position:relative;min-height:560px;overflow:hidden;background:#0b0a09;display:flex;align-items:center}
+.ewp-lostBg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 40%;opacity:.45}
+.ewp-lostIn{position:relative;box-sizing:border-box;width:100%;max-width:calc(900px + 2 * max(16px,(100% - 1248px) / 2));
+ padding:56px max(16px,calc((100vw - 1248px) / 2));display:flex;flex-direction:column;gap:18px}
+.ewp-lostTag{align-self:flex-start;background:#CC0000;color:#fff;font-family:Anton,sans-serif;font-size:13px;
+ letter-spacing:.14em;text-transform:uppercase;padding:5px 10px}
+.ewp-lost .ewp-lostH{margin:0;font-family:Anton,"Instrument Sans",sans-serif;font-weight:400;font-size:96px;line-height:.95;
+ color:#fff;text-transform:uppercase;background:none;padding:0}
+.ewp-lost .ewp-lostP{margin:0;font-size:20px;line-height:1.5;color:rgba(255,255,255,.85);max-width:640px}
+.ewp-lostDo{display:flex;flex-wrap:wrap;gap:12px;margin-top:6px}
+.ewp-lostGo{background:#CC0000;color:#fff;font-family:Anton,sans-serif;font-size:18px;text-transform:uppercase;
+ text-decoration:none;padding:0 26px;min-height:54px;display:flex;align-items:center;border-radius:8px}
+.ewp-lostGo:hover{background:#a80000;color:#fff}
+.ewp-lostFind{display:flex;background:#fff;border-radius:8px;overflow:hidden;margin:0}
+.ewp-lostFind input{font:inherit;font-size:17px;padding:0 16px;width:300px;max-width:60vw;min-height:54px;border:0;outline:0;color:#111}
+.ewp-lostFind button{background:#fff;border:0;padding:0 16px;color:#111;cursor:pointer}
 .ewp-show{display:flex;align-items:stretch;background:#0b0a09;min-height:520px}
 .ewp-showCopy{flex:1 1 auto;min-width:0;box-sizing:border-box;display:flex;flex-direction:column;
  justify-content:center;align-items:flex-start;gap:16px;
@@ -3300,6 +3430,10 @@ a.ewp-comingCard:hover{background:#b00000}
 @media(max-width:820px){
  .ewp-hero a{min-height:380px}
  .ewp-show{flex-direction:column-reverse;min-height:0}
+ .ewp-lost{min-height:440px}
+ .ewp-lost .ewp-lostH{font-size:60px}
+ .ewp-lostFind{width:100%}
+ .ewp-lostFind input{flex:1;width:auto;max-width:none}
  .ewp-showShot{width:100%}
  .ewp-showCopy{padding:24px 16px 28px;gap:12px}
  .ewp-show .ewp-showTitle{font-size:34px}

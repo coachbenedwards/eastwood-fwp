@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.63.0
+ * Version: 3.64.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -3921,7 +3921,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.63.0';
+const EW_FWP_VERSION = '3.64.0';
 
 /*
  * Parts loader.
@@ -7448,6 +7448,38 @@ add_action( 'template_redirect', function () {
 	status_header( 404 );
 	nocache_headers();
 
+	/*
+	 * The page itself is an ordinary page, page-not-found, laid out in
+	 * Elementor like every other page, so its photo, words and tiles can be
+	 * changed by anybody in the builder. It is drawn here in place of the
+	 * address that was not found, which keeps the 404 status and the
+	 * mistyped address in the bar. The page is kept out of search engines.
+	 * If it has been taken away, the plain version below still works.
+	 */
+	$lost = get_page_by_path( 'page-not-found' );
+	if ( $lost && 'publish' === $lost->post_status && class_exists( '\Elementor\Plugin' )
+		&& '' !== (string) get_post_meta( $lost->ID, '_elementor_data', true ) ) {
+		$el = \Elementor\Plugin::instance();
+		// Drawn first: Elementor refuses to draw a page into itself, and it
+		// would think it was if the current post were already this page.
+		$body = $el->frontend->get_builder_content_for_display( $lost->ID, true );
+		// Every block's styling decides whether to print by looking at the
+		// current post, so from here the current post is this page.
+		$GLOBALS['post'] = $lost; // phpcs:ignore WordPress.WP.GlobalVariablesOverride
+		setup_postdata( $lost );
+		add_action( 'wp_enqueue_scripts', function () use ( $el ) {
+			$el->frontend->enqueue_styles();
+		}, 5 );
+		add_action( 'wp_head', function () {
+			echo '<meta name="robots" content="noindex,nofollow">' . "\n";
+			echo '<style id="ew-404-css">' . ew_prose_css_inline() . '.ew-lostpage .ew-prose{padding-top:0}</style>'; // phpcs:ignore
+		}, 20 );
+		get_header();
+		echo '<div class="ew-lostpage">' . $body . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		get_footer();
+		exit;
+	}
+
 	add_action( 'wp_head', function () {
 		echo '<style id="ew-404-css">' . ew_prose_css_inline() . ew_404_css() . '</style>'; // phpcs:ignore
 	}, 20 );
@@ -7457,3 +7489,10 @@ add_action( 'template_redirect', function () {
 	get_footer();
 	exit;
 }, 9 );
+
+/* The page-not-found page is never offered to search engines on its own. */
+add_action( 'wp_head', function () {
+	if ( is_page( 'page-not-found' ) ) {
+		echo '<meta name="robots" content="noindex,nofollow">' . "\n";
+	}
+}, 1 );
