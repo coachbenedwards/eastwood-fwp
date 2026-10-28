@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.66.0
+ * Version: 3.66.1
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -3600,7 +3600,8 @@ function ew_squad_shortcode( $atts = array(), $content = '' ) {
 	data-numbers="<?php echo esc_attr( (string) wp_json_encode( ew_player_numbers() ) ); ?>"
 	data-squad="<?php echo esc_attr( (string) wp_json_encode( function_exists( 'ew_squad_store_details' ) ? array_keys( ew_squad_store_details() ) : array() ) ); ?>"
 	data-groups="<?php echo esc_attr( (string) wp_json_encode( ew_squad_groups( $content ) ) ); ?>"
-	data-empty="<?php echo esc_attr( $atts['empty'] ); ?>">
+	data-empty="<?php echo esc_attr( $atts['empty'] ); ?>"
+	data-photos="<?php echo esc_attr( plugins_url( 'assets/players/', __FILE__ ) . '|' . EW_FWP_VERSION ); ?>">
 	<div class="ew-sq-top"><p class="ew-loading"><?php echo esc_html( $atts['loading'] ); ?></p></div>
 	<div class="ew-sq-body"></div>
 </div>
@@ -3774,6 +3775,9 @@ function build(apps,gls){
  });
 
  function slug(n){return n.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
+ // Squad photographs ship with the plugin, one per player, named after him
+ // (assets/players/luke-rawson.jpg). A player with none keeps the empty frame.
+ var PHOTOS=(root.getAttribute('data-photos')||'/wp-content/uploads/ew-players/|').split('|');
 
  // The reference lists the squad under Goalkeepers, Defenders, Midfielders
  // and Forwards. Anyone the position list does not name keeps their place on
@@ -3834,7 +3838,7 @@ function build(apps,gls){
     var pos=POSNAME[key[nkey(r.name)]]||'';
     return '<li class="ew-sq-card">'
      +'<span class="ew-sq-shot">'
-       +'<img src="/wp-content/uploads/ew-players/'+slug(r.name)+'.jpg" alt="" loading="lazy"'
+       +'<img src="'+PHOTOS[0]+slug(r.name)+'.jpg?v='+PHOTOS[1]+'" alt="" loading="lazy"'
        +' onerror="this.remove()">'
        +'<i class="ew-sq-scrim"></i>'
        +(r.shirt?'<b class="ew-sq-no">'+r.shirt+'</b>':'')
@@ -3925,7 +3929,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.66.0';
+const EW_FWP_VERSION = '3.66.1';
 
 /*
  * Parts loader.
