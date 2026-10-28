@@ -1244,6 +1244,10 @@ function ew_shirt_mark_paid( $session_id, $hook ) {
 	if ( function_exists( 'ew_track_purchase' ) ) {
 		ew_track_purchase( $bid );
 	}
+	// The till and the website share one count, in Square.
+	if ( function_exists( 'ew_sq_record_sale' ) ) {
+		ew_sq_record_sale( $bid, $s );
+	}
 }
 
 add_action( 'rest_api_init', function () {
@@ -1342,6 +1346,9 @@ add_action( 'rest_api_init', function () {
 			) : 0;
 			if ( $booking && $consent ) {
 				update_post_meta( $booking, '_ewt_consent', 'yes' );
+			}
+			if ( $booking ) {
+				update_post_meta( $booking, '_ewt_shirts', wp_json_encode( array( array( $sku, $size ) ) ) );
 			}
 
 			$back = wp_get_referer();

@@ -80,6 +80,7 @@ function ew_so_lines( $items, $fields, $sizes, $names, $nums ) {
 			return array( array(), 'Printing is not offered at the moment.' );
 		}
 		$lines[] = array(
+			'sku'   => $sku,
 			'name'  => trim( (string) ( $item['name'] ?? 'Shirt' ) ),
 			'size'  => $size,
 			'pence' => (int) round( (float) ( $item['price'] ?? 0 ) * 100 ),
@@ -116,6 +117,9 @@ function ew_so_create( $email, $name, $lines, $post ) {
 	}
 	update_post_meta( $id, '_ewt_kind', 'shop' );
 	update_post_meta( $id, '_ewt_staff', get_current_user_id() );
+	update_post_meta( $id, '_ewt_shirts', wp_json_encode( array_map( function ( $l ) {
+		return array( $l['sku'], $l['size'] );
+	}, $lines ) ) );
 	// A link sent by a person is not a checkout someone walked away from.
 	wp_clear_scheduled_hook( 'ew_tix_remind', array( $id ) );
 

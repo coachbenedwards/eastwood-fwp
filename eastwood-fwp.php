@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.65.1
+ * Version: 3.66.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -397,10 +397,11 @@ function ew_fwp_settings_page() {
 
 	$sq_env = ew_sq_env();
 
-	echo '<h2>Square</h2>';
-	echo '<p>Card payments in the club shop. Both sets are kept here and Mode at the bottom'
-		. ' decides which one the site uses, so switching to sandbox to test and back again'
-		. ' never means typing a key in twice.</p>';
+	echo '<h2>Square &mdash; Eastwood Ventures</h2>';
+	echo '<p>Shirt stock. The shop reads how many of each size are left from this Square account'
+		. ' (the Location ID below), and takes every shirt sold on the website off the same count,'
+		. ' so the tills and the website share one number. Both sets are kept here and Mode at the'
+		. ' bottom decides which one the site uses.</p>';
 	echo '<form method="post">';
 	wp_nonce_field( 'ew_sq_save' );
 
@@ -455,6 +456,9 @@ function ew_fwp_settings_page() {
 	);
 	submit_button( 'Save Square settings', 'primary', 'ew_sq_save', false );
 	echo '</form>';
+	if ( function_exists( 'ew_sq_status_html' ) ) {
+		echo wp_kses_post( ew_sq_status_html() );
+	}
 
 	/* ------------------------------------------------------------------
 	 * Stripe. Square takes the CIC money; Stripe is Ventures. Keeping
@@ -3921,7 +3925,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.65.1';
+const EW_FWP_VERSION = '3.66.0';
 
 /*
  * Parts loader.
