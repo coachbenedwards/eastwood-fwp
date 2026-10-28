@@ -594,6 +594,41 @@ function ew_food_icon( $which ) {
 
 /* --- Staff: use a token ------------------------------------------------- */
 
+/**
+ * Take one of token $i off pass $bid. The one place a token is used, for
+ * the pass page's "Use one" button and the app's scanner alike.
+ */
+function ew_food_use( $bid, $i, $who ) {
+	if ( ! $bid ) {
+		return new WP_Error( 'ewft_pass', 'No such pass.', array( 'status' => 404 ) );
+	}
+	$e = ew_food_pass_event( $bid );
+	if ( current_time( 'Y-m-d' ) !== $e['date'] ) {
+		return new WP_Error( 'ewft_day', 'This pass is for ' . ew_food_day( $e['date'], 'l j F' ) . '.', array( 'status' => 409 ) );
+	}
+	$tokens = ew_food_tokens( $bid );
+	if ( empty( $tokens[ $i ] ) ) {
+		return new WP_Error( 'ewft_tok', 'No such token.', array( 'status' => 400 ) );
+	}
+	if ( (int) $tokens[ $i ]['used'] >= (int) $tokens[ $i ]['n'] ) {
+		return new WP_Error( 'ewft_none', 'All used.', array( 'status' => 409 ) );
+	}
+	$tokens[ $i ]['used'] = (int) $tokens[ $i ]['used'] + 1;
+	update_post_meta( $bid, '_ewt_tokens', wp_slash( wp_json_encode( $tokens, JSON_UNESCAPED_UNICODE ) ) );
+
+	$log   = json_decode( (string) get_post_meta( $bid, '_ewt_tlog', true ), true );
+	$log   = is_array( $log ) ? $log : array();
+	$log[] = current_time( 'H:i' ) . ' · ' . $tokens[ $i ]['name'] . ' · ' . $who;
+	update_post_meta( $bid, '_ewt_tlog', wp_slash( wp_json_encode( $log, JSON_UNESCAPED_UNICODE ) ) );
+
+	return array(
+		'ok'     => true,
+		'left'   => max( 0, (int) $tokens[ $i ]['n'] - (int) $tokens[ $i ]['used'] ),
+		'log'    => $log,
+		'tokens' => $tokens,
+	);
+}
+
 add_action( 'rest_api_init', function () {
 	register_rest_route( 'eastwood/v1', '/food/use', array(
 		'methods'             => 'POST',
@@ -601,36 +636,8 @@ add_action( 'rest_api_init', function () {
 			return current_user_can( 'edit_posts' );
 		},
 		'callback'            => function ( $req ) {
-			$bid = ew_food_find( (string) $req->get_param( 'pass' ) );
-			if ( ! $bid ) {
-				return new WP_Error( 'ewft_pass', 'No such pass.', array( 'status' => 404 ) );
-			}
-			$e = ew_food_pass_event( $bid );
-			if ( current_time( 'Y-m-d' ) !== $e['date'] ) {
-				return new WP_Error( 'ewft_day', 'This pass is for ' . ew_food_day( $e['date'], 'l j F' ) . '.', array( 'status' => 409 ) );
-			}
-			$tokens = ew_food_tokens( $bid );
-			$i      = (int) $req->get_param( 'i' );
-			if ( empty( $tokens[ $i ] ) ) {
-				return new WP_Error( 'ewft_tok', 'No such token.', array( 'status' => 400 ) );
-			}
-			if ( (int) $tokens[ $i ]['used'] >= (int) $tokens[ $i ]['n'] ) {
-				return new WP_Error( 'ewft_none', 'All used.', array( 'status' => 409 ) );
-			}
-			$tokens[ $i ]['used'] = (int) $tokens[ $i ]['used'] + 1;
-			update_post_meta( $bid, '_ewt_tokens', wp_slash( wp_json_encode( $tokens, JSON_UNESCAPED_UNICODE ) ) );
-
-			$log   = json_decode( (string) get_post_meta( $bid, '_ewt_tlog', true ), true );
-			$log   = is_array( $log ) ? $log : array();
-			$who   = wp_get_current_user();
-			$log[] = current_time( 'H:i' ) . ' · ' . $tokens[ $i ]['name'] . ' · ' . ( $who && $who->exists() ? $who->display_name : '' );
-			update_post_meta( $bid, '_ewt_tlog', wp_slash( wp_json_encode( $log, JSON_UNESCAPED_UNICODE ) ) );
-
-			return array(
-				'ok'   => true,
-				'left' => max( 0, (int) $tokens[ $i ]['n'] - (int) $tokens[ $i ]['used'] ),
-				'log'  => $log,
-			);
+			$who = wp_get_current_user();
+			return ew_food_use( ew_food_find( (string) $req->get_param( 'pass' ) ), (int) $req->get_param( 'i' ), $who && $who->exists() ? $who->display_name : '' );
 		},
 	) );
 } );

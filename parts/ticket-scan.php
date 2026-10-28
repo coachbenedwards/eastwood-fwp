@@ -8,6 +8,12 @@
  *   POST /wp-json/eastwood/v1/ticket/checkin   { "ref": "<...>" }
  *        Header  X-Scan-Secret: <ew_scan_secret option>
  *        Marks _ewt_in once (admits the ticket).
+ *   POST /wp-json/eastwood/v1/ticket/food-use   { "ref": "<...>", "i": <token> }
+ *        Header  X-Scan-Secret. Takes one token off a food token pass.
+ *
+ * A food token pass is not a way through the turnstile, so check-in never
+ * admits one. Verify still recognises it and answers status "food" with
+ * the tokens left, so the same scanner can serve the food counter.
  *
  * Reuses the existing ewt_booking records (paid tickets + free claims).
  *
@@ -29,6 +35,11 @@ add_action('rest_api_init', function () {
 		'methods'             => 'POST',
 		'permission_callback' => '__return_true', // secret checked inside
 		'callback'            => 'ew_ticket_checkin',
+	]);
+	register_rest_route('eastwood/v1', '/ticket/food-use', [
+		'methods'             => 'POST',
+		'permission_callback' => '__return_true', // secret checked inside
+		'callback'            => 'ew_ticket_food_use',
 	]);
 });
 
@@ -91,7 +102,56 @@ function ew_ticket_admissible($bstatus) {
 	return in_array($bstatus, ['paid', 'claimed'], true);
 }
 
+/** What the scanner shows for a food token pass. */
+function ew_ticket_food_payload($id) {
+	$paid = 'paid' === get_post_meta($id, '_ewt_status', true);
+	$e    = function_exists('ew_food_pass_event') ? ew_food_pass_event($id) : ['name' => '', 'date' => ''];
+	$tok  = function_exists('ew_food_tokens') ? ew_food_tokens($id) : [];
+	return [
+		'status' => $paid ? 'food' : 'unpaid',
+		'kind'   => 'food',
+		'name'   => get_post_meta($id, '_ewt_name', true) ?: null,
+		'event'  => $e['name'] ?: null,
+		'date'   => $e['date'] ?: null,
+		'today'  => $e['date'] === current_time('Y-m-d'),
+		'code'   => get_post_meta($id, '_ewt_code', true) ?: null,
+		'tokens' => array_values(array_map(function ($t) {
+			return ['name' => (string) ($t['name'] ?? ''), 'n' => (int) ($t['n'] ?? 0), 'used' => (int) ($t['used'] ?? 0)];
+		}, $tok)),
+	];
+}
+
+function ew_ticket_secret_ok(WP_REST_Request $r) {
+	$secret = get_option('ew_scan_secret', '') ?: EW_SCAN_SECRET_DEFAULT;
+	return $secret && hash_equals((string) $secret, (string) $r->get_header('x_scan_secret'));
+}
+
+/** Take one token off a food pass, from the app's scanner. */
+function ew_ticket_food_use(WP_REST_Request $r) {
+	if (!ew_ticket_secret_ok($r)) {
+		return new WP_REST_Response(['status' => 'error', 'message' => 'Not authorised'], 401);
+	}
+	$body = $r->get_json_params();
+	$id   = ew_ticket_find_any(isset($body['ref']) ? $body['ref'] : '');
+	if (!$id || 'food' !== get_post_meta($id, '_ewt_kind', true) || !function_exists('ew_food_use')) {
+		return new WP_REST_Response(['status' => 'notfound'], 200);
+	}
+	if ('paid' !== get_post_meta($id, '_ewt_status', true)) {
+		return new WP_REST_Response(ew_ticket_food_payload($id), 200);
+	}
+	$res = ew_food_use($id, (int) ($body['i'] ?? -1), 'App');
+	$out = ew_ticket_food_payload($id);
+	if (is_wp_error($res)) {
+		$out['message'] = $res->get_error_message();
+	}
+	return new WP_REST_Response($out, 200);
+}
+
 function ew_ticket_verify(WP_REST_Request $r) {
+	$any = ew_ticket_find_any($r->get_param('ref'));
+	if ($any && 'food' === get_post_meta($any, '_ewt_kind', true)) {
+		return new WP_REST_Response(ew_ticket_food_payload($any), 200);
+	}
 	$id = ew_ticket_find($r->get_param('ref'));
 	if (!$id) return new WP_REST_Response(['status' => 'notfound'], 200);
 
