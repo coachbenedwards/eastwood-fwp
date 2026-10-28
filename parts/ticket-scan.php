@@ -112,7 +112,9 @@ function ew_ticket_food_payload($id) {
 	return [
 		'status' => $paid ? 'food' : 'unpaid',
 		'kind'   => 'food',
-		'name'   => get_post_meta($id, '_ewt_name', true) ?: null,
+		// The child the tokens are for, when the parent gave one.
+		'name'   => get_post_meta($id, '_ewt_child', true) ?: (get_post_meta($id, '_ewt_name', true) ?: null),
+		'child'  => get_post_meta($id, '_ewt_child', true) ?: null,
 		'event'  => $e['name'] ?: null,
 		'date'   => $e['date'] ?: null,
 		'today'  => $e['date'] === current_time('Y-m-d'),

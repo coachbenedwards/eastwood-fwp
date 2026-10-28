@@ -200,6 +200,10 @@ function ew_tix_shortcode( $atts, $content = null ) {
 		'bonus'       => '',
 		'icons'       => '',
 		'name_label'  => 'Name',
+		// A name the booking is for (food tokens: the child's), asked for
+		// above the email and required whenever the label is set.
+		'child_label' => '',
+		'child_need'  => '',
 		'email_label' => 'Email · your tickets are sent here',
 		'continue'    => 'Continue to payment',
 		'need'        => 'Please add your email.',
@@ -232,7 +236,7 @@ function ew_tix_shortcode( $atts, $content = null ) {
 
 	$h  = '<section class="ewt" id="tickets" data-page="' . (int) $page . '" data-rest="' . esc_url( rest_url( 'eastwood/v1/tickets/checkout' ) ) . '"';
 	$h .= '' !== $a['ev'] ? ' data-ev="' . esc_attr( $a['ev'] ) . '"' : '';
-	$h .= ' data-pk="' . esc_attr( ew_tix_pk() ) . '" data-off="' . esc_attr( $a['off'] ) . '" data-loading="' . esc_attr( $a['loading'] ) . '" data-need="' . esc_attr( $a['need'] ) . '" data-done="' . esc_attr( $a['upsell_done'] ) . '">';
+	$h .= ' data-pk="' . esc_attr( ew_tix_pk() ) . '" data-off="' . esc_attr( $a['off'] ) . '" data-loading="' . esc_attr( $a['loading'] ) . '" data-need="' . esc_attr( $a['need'] ) . '" data-child-need="' . esc_attr( $a['child_need'] ) . '" data-done="' . esc_attr( $a['upsell_done'] ) . '">';
 	if ( $paid ) {
 		$after = function_exists( 'ew_tix_after_pay' ) ? ew_tix_after_pay( $page, $a, sanitize_text_field( wp_unslash( $_GET['ewt_paid'] ) ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
 		$h    .= '' !== $after ? $after : '<p class="ewt-thanks">' . esc_html( $a['thanks'] ) . '</p>';
@@ -289,7 +293,11 @@ function ew_tix_shortcode( $atts, $content = null ) {
 		$h .= '<p class="ewt-note">' . esc_html( $a['note'] ) . '</p>';
 	}
 	$h .= '<div class="ewt-co" hidden><h3 class="ewt-co-title">' . esc_html( $a['co_title'] ) . '</h3><div class="ewt-lines"></div>';
-	$h .= '<form class="ewt-who" novalidate><label><span>' . esc_html( $a['email_label'] ) . '</span><input type="email" name="email" autocomplete="email" required></label>';
+	$h .= '<form class="ewt-who" novalidate>';
+	if ( '' !== trim( $a['child_label'] ) ) {
+		$h .= '<label><span>' . esc_html( $a['child_label'] ) . '</span><input type="text" name="child" autocomplete="off" maxlength="60" required></label>';
+	}
+	$h .= '<label><span>' . esc_html( $a['email_label'] ) . '</span><input type="email" name="email" autocomplete="email" required></label>';
 	$h .= '<button type="submit" class="ewt-go">' . esc_html( $a['continue'] ) . '</button></form>';
 	$h .= '<div class="ewt-mount"></div><p class="ewt-msg"></p></div>';
 	$h .= '<div class="ewt-bar"><div class="ewt-bar-in"><span class="ewt-bar-lines"></span><span class="ewt-bar-tot">£0</span><button type="button" class="ewt-go">' . esc_html( $a['checkout'] ) . '</button></div></div>';
@@ -358,6 +366,10 @@ add_action( 'rest_api_init', function () {
 			$event = (string) ( $block['fields']['event'] ?? get_the_title( $post ) );
 			$name  = trim( sanitize_text_field( (string) $req->get_param( 'name' ) ) );
 			$email = sanitize_email( (string) $req->get_param( 'email' ) );
+			$child = trim( mb_substr( sanitize_text_field( (string) $req->get_param( 'child' ) ), 0, 60 ) );
+			if ( '' !== trim( (string) ( $block['fields']['child_label'] ?? '' ) ) && '' === $child ) {
+				return new WP_Error( 'ewt_child', (string) ( $block['fields']['child_need'] ?? '' ) ?: 'Please add the name.', array( 'status' => 400 ) );
+			}
 			if ( ! is_email( $email ) ) {
 				return new WP_Error( 'ewt_who', (string) ( $block['fields']['need'] ?? 'Please add your email.' ), array( 'status' => 400 ) );
 			}
@@ -372,6 +384,9 @@ add_action( 'rest_api_init', function () {
 			);
 			if ( '' !== $ev ) {
 				$body['metadata[ev]'] = $ev;
+			}
+			if ( '' !== $child ) {
+				$body['metadata[child]'] = $child;
 			}
 			if ( '' !== (string) ( $block['fields']['kind'] ?? '' ) ) {
 				$body['metadata[kind]'] = (string) $block['fields']['kind'];
@@ -425,6 +440,9 @@ add_action( 'rest_api_init', function () {
 			// The booker is saved before the card form opens.
 			$hook = (string) ( $block['fields']['crm_hook'] ?? '' );
 			$bid  = function_exists( 'ew_tix_booking_start' ) ? ew_tix_booking_start( $post, $event, $name, $email, implode( ', ', $said ), $total, $hook, (string) ( $block['fields']['greeting'] ?? '' ) ) : 0;
+			if ( $bid && '' !== $child ) {
+				update_post_meta( $bid, '_ewt_child', $child );
+			}
 			if ( $bid ) {
 				do_action( 'ew_tix_started', (int) $bid, $block, $ev, $req );
 			}
@@ -591,17 +609,19 @@ function ewStripeCheckout(stripe, opts){
       if(checkout)return;
       who.hidden=false; msg.textContent='';
       bar.classList.remove('ewt-on');
-      var f=who.querySelector('input[name=email]'); if(f&&!f.value)setTimeout(function(){f.focus({preventScroll:true});},400);
+      var f=who.querySelector('input[name=child]')||who.querySelector('input[name=email]'); if(f&&!f.value)setTimeout(function(){f.focus({preventScroll:true});},400);
     });
     who.addEventListener('submit',function(e){
       e.preventDefault();
       var name='', email=who.querySelector('[name=email]').value.trim();
+      var cf=who.querySelector('[name=child]'), child=cf?cf.value.trim():'';
+      if(cf&&!child){msg.textContent=root.dataset.childNeed;cf.focus();return;}
       if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){msg.textContent=root.dataset.need;return;}
       if(checkout)return;
       msg.textContent=root.dataset.loading;
       var stripe=window.Stripe(root.dataset.pk);
       ewStripeCheckout(stripe,{fetchClientSecret:function(){
-        return fetch(root.dataset.rest,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:+root.dataset.page,ev:root.dataset.ev||'',items:q,name:name,email:email,r:window.ewR||''})})
+        return fetch(root.dataset.rest,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:+root.dataset.page,ev:root.dataset.ev||'',items:q,name:name,child:child,email:email,r:window.ewR||''})})
           .then(function(r){return r.json();}).then(function(j){if(!j.clientSecret)throw new Error(j.message||'error');return j.clientSecret;});
       }}).then(function(c){checkout=c;msg.textContent='';who.hidden=true;c.mount(mount);})
         .catch(function(err){msg.textContent=(err&&err.message)||root.dataset.off;});

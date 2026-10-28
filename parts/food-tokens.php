@@ -158,6 +158,8 @@ add_filter( 'ew_tix_block', function ( $found, $post, $ev ) {
 			'kind'     => 'food',
 			'ev'       => (string) $e['id'],
 			'need'     => $f['need'],
+			'child_label' => $f['child_label'],
+			'child_need'  => $f['child_need'],
 			'crm_hook' => $f['crm_hook'],
 			'greeting' => $f['greeting'],
 		),
@@ -177,6 +179,8 @@ function ew_food_defaults() {
 		'each'        => 'each',
 		'checkout'    => 'Checkout',
 		'co_title'    => 'Your order',
+		'child_label' => "Your child's name · it goes on the pass",
+		'child_need'  => "Please add your child's name.",
 		'email_label' => 'Your email · we send your token pass here',
 		'continue'    => 'Continue to payment',
 		'need'        => 'Please add your email.',
@@ -194,6 +198,7 @@ function ew_food_defaults() {
 		'only'        => '{event} · {date} only',
 		'left'        => '{n} left',
 		'pass_label'  => 'Food token pass',
+		'pass_for'    => 'For {child}',
 		'code_note'   => "If it won't scan, staff can type this code.",
 		'send_head'   => 'Send it to your child',
 		'share'       => 'Share',
@@ -311,6 +316,8 @@ function ew_food_shortcode( $atts ) {
 			'each'        => $a['each'],
 			'checkout'    => $a['checkout'],
 			'co_title'    => $a['co_title'],
+			'child_label' => $a['child_label'],
+			'child_need'  => $a['child_need'],
 			'email_label' => $a['email_label'],
 			'continue'    => $a['continue'],
 			'need'        => $a['need'],
@@ -469,6 +476,7 @@ function ew_food_pass_html( $bid, $a, $just_paid ) {
 	$url    = ew_food_pass_url( $bid );
 	$code   = (string) get_post_meta( $bid, '_ewt_code', true );
 	$tokens = ew_food_tokens( $bid );
+	$child  = trim( (string) get_post_meta( $bid, '_ewt_child', true ) );
 	$staff  = current_user_can( 'edit_posts' );
 	$today  = current_time( 'Y-m-d' ) === $e['date'];
 
@@ -501,7 +509,7 @@ function ew_food_pass_html( $bid, $a, $just_paid ) {
 
 	if ( $staff ) {
 		$h .= '<div class="ewft-staff"><p class="ewft-staffHead">' . esc_html( $a['staff_head'] ) . ' · '
-			. esc_html( (string) get_post_meta( $bid, '_ewt_name', true ) ) . ' · ' . esc_html( $code ) . '</p>';
+			. esc_html( '' !== $child ? $child : (string) get_post_meta( $bid, '_ewt_name', true ) ) . ' · ' . esc_html( $code ) . '</p>';
 		if ( ! $today ) {
 			$h .= '<p class="ewft-wrong">' . esc_html( ew_food_say( $a['wrong_day'], $map ) ) . '</p>';
 		}
@@ -521,6 +529,9 @@ function ew_food_pass_html( $bid, $a, $just_paid ) {
 	// The pass itself.
 	$h .= '<div class="ewft-card">';
 	$h .= '<p class="ewft-cardLab">' . esc_html( $a['pass_label'] ) . '</p>';
+	if ( '' !== $child && '' !== $a['pass_for'] ) {
+		$h .= '<p class="ewft-for">' . esc_html( ew_food_say( $a['pass_for'], array( 'child' => $child ) ) ) . '</p>';
+	}
 	$h .= '<div class="ewft-qr" data-qr="' . esc_url( $url ) . '" role="img" aria-label="QR code"></div>';
 	$h .= '<p class="ewft-code">' . esc_html( $code ) . '</p>';
 	$h .= '<p class="ewft-codeNote">' . esc_html( $a['code_note'] ) . '</p>';
@@ -907,6 +918,7 @@ body.ew-food .ewt-bar .ewt-bar-tot{color:#fff}
 .ewft-log{margin:6px 0 0;padding:0 0 0 18px;font-size:15px}
 .ewft-card{background:#0b0a09;color:#fff;border-radius:8px;padding:32px;display:flex;flex-direction:column;align-items:center;gap:12px}
 .ewft .ewft-cardLab{font-family:Anton,Impact,sans-serif;font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:#ff4d4d}
+.ewft .ewft-for{margin:6px 0 0;font-family:Anton,Impact,sans-serif;font-size:26px;line-height:1.1;text-transform:uppercase}
 .ewft-qr{background:#fff;padding:14px;width:228px;height:228px}
 .ewft-qr img,.ewft-qr svg{display:block;width:200px;height:200px}
 .ewft .ewft-code{font-family:Anton,Impact,sans-serif;font-size:24px;letter-spacing:.08em}
