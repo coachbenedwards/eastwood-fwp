@@ -94,6 +94,8 @@ function ew_ticket_payload($id, $status) {
 		'code'          => get_post_meta($id, '_ewt_code', true) ?: null,
 		'headcount'     => ew_ticket_headcount($id),
 		'checked_in_at' => get_post_meta($id, '_ewt_in', true) ?: null,
+		// A match ticket is tied to a fixture; anything else is an event ticket.
+		'kind'          => (int) get_post_meta($id, '_ewt_fixture', true) > 0 ? 'match' : 'event',
 	];
 }
 
