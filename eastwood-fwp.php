@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.72.1
+ * Version: 3.73.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -27,20 +27,30 @@ const EW_COMP = '143';
 /**
  * A person's name, cased the way a name is written.
  *
- * People type their name into a checkout however they like, and the one
- * that keeps coming back is the shouted one -- KATE SHIRLEY -- which then
- * goes onto the ticket, into the email, and down the printed list at the
- * gate looking like a mistake. A name that arrives entirely in capitals,
- * or entirely in lower case, is re-cased a word at a time.
+ * People type their name into a checkout however they like. Three kinds
+ * of wrong keep coming back: the shouted one (KATE SHIRLEY), the lazy one
+ * (lucas evans), and the half-done one (Olly goodacre, where the surname
+ * never got its capital). All three go onto a ticket, into an email and
+ * down the printed list at the gate looking like a mistake.
  *
- * A name with a capital already inside it is left exactly as it was typed.
- * That is somebody who knows how their own name is spelt -- McGugan,
- * O'Brien, van Dijk, DeAndre -- and guessing at those would do more harm
- * than the shouting does. Mc is the one repair worth making on the way
- * back up, because MCGUGAN would otherwise come out as Mcgugan. Mac is
- * left alone: Macey and Mackie are as common as MacDonald. An O' or a
- * D' is put back up too, but only where a single letter opens the word,
- * so that a possessive is not turned into Dave'S.
+ * The repair is made word by word rather than to the whole name, because
+ * the whole name is rarely uniformly wrong. A word that is entirely in
+ * capitals or entirely in lower case is re-cased; a word that already has
+ * a capital inside it is left exactly as typed, because that is somebody
+ * who knows how their own name is spelt -- McGugan, O'Brien, DeAndre.
+ *
+ * Three exceptions, all of them cases where the obvious repair is worse
+ * than the fault:
+ *
+ *  - Particles. "van", "de", "von" and their kin stay lower case unless
+ *    they open the name, so van Dijk does not become Van Dijk.
+ *  - Mc, and O' or D'. MCGUGAN would otherwise come out as Mcgugan and
+ *    O'BRIEN as O'brien. Mac is deliberately left alone, since Macey and
+ *    Mackie are as common as MacDonald, and the apostrophe is only put
+ *    back up where a single letter opens the word, so a possessive is
+ *    not turned into Dave'S.
+ *  - An email address typed into the name box. It happens, it is not a
+ *    name, and title-casing it makes it wrong as well as odd.
  *
  * @param string $raw What they typed.
  * @return string The name as it should be shown.
@@ -50,43 +60,54 @@ function ew_person_name( $raw ) {
 	if ( '' === $name ) {
 		return '';
 	}
-
-	$letters = (string) preg_replace( '/[^\p{L}]/u', '', $name );
-	if ( '' === $letters ) {
+	// Somebody has put their email in the name box. Leave it be.
+	if ( false !== strpos( $name, '@' ) ) {
 		return $name;
 	}
 
-	$up = function_exists( 'mb_strtoupper' ) ? mb_strtoupper( $letters, 'UTF-8' ) : strtoupper( $letters );
-	$lo = function_exists( 'mb_strtolower' ) ? mb_strtolower( $letters, 'UTF-8' ) : strtolower( $letters );
-	if ( $letters !== $up && $letters !== $lo ) {
-		return $name;
-	}
-
-	$name = function_exists( 'mb_convert_case' )
-		? mb_convert_case( $name, MB_CASE_TITLE, 'UTF-8' )
-		: ucwords( strtolower( $name ), " \t\r\n\f\v-'" );
-
-	$up1 = function ( $c ) {
+	$up = function ( $c ) {
 		return function_exists( 'mb_strtoupper' ) ? mb_strtoupper( $c, 'UTF-8' ) : strtoupper( $c );
 	};
+	$lo = function ( $c ) {
+		return function_exists( 'mb_strtolower' ) ? mb_strtolower( $c, 'UTF-8' ) : strtolower( $c );
+	};
+	$particles = array( 'van', 'von', 'de', 'del', 'della', 'der', 'den', 'di', 'da', 'dos',
+		'du', 'la', 'le', 'bin', 'ibn', 'al', 'ter', 'ten', 'op', 'af' );
 
-	// O'Brien, D'Arcy. Only after a single opening letter, so that a
-	// possessive -- Dave's -- is not turned into Dave'S.
-	$name = (string) preg_replace_callback(
-		'/\b(\p{Lu})\x27(\p{Ll})/u',
-		function ( $m ) use ( $up1 ) {
-			return $m[1] . "\x27" . $up1( $m[2] );
-		},
-		$name
-	);
-
-	return (string) preg_replace_callback(
-		'/\bMc(\p{Ll})/u',
-		function ( $m ) use ( $up1 ) {
-			return 'Mc' . $up1( $m[1] );
-		},
-		$name
-	);
+	$words = explode( ' ', $name );
+	foreach ( $words as $i => $w ) {
+		$letters = (string) preg_replace( '/[^\p{L}]/u', '', $w );
+		if ( '' === $letters ) {
+			continue;
+		}
+		// A capital already inside the word is somebody's own spelling.
+		if ( $letters !== $up( $letters ) && $letters !== $lo( $letters )
+			&& $letters !== $up( mb_substr( $letters, 0, 1 ) ) . $lo( mb_substr( $letters, 1 ) ) ) {
+			continue;
+		}
+		if ( $i > 0 && in_array( $lo( $letters ), $particles, true ) && $letters === $lo( $letters ) ) {
+			continue;
+		}
+		$w = function_exists( 'mb_convert_case' )
+			? mb_convert_case( $w, MB_CASE_TITLE, 'UTF-8' )
+			: ucwords( strtolower( $w ), " -'" );
+		$w = (string) preg_replace_callback(
+			'/^(\p{Lu})\x27(\p{Ll})/u',
+			function ( $m ) use ( $up ) {
+				return $m[1] . "\x27" . $up( $m[2] );
+			},
+			$w
+		);
+		$w = (string) preg_replace_callback(
+			'/^Mc(\p{Ll})/u',
+			function ( $m ) use ( $up ) {
+				return 'Mc' . $up( $m[1] );
+			},
+			$w
+		);
+		$words[ $i ] = $w;
+	}
+	return implode( ' ', $words );
 }
 
 /**
@@ -3994,7 +4015,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.72.1';
+const EW_FWP_VERSION = '3.73.0';
 
 /*
  * Parts loader.

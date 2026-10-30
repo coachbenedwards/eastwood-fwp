@@ -26,6 +26,13 @@
  * shorter road. "Word" serves the identical sheet as a .doc, which Word
  * and Google Docs both open and edit.
  *
+ * Somebody whose card is refused goes round again, so the same family
+ * could be three lines on a sheet with no sign anything had gone wrong.
+ * Attempts fold into one line now, and the row says how many times it
+ * took -- a parent who paid on the third go often thinks they have been
+ * charged three times, and one who never got through may turn up
+ * believing they did.
+ *
  * A pass bought for a child carries the child's name, and that is what
  * the sheet calls out and sorts on -- the card belongs to whoever paid,
  * and they go on the line underneath. Same precedence the pass itself
@@ -169,6 +176,51 @@ function ew_pl_rows( $event, $status ) {
 	usort( $out, function ( $a, $b ) {
 		return strnatcasecmp( ew_pl_who( $a ), ew_pl_who( $b ) );
 	} );
+	return ew_pl_fold( $out );
+}
+
+/**
+ * One line per person, carrying what they tried.
+ *
+ * Somebody whose card is refused goes round again, and a family that
+ * went round three times was three lines on the sheet -- the same child
+ * printed over and over, and no sign that anything had gone wrong. They
+ * are folded into the attempt that stuck, or, if none of them did, into
+ * the last one, and the row says how many times it took.
+ *
+ * That is worth knowing at the door: a parent who paid on the third go
+ * thinks they may have been charged three times, and somebody who never
+ * got through may turn up believing they did.
+ */
+function ew_pl_fold( $rows ) {
+	$by = array();
+	foreach ( $rows as $b ) {
+		$email = strtolower( trim( (string) get_post_meta( $b->ID, '_ewt_email', true ) ) );
+		$key   = ( '' !== $email ? $email : 'id:' . $b->ID ) . '|' . strtolower( ew_pl_who( $b ) );
+		$by[ $key ][] = $b;
+	}
+	$out = array();
+	foreach ( $by as $set ) {
+		$paid = array();
+		foreach ( $set as $b ) {
+			if ( 'paid' === (string) get_post_meta( $b->ID, '_ewt_status', true ) ) {
+				$paid[] = $b;
+			}
+		}
+		// Every paid attempt is a real one and stays; the ones that never
+		// went through collapse into a count against the last row shown.
+		$keep  = $paid ? $paid : array( end( $set ) );
+		$tries = count( $set );
+		$lost  = $tries - count( $paid );
+		foreach ( $keep as $i => $b ) {
+			$b->ew_tries = $tries;
+			$b->ew_lost  = ( 0 === $i ) ? $lost : 0;
+			$out[]       = $b;
+		}
+	}
+	usort( $out, function ( $a, $b ) {
+		return strnatcasecmp( ew_pl_who( $a ), ew_pl_who( $b ) );
+	} );
 	return $out;
 }
 
@@ -223,6 +275,8 @@ function ew_pl_css() {
 .ewpl-doc .acts .ar .ow em{font-style:normal;font-family:var(--mono);font-size:8px;color:var(--faint-2);
  display:block;margin-top:.6mm;letter-spacing:.03em}
 .ewpl-doc .acts .ar .ac{font-size:10.5px;color:var(--muted);line-height:1.4;min-width:0;overflow-wrap:anywhere}
+.ewpl-doc .acts .ar .ac .warn{font-style:normal;display:block;margin-top:.8mm;font-family:var(--cond);
+ font-weight:600;font-size:10px;letter-spacing:.02em;color:var(--red);line-height:1.25}
 .ewpl-doc .acts .ar .by{font-family:var(--mono);font-size:9px;color:var(--red);letter-spacing:.03em}
 .ewpl-doc .acts .ar .mi{font-family:var(--mono);font-size:9.5px;color:var(--text);text-align:right}
 .ewpl-doc .acts .ar .dn{justify-self:end;width:4mm;height:4mm;border:1px solid var(--hair-2)}
@@ -249,10 +303,17 @@ function ew_pl_sheet( $rows, $event, $status ) {
 	};
 
 	$h  = '<div class="ewpl-doc">';
+	// The count is lines on the sheet, which is people, not bookings --
+	// the attempts that failed were folded into the line above them.
+	$folded = 0;
+	foreach ( $rows as $b ) {
+		$folded += (int) ( $b->ew_lost ?? 0 );
+	}
 	$h .= '<div class="doc-hd"><div><p class="kind">Eastwood FC &middot; Bookings</p>'
 		. '<p class="name">' . esc_html( $title ) . '</p></div>'
-		. '<div class="facts"><b>' . count( $rows ) . '</b> booking' . ( 1 === count( $rows ) ? '' : 's' ) . '<br>'
+		. '<div class="facts"><b>' . count( $rows ) . '</b> on the list<br>'
 		. ( '' !== $status ? '<b>' . esc_html( ucfirst( $status ) ) . '</b> only<br>' : '' )
+		. ( $folded ? '<b>' . $folded . '</b> failed attempt' . ( 1 === $folded ? '' : 's' ) . ' folded in<br>' : '' )
 		. esc_html( $when ) . '</div></div>';
 
 	$h .= '<div class="zone"><span class="z">The list</span>'
@@ -274,7 +335,24 @@ function ew_pl_sheet( $rows, $event, $status ) {
 		$h    .= '<div class="ar' . ( 'paid' === $st ? '' : ' unpaid' ) . '">';
 		$h    .= '<div class="ow">' . esc_html( ew_pl_who( $b ) )
 			. ( '' !== $under ? '<em>' . esc_html( $under ) . '</em>' : '' ) . '</div>';
-		$h    .= '<div class="ac">' . esc_html( ew_pl_what( $b->ID ) ) . '</div>';
+		$note  = '';
+		if ( ! empty( $b->ew_lost ) ) {
+			$lost  = (int) $b->ew_lost;
+			$tries = (int) $b->ew_tries;
+			if ( 'paid' === $st ) {
+				$note = sprintf(
+					'Card would not go through %s first — they may think they have been charged %s.',
+					1 === $lost ? 'once' : $lost . ' times',
+					1 === $lost ? 'twice' : ( $lost + 1 ) . ' times'
+				);
+			} elseif ( $tries > 1 ) {
+				$note = sprintf( 'Tried %d times and never got through — may turn up thinking they paid.', $tries );
+			} else {
+				$note = 'Started and never paid — may turn up thinking they did.';
+			}
+		}
+		$h    .= '<div class="ac">' . esc_html( ew_pl_what( $b->ID ) )
+			. ( '' !== $note ? '<em class="warn">' . esc_html( $note ) . '</em>' : '' ) . '</div>';
 		$h    .= '<div class="by">' . esc_html( (string) get_post_meta( $b->ID, '_ewt_key', true ) ) . '</div>';
 		$h    .= '<div class="mi">' . esc_html( $pence ? $money( $pence ) : ucfirst( $st ) ) . '</div>';
 		$h    .= '<div class="dn"></div>';
