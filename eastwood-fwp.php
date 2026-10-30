@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.73.0
+ * Version: 3.73.1
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -71,8 +71,10 @@ function ew_person_name( $raw ) {
 	$lo = function ( $c ) {
 		return function_exists( 'mb_strtolower' ) ? mb_strtolower( $c, 'UTF-8' ) : strtolower( $c );
 	};
+	// 'and' is here because a parent naming two children writes "Sebby and
+	// Luca", and And is not a name.
 	$particles = array( 'van', 'von', 'de', 'del', 'della', 'der', 'den', 'di', 'da', 'dos',
-		'du', 'la', 'le', 'bin', 'ibn', 'al', 'ter', 'ten', 'op', 'af' );
+		'du', 'la', 'le', 'bin', 'ibn', 'al', 'ter', 'ten', 'op', 'af', 'and' );
 
 	$words = explode( ' ', $name );
 	foreach ( $words as $i => $w ) {
@@ -85,7 +87,10 @@ function ew_person_name( $raw ) {
 			&& $letters !== $up( mb_substr( $letters, 0, 1 ) ) . $lo( mb_substr( $letters, 1 ) ) ) {
 			continue;
 		}
-		if ( $i > 0 && in_array( $lo( $letters ), $particles, true ) && $letters === $lo( $letters ) ) {
+		// A particle stays down however it arrived, so VAN DIJK and van Dijk
+		// both come out van Dijk.
+		if ( $i > 0 && in_array( $lo( $letters ), $particles, true ) ) {
+			$words[ $i ] = $lo( $w );
 			continue;
 		}
 		$w = function_exists( 'mb_convert_case' )
@@ -4015,7 +4020,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.73.0';
+const EW_FWP_VERSION = '3.73.1';
 
 /*
  * Parts loader.

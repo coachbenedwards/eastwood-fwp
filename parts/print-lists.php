@@ -33,6 +33,11 @@
  * charged three times, and one who never got through may turn up
  * believing they did.
  *
+ * The order is by surname -- the last word of the name on the pass --
+ * because that is how somebody is found on a sheet of 38. A child given
+ * no surname drops to the bottom instead of being filed under a first
+ * name as though it were one.
+ *
  * A pass bought for a child carries the child's name, and that is what
  * the sheet calls out and sorts on -- the card belongs to whoever paid,
  * and they go on the line underneath. Same precedence the pass itself
@@ -128,6 +133,35 @@ function ew_pl_who( $b ) {
 	return '' !== $name ? $name : (string) $b->post_title;
 }
 
+/**
+ * What a row sorts under: the surname.
+ *
+ * A door list is searched by surname, so the sort runs on the last word
+ * of the name on the pass -- Wood for Cohen Wood, Bradshaw for Taylen
+ * Harvey Bradshaw. A child entered with no surname at all cannot join
+ * that order honestly, so those drop to the bottom in their own run
+ * rather than being filed under a first name as though it were one.
+ */
+function ew_pl_sortkey( $b ) {
+	$who   = trim( preg_replace( '/\s+/u', ' ', ew_pl_who( $b ) ) );
+	$words = array_values( array_filter( explode( ' ', $who ) ) );
+	if ( count( $words ) < 2 ) {
+		return array( 1, $who, '' );
+	}
+	return array( 0, end( $words ), $who );
+}
+
+/** The two keys compared, surname first, then the whole name. */
+function ew_pl_sortcmp( $a, $b ) {
+	$ka = ew_pl_sortkey( $a );
+	$kb = ew_pl_sortkey( $b );
+	if ( $ka[0] !== $kb[0] ) {
+		return $ka[0] < $kb[0] ? -1 : 1;
+	}
+	$n = strnatcasecmp( $ka[1], $kb[1] );
+	return 0 !== $n ? $n : strnatcasecmp( $ka[2], $kb[2] );
+}
+
 /** Who paid, when that is somebody other than the name above. */
 function ew_pl_booked_by( $b ) {
 	if ( '' === trim( (string) get_post_meta( $b->ID, '_ewt_child', true ) ) ) {
@@ -173,9 +207,7 @@ function ew_pl_rows( $event, $status ) {
 	// A door list is read in the order the names are called, and that is
 	// the child's name where there is one, so the sort happens here
 	// rather than in the query.
-	usort( $out, function ( $a, $b ) {
-		return strnatcasecmp( ew_pl_who( $a ), ew_pl_who( $b ) );
-	} );
+	usort( $out, 'ew_pl_sortcmp' );
 	return ew_pl_fold( $out );
 }
 
@@ -218,9 +250,7 @@ function ew_pl_fold( $rows ) {
 			$out[]       = $b;
 		}
 	}
-	usort( $out, function ( $a, $b ) {
-		return strnatcasecmp( ew_pl_who( $a ), ew_pl_who( $b ) );
-	} );
+	usort( $out, 'ew_pl_sortcmp' );
 	return $out;
 }
 
@@ -317,7 +347,7 @@ function ew_pl_sheet( $rows, $event, $status ) {
 		. esc_html( $when ) . '</div></div>';
 
 	$h .= '<div class="zone"><span class="z">The list</span>'
-		. '<span class="sub">Alphabetical by the name on the pass. Whoever paid is underneath. Tick them off as they come in.</span>'
+		. '<span class="sub">By surname. Anyone entered without one is at the bottom. Whoever paid is underneath &mdash; tick them off as they come in.</span>'
 		. '<span class="tot">' . esc_html( $money( $paid ) ) . ' taken</span></div>';
 
 	$h .= '<div class="acts"><div class="ah"><div>Name</div><div>What</div><div>Code</div>'
