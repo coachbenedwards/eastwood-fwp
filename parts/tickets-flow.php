@@ -271,7 +271,7 @@ function ew_tix_mark_paid( $bid, $s, $hook ) {
 	update_post_meta( $bid, '_ewt_paid', (int) ( $s['amount_total'] ?? 0 ) );
 	update_post_meta( $bid, '_ewt_session', $s['id'] );
 	// Only the email is asked for, so the name comes from the card.
-	$who = trim( (string) ( $s['customer_details']['name'] ?? '' ) );
+	$who = ew_person_name( (string) ( $s['customer_details']['name'] ?? '' ) );
 	if ( '' !== $who ) {
 		update_post_meta( $bid, '_ewt_name', $who );
 		wp_update_post( array( 'ID' => $bid, 'post_title' => $who ) );

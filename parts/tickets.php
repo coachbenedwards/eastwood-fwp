@@ -364,7 +364,7 @@ add_action( 'rest_api_init', function () {
 			}
 			$tix   = ew_tix_lines( $block['lines'] );
 			$event = (string) ( $block['fields']['event'] ?? get_the_title( $post ) );
-			$name  = trim( sanitize_text_field( (string) $req->get_param( 'name' ) ) );
+			$name  = ew_person_name( sanitize_text_field( (string) $req->get_param( 'name' ) ) );
 			$email = sanitize_email( (string) $req->get_param( 'email' ) );
 			$child = trim( mb_substr( sanitize_text_field( (string) $req->get_param( 'child' ) ), 0, 60 ) );
 			if ( '' !== trim( (string) ( $block['fields']['child_label'] ?? '' ) ) && '' === $child ) {

@@ -464,7 +464,7 @@ add_action( 'rest_api_init', function () {
 			}
 			$a        = $block['atts'];
 			$game     = ew_cm_game( (int) $req->get_param( 'game' ) );
-			$name     = trim( sanitize_text_field( (string) $req->get_param( 'name' ) ) );
+			$name     = ew_person_name( sanitize_text_field( (string) $req->get_param( 'name' ) ) );
 			$email    = sanitize_email( (string) $req->get_param( 'email' ) );
 			$note     = trim( sanitize_textarea_field( (string) $req->get_param( 'note' ) ) );
 			$adults   = max( 0, min( 10, (int) $req->get_param( 'adults' ) ) );

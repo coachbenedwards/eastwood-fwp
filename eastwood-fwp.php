@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.70.1
+ * Version: 3.71.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -23,6 +23,71 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 const EW_TEAM = '2059';
 const EW_COMP = '143';
+
+/**
+ * A person's name, cased the way a name is written.
+ *
+ * People type their name into a checkout however they like, and the one
+ * that keeps coming back is the shouted one -- KATE SHIRLEY -- which then
+ * goes onto the ticket, into the email, and down the printed list at the
+ * gate looking like a mistake. A name that arrives entirely in capitals,
+ * or entirely in lower case, is re-cased a word at a time.
+ *
+ * A name with a capital already inside it is left exactly as it was typed.
+ * That is somebody who knows how their own name is spelt -- McGugan,
+ * O'Brien, van Dijk, DeAndre -- and guessing at those would do more harm
+ * than the shouting does. Mc is the one repair worth making on the way
+ * back up, because MCGUGAN would otherwise come out as Mcgugan. Mac is
+ * left alone: Macey and Mackie are as common as MacDonald. An O' or a
+ * D' is put back up too, but only where a single letter opens the word,
+ * so that a possessive is not turned into Dave'S.
+ *
+ * @param string $raw What they typed.
+ * @return string The name as it should be shown.
+ */
+function ew_person_name( $raw ) {
+	$name = trim( (string) preg_replace( '/\s+/u', ' ', (string) $raw ) );
+	if ( '' === $name ) {
+		return '';
+	}
+
+	$letters = (string) preg_replace( '/[^\p{L}]/u', '', $name );
+	if ( '' === $letters ) {
+		return $name;
+	}
+
+	$up = function_exists( 'mb_strtoupper' ) ? mb_strtoupper( $letters, 'UTF-8' ) : strtoupper( $letters );
+	$lo = function_exists( 'mb_strtolower' ) ? mb_strtolower( $letters, 'UTF-8' ) : strtolower( $letters );
+	if ( $letters !== $up && $letters !== $lo ) {
+		return $name;
+	}
+
+	$name = function_exists( 'mb_convert_case' )
+		? mb_convert_case( $name, MB_CASE_TITLE, 'UTF-8' )
+		: ucwords( strtolower( $name ), " \t\r\n\f\v-'" );
+
+	$up1 = function ( $c ) {
+		return function_exists( 'mb_strtoupper' ) ? mb_strtoupper( $c, 'UTF-8' ) : strtoupper( $c );
+	};
+
+	// O'Brien, D'Arcy. Only after a single opening letter, so that a
+	// possessive -- Dave's -- is not turned into Dave'S.
+	$name = (string) preg_replace_callback(
+		'/\b(\p{Lu})\x27(\p{Ll})/u',
+		function ( $m ) use ( $up1 ) {
+			return $m[1] . "\x27" . $up1( $m[2] );
+		},
+		$name
+	);
+
+	return (string) preg_replace_callback(
+		'/\bMc(\p{Ll})/u',
+		function ( $m ) use ( $up1 ) {
+			return 'Mc' . $up1( $m[1] );
+		},
+		$name
+	);
+}
 
 /**
  * The address of a file shipped inside the plugin, stamped with the time
@@ -3929,7 +3994,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.70.1';
+const EW_FWP_VERSION = '3.71.0';
 
 /*
  * Parts loader.

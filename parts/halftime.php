@@ -127,12 +127,12 @@ add_action( 'rest_api_init', function () {
 			if ( ! $a ) {
 				return new WP_REST_Response( array( 'message' => 'no block' ), 400 );
 			}
-			$name  = trim( sanitize_text_field( (string) $req->get_param( 'name' ) ) );
+			$name  = ew_person_name( sanitize_text_field( (string) $req->get_param( 'name' ) ) );
 			$email = sanitize_email( (string) $req->get_param( 'email' ) );
 			$phone = trim( sanitize_text_field( (string) $req->get_param( 'phone' ) ) );
 			$kids  = array();
 			foreach ( array_slice( (array) $req->get_param( 'children' ), 0, max( 1, min( 12, (int) $a['max'] ) ) ) as $k ) {
-				$kn = trim( sanitize_text_field( (string) ( $k['name'] ?? '' ) ) );
+				$kn = ew_person_name( sanitize_text_field( (string) ( $k['name'] ?? '' ) ) );
 				$ka = (int) ( $k['age'] ?? 0 );
 				if ( '' !== $kn && $ka > 0 && $ka < 18 ) {
 					$kids[] = $kn . ' (' . $ka . ')';

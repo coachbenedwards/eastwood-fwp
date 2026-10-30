@@ -184,7 +184,7 @@ add_action( 'rest_api_init', function () {
 			if ( ! $a ) {
 				return new WP_REST_Response( array( 'message' => 'no block' ), 400 );
 			}
-			$name  = trim( sanitize_text_field( (string) $req->get_param( 'name' ) ) );
+			$name  = ew_person_name( sanitize_text_field( (string) $req->get_param( 'name' ) ) );
 			$email = sanitize_email( (string) $req->get_param( 'email' ) );
 			$phone = trim( sanitize_text_field( (string) $req->get_param( 'phone' ) ) );
 			$pos   = trim( sanitize_text_field( (string) $req->get_param( 'pos' ) ) );

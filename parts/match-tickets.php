@@ -334,7 +334,7 @@ function ew_mt_booking( $s, $fx ) {
 		return (int) $have[0];
 	}
 
-	$who   = trim( (string) ( $s['customer_details']['name'] ?? '' ) );
+	$who   = ew_person_name( (string) ( $s['customer_details']['name'] ?? '' ) );
 	$email = trim( (string) ( $s['customer_details']['email'] ?? '' ) );
 	$bid   = wp_insert_post(
 		array(

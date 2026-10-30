@@ -530,7 +530,7 @@ add_action( 'rest_api_init', function () {
 			}
 			$a     = shortcode_atts( ew_acad_ask_defaults(), $blk['atts'], 'eastwood_ask' );
 			$q     = trim( sanitize_textarea_field( (string) $req->get_param( 'q' ) ) );
-			$name  = trim( sanitize_text_field( (string) $req->get_param( 'name' ) ) );
+			$name  = ew_person_name( sanitize_text_field( (string) $req->get_param( 'name' ) ) );
 			$email = trim( (string) $req->get_param( 'email' ) );
 			if ( '' === $q ) {
 				return new WP_REST_Response( array( 'message' => $a['need_q'] ), 400 );

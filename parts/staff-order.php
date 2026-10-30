@@ -201,7 +201,7 @@ function ew_so_page() {
 	// Create.
 	if ( isset( $_POST['ew_so_make'] ) && check_admin_referer( 'ew_so_make' ) ) {
 		$email = sanitize_email( wp_unslash( $_POST['email'] ?? '' ) );
-		$name  = sanitize_text_field( wp_unslash( $_POST['cname'] ?? '' ) );
+		$name  = ew_person_name( sanitize_text_field( wp_unslash( $_POST['cname'] ?? '' ) ) );
 		list( $lines, $err ) = ew_so_lines( $items, $fields,
 			(array) wp_unslash( $_POST['size'] ?? array() ),
 			(array) wp_unslash( $_POST['pname'] ?? array() ),

@@ -444,7 +444,7 @@ add_action( 'rest_api_init', function () {
 		'methods'             => 'POST',
 		'permission_callback' => '__return_true',
 		'callback'            => function ( $req ) {
-			$name = trim( preg_replace( '/\s+/', ' ', wp_strip_all_tags( (string) $req->get_param( 'name' ) ) ) );
+			$name = ew_person_name( wp_strip_all_tags( (string) $req->get_param( 'name' ) ) );
 			if ( strlen( $name ) < 3 || strlen( $name ) > 80 ) {
 				return new WP_REST_Response( array( 'message' => 'bad' ), 400 );
 			}
@@ -474,7 +474,7 @@ add_action( 'rest_api_init', function () {
 				return new WP_REST_Response( array( 'message' => 'no block' ), 400 );
 			}
 			$a        = $block['atts'];
-			$name     = trim( sanitize_text_field( (string) $req->get_param( 'name' ) ) );
+			$name     = ew_person_name( sanitize_text_field( (string) $req->get_param( 'name' ) ) );
 			$email    = sanitize_email( (string) $req->get_param( 'email' ) );
 			$school   = trim( sanitize_text_field( (string) $req->get_param( 'school' ) ) );
 			$adults   = max( 0, min( 20, (int) $req->get_param( 'adults' ) ) );
