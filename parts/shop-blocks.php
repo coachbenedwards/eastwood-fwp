@@ -112,6 +112,15 @@ add_shortcode( 'eastwood_shop', 'ew_shop_shortcode' );
  *   WOMENS | Women's | home-shirt-2627
  *   KIDS | Kids | home-shirt-2627-kids
  *
+ * A product that comes in more than one colour adds four more columns:
+ * the colour, its front photograph, its back photograph and the swatch
+ * colour. The code is then unique per colour and fit, and the sizes in
+ * the shop sit under it, so a sale reads BLACK ADULT M in the bookings.
+ *
+ *   BLACK ADULT | Adult | hoodie-adult | Black | assets/shop/hoodie-black-front.png | assets/shop/hoodie-black-back.png | #151515
+ *
+ * With no colour column anywhere the page is exactly as it was.
+ *
  * @param array       $atts    Attributes.
  * @param string|null $content Body.
  * @return string
@@ -205,12 +214,33 @@ function ew_shirt_size_tables( $text, $head ) {
 	return $out;
 }
 
+/**
+ * A photograph named on a fit line: a full address is used as it is, a
+ * path inside the plugin (assets/shop/...) is turned into its address.
+ *
+ * @param string $pic The value from the line.
+ * @return string
+ */
+function ew_shirt_pic_url( $pic ) {
+	$pic = trim( (string) $pic );
+	if ( '' === $pic ) {
+		return '';
+	}
+	if ( preg_match( '#^(https?:)?//#', $pic ) || 0 === strpos( $pic, '/' ) ) {
+		return $pic;
+	}
+	return ew_asset_url( ltrim( $pic, '/' ) );
+}
+
 function ew_shirt_shortcode( $atts, $content = null ) {
 	$a = shortcode_atts(
 		array(
 			'title'         => '',
 			'brand'         => '',
 			'fit_label'     => 'Fit',
+			'colour_label'  => 'Colour',
+			'front_label'   => 'Front',
+			'back_label'    => 'Back',
 			'size_label'    => 'Size',
 			'chart_label'   => 'Size chart',
 			'chart_url'     => '',
@@ -302,9 +332,13 @@ function ew_shirt_shortcode( $atts, $content = null ) {
 			continue;
 		}
 		$fits[] = array(
-			'code' => $code,
-			'name' => (string) ( $bits[1] ?? $code ),
-			'sku'  => (string) ( $bits[2] ?? '' ),
+			'code'   => $code,
+			'name'   => (string) ( $bits[1] ?? $code ),
+			'sku'    => (string) ( $bits[2] ?? '' ),
+			'colour' => (string) ( $bits[3] ?? '' ),
+			'front'  => ew_shirt_pic_url( (string) ( $bits[4] ?? '' ) ),
+			'back'   => ew_shirt_pic_url( (string) ( $bits[5] ?? '' ) ),
+			'swatch' => (string) ( $bits[6] ?? '' ),
 		);
 	}
 	if ( ! $fits ) {
@@ -350,6 +384,8 @@ function ew_shirt_shortcode( $atts, $content = null ) {
 			'shirt'  => ew_asset_url( 'assets/shop/home-shirt-back.png' ),
 		),
 		'sizelab'   => $a['size_label'],
+		'frontlab'  => $a['front_label'],
+		'backlab'   => $a['back_label'],
 		'totlab'    => $a['total_label'],
 		'printline' => $a['print_line'],
 		'emailbad'  => $a['email_bad'],
@@ -374,7 +410,8 @@ function ew_shirt_shortcode( $atts, $content = null ) {
  <div class="ewsh-wrap">
   <div class="ewsh-gal">
    <div class="ewsh-galface" id="ewshGalFront">
-    <img src="<?php echo esc_url( '' !== trim( (string) $a['shirt_front'] ) ? $a['shirt_front'] : ew_asset_url( 'assets/shop/home-shirt-front.png' ) ); ?>" alt="<?php echo esc_attr( $a['title'] ); ?>" width="900" height="900">
+    <img id="ewshGalImg" src="<?php echo esc_url( '' !== $fits[0]['front'] ? $fits[0]['front'] : ( '' !== trim( (string) $a['shirt_front'] ) ? $a['shirt_front'] : ew_asset_url( 'assets/shop/home-shirt-front.png' ) ) ); ?>" alt="<?php echo esc_attr( $a['title'] ); ?>" width="900" height="900">
+    <div class="ewsh-thumbs" id="ewshThumbs" hidden></div>
    </div>
    <?php if ( '' !== trim( (string) $a['print_price'] ) ) : ?>
    <div class="ewsh-prev" id="ewshGalBack" hidden>
@@ -397,6 +434,10 @@ function ew_shirt_shortcode( $atts, $content = null ) {
     <p class="ewsh-note" id="ewshNote"></p>
     <div class="ewsh-rule"></div>
     <p class="ewsh-stock" id="ewshStock"></p>
+    <div id="ewshColWrap" hidden>
+     <p class="ewsh-lab"><?php echo esc_html( $a['colour_label'] ); ?> <span class="ewsh-colname" id="ewshColName"></span></p>
+     <div class="ewsh-cols" id="ewshCols"></div>
+    </div>
     <p class="ewsh-lab"><?php echo esc_html( $a['fit_label'] ); ?></p>
     <div class="ewsh-fits" id="ewshFits"></div>
     <div class="ewsh-sizerow">
@@ -631,7 +672,7 @@ function ew_shirt_css() {
 		   pixels of difference that were really two larger ones cancelling.
 		   Measured at 390: with this the page is the height it was. */
 		'@media(max-width:767px){.ewsh{padding-left:30px;padding-right:30px}}'
-		. '.ewsh{font-family:"Instrument Sans",system-ui,sans-serif;color:#101010}.ewsh-wrap{display:flex;gap:52px;align-items:flex-start;max-width:1140px;margin:0 auto}.ewsh-gal{flex:0 0 470px;background:transparent;border-radius:0;padding:0}.ewsh-info{flex:1 1 auto;min-width:0}.ewsh-info h1,.ewsh-info h2{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:42px;line-height:1.03;letter-spacing:.5px;text-transform:uppercase;margin:0 0 6px;color:#101010}.ewsh-sub{font-size:14px;color:#777;margin:0 0 22px}.ewsh-price{font-family:Anton,Impact,sans-serif;font-size:26px;margin:0 0 4px;color:#101010}.ewsh-note{font-size:13px;color:#8a8a8a;margin:0 0 26px}.ewsh-lab{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin:0 0 10px}.ewsh-sizes{display:flex;gap:9px;flex-wrap:wrap;margin:0 0 26px}.ewsh-sizes button{min-width:62px;padding:13px 6px;background:#fff;border:1.5px solid #d6d6d6;border-radius:6px;font:inherit;font-size:14px;font-weight:600;cursor:pointer}.ewsh-sizes button.on{border-color:#101010;background:#101010;color:#fff}.ewsh-sizes button[disabled]{color:#c0c0c0;border-style:dashed;cursor:not-allowed;text-decoration:line-through}.ewsh-ful{display:flex;flex-direction:column;gap:10px;margin:0 0 26px}.ewsh-ful label{display:flex;gap:12px;align-items:flex-start;border:1.5px solid #d6d6d6;border-radius:8px;padding:15px 16px;cursor:pointer}.ewsh-ful label.on{border-color:#101010}.ewsh-ful b{display:block;font-size:15px;margin-bottom:3px}.ewsh-ful span span{display:block;font-size:13px;color:#777;line-height:1.45}.ewsh-pay{border:1.5px solid #e2e2e2;border-radius:10px;padding:22px;background:#fafafa}.ewsh-pay p{margin:0;font-size:14px;line-height:1.6;color:#666}.ewsh-pay b{display:block;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#101010;margin-bottom:6px}@media(max-width:900px){.ewsh-wrap{flex-direction:column;gap:26px}.ewsh-gal{flex:1 1 auto;width:100%}} .ewsh-fits{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 18px} .ewsh-fits button{font:700 13px/1 Inter,sans-serif;letter-spacing:.4px;padding:11px 18px; border:1.5px solid #d8d8dc;background:#fff;color:#111;border-radius:4px;cursor:pointer} .ewsh-fits button.on{border-color:#CC0000;background:#CC0000;color:#fff} .ewsh-sizes button[disabled]{opacity:.4;text-decoration:line-through;cursor:not-allowed} .ewsh-sizes button.on{border-color:#CC0000;background:#CC0000;color:#fff}      .ewsh-go{margin:0;width:100%;background:#CC0000;color:#fff;border:0;border-radius:6px;font:700 15px/1 Inter,sans-serif;letter-spacing:.4px;padding:17px 20px;cursor:pointer}      .ewsh-go:not([disabled]):hover{background:#b30000}      .ewsh-go[disabled]{background:#e6e6e8;color:#9b9b9f;cursor:not-allowed}      .ewsh-small{margin:12px 0 0;font-size:13px;color:#777;line-height:1.5}      .ewsh-co{margin:0}      .ewsh-mount{background:#fff;border-radius:6px;min-height:40px}      .ewsh-mount:empty{display:none}      .ewsh-msg{margin:10px 0 0;font-size:13px;color:#777}      .ewsh-thanks{border:1.5px solid #CC0000;border-radius:8px;padding:16px 18px;margin:0 0 22px;font-size:15px;color:#101010}      .ewsh-head{margin:0 0 14px}      .ewsh-head h2{margin:0}      .ewsh-back{margin:7px 0 0;font-size:13px;color:#777}      .ewsh-back button{background:none;border:0;padding:0;font:inherit;color:#777;cursor:pointer;text-decoration:underline}      .ewsh-back button:hover{color:#CC0000}      .ewsh-card{background:#fff;border:1.5px solid #e2e2e2;border-radius:10px;overflow:hidden}      .ewsh-sum{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 18px;border-bottom:1px solid #ececec}      .ewsh-sum p{margin:0;font-size:14px;color:#555}      .ewsh-sum p+p{font-family:Anton,Impact,sans-serif;font-size:24px;color:#101010;white-space:nowrap}      .ewsh-det{margin:0;padding:22px;background:#fafafa}      .ewsh-det .ewsh-ful{margin:0 0 18px}      .ewsh-sub-lab{margin-top:4px}      .ewsh-flab{display:block;font-size:13px;font-weight:600;margin:0 0 6px}      .ewsh-flab2{margin-top:14px}      .ewsh-email{width:100%;box-sizing:border-box;border:1.5px solid #d6d6d6;border-radius:6px;padding:13px 14px;font:400 15px "Instrument Sans",system-ui,sans-serif;color:#101010;background:#fff}      .ewsh-email:focus{outline:none;border-color:#101010}      .ewsh-fnote{margin:7px 0 0;font-size:12px;color:#777}      .ewsh-check{display:flex;align-items:center;gap:9px;margin:16px 0 20px;font-size:13px;color:#555;cursor:pointer}      .ewsh-cont{margin:0}      .ewsh-err{margin:10px 0 0;font-size:13px;color:#CC0000;font-weight:600}      .ewsh-err:empty{display:none}      .ewsh [hidden]{display:none}      .ewsh-stock{margin:0 0 24px;font-size:14px;font-weight:600;color:#1a7f4b}      .ewsh-stock:empty{display:none}      .ewsh-stock.out{color:#8a8a8a}      .ewsh-price{margin-bottom:20px}      .ewsh-rule{height:1px;background:#e2e2e2;margin:0 0 20px}      .ewsh-sizerow{display:flex;justify-content:space-between;align-items:baseline;gap:16px}      .ewsh-chart{font-size:13px;color:#555}      .ewsh-chart:hover{color:#CC0000}      .ewsh-share{display:flex;align-items:center;gap:14px;margin:26px 0 0;padding-top:18px;border-top:1px solid #e2e2e2;color:#555}      .ewsh-share span{font-size:13px;color:#777}      .ewsh-share a{color:#555;display:flex}      .ewsh-share a:hover{color:#CC0000}      .ewsh-order{max-width:460px}      .ewsh-print{margin:0 0 14px}      .ewsh-print.on{background:#fff;border:1.5px solid #e2e2e2;border-radius:8px;padding:16px 18px}      .ewsh-pbtn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:#101010;border:0;border-radius:6px;padding:17px 20px;font:700 13px/1 Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#fff;cursor:pointer}      .ewsh-pbtn:hover{background:#2a2a2a}      .ewsh-pbtn[disabled]{background:#e6e6e8;color:#9b9b9f;cursor:not-allowed}      .ewsh-pbtn[disabled]:hover{background:#e6e6e8}      .ewsh-print.on .ewsh-pbtn{background:#101010;color:#fff}      .ewsh-pfields{display:flex;gap:12px;margin:16px 0 0}      .ewsh-pf{flex:1 1 auto;min-width:0}      .ewsh-pf-num{flex:0 0 110px}      .ewsh-pname{letter-spacing:.08em;text-transform:uppercase;font-weight:600}      .ewsh-pwho{margin:16px 0 0}      .ewsh-pwho .ewsh-pf{flex:1 1 auto}      select.ewsh-email{padding-right:12px}      .ewsh-pwarn{margin:14px 0 0;font-size:13px;color:#777}      .ewsh-pay{border:0;padding:0;background:none}      .ewsh-ptitle{margin:0 0 10px;font-size:16px;font-weight:700;color:#101010}      .ewsh-pmodes{display:flex;gap:10px}      .ewsh-pmodes button{flex:1 1 0;min-width:0;background:#fff;color:#101010;border:1px solid #8a8a8a;border-radius:0;padding:16px 6px;font:700 15px/1 "Instrument Sans",system-ui,sans-serif;cursor:pointer}      .ewsh-pmodes button:hover{background:#f2f2f2;border-color:#101010}      .ewsh-pmodes button.on,.ewsh-pmodes button.on:hover{background:#000;border-color:#000;color:#fff}      .ewsh-pwho{margin:12px 0 0}      .ewsh-pwho select.ewsh-email{border-color:#8a8a8a;padding:15px 14px}      .ewsh-pay .ewsh-go{width:100%;font-size:15px;padding:19px 20px}      .ewsh-prt{margin:0;padding:22px;background:#fafafa}      .ewsh-printcta{margin:0 0 14px}      .ewsh-pchosen{margin:10px 0 0;font-size:13px;color:#777}      .ewsh-pchosen:empty{display:none}      .ewsh-prev{position:relative;width:100%;margin:0}      .ewsh-galface img{display:block;width:100%;height:auto}      .ewsh-prev img{display:block;width:100%;height:auto}      .ewsh-prev b,.ewsh-prev i{position:absolute;left:0;right:0;text-align:center;-webkit-text-fill-color:#fff;color:#fff;-webkit-text-stroke:3.9px rgba(40,0,6,.9);paint-order:stroke;font-family:Oswald,"Instrument Sans",sans-serif;font-weight:700}      .ewsh-prev b{top:17%;font-size:47px;line-height:34px;text-transform:uppercase}      .ewsh-prev i{top:36%;font-style:normal;font-size:174px;line-height:127px}      .ewsh-plead{margin:12px 0 0;font-size:13px;color:#777}      .ewsh-prt .ewsh-go{margin:18px 0 0}      .ewsh-guide{margin:0 0 26px;border-top:1px solid #e2e2e2;border-bottom:1px solid #e2e2e2}      .ewsh-guide summary{list-style:none;cursor:pointer;padding:15px 0;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#101010;display:flex;align-items:center;justify-content:space-between}      .ewsh-guide summary::-webkit-details-marker{display:none}      .ewsh-guide summary::after{content:"+";font-size:18px;font-weight:400;line-height:1;color:#777}      .ewsh-guide[open] summary::after{content:"\\2013"}      .ewsh-guide summary:hover{color:#CC0000}      .ewsh-guide-scroll{overflow-x:auto;padding:0 0 4px}      .ewsh-guide-tbl{width:100%;border-collapse:collapse;font-size:14px;margin:0 0 4px}      .ewsh-guide-tbl th,.ewsh-guide-tbl td{padding:11px 12px;text-align:center;white-space:nowrap}      .ewsh-guide-tbl thead th{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#777;border-bottom:1px solid #e2e2e2}      .ewsh-guide-tbl tbody th{text-align:left;font-weight:700;color:#101010}      .ewsh-guide-tbl tbody td{color:#555}      .ewsh-guide-tbl tbody tr+tr th,.ewsh-guide-tbl tbody tr+tr td{border-top:1px solid #f0f0f0}      .ewsh-guide-tbl thead th:first-child{text-align:left}      .ewsh-gfit{margin:0 0 12px;font:400 20px/1 Anton,Impact,sans-serif;letter-spacing:.5px;text-transform:uppercase;color:#101010}      .ewsh-guide-blk+.ewsh-guide-blk{margin-top:26px}      .ewsh-gnote{margin:0 0 18px;font-size:13px;color:#777;line-height:1.55;max-width:62ch}      .ewsh-tabs{max-width:1140px;margin:46px auto 0;padding:0}      .ewsh-tabrow{display:flex;gap:40px;flex-wrap:wrap;border-bottom:1px solid #e2e2e2}      .ewsh-tab{background:none;border:0;border-bottom:3px solid transparent;margin:0 0 -1px;padding:0 0 14px;font:400 20px/1 Anton,Impact,sans-serif;letter-spacing:.5px;text-transform:uppercase;color:#8a8a8a;cursor:pointer}      .ewsh-tab:hover{color:#101010}      .ewsh-tab.on{color:#101010;border-bottom-color:#CC0000}      .ewsh-panel{padding:30px 0 4px}      .ewsh-panel p{margin:0 0 14px;font-size:15px;line-height:1.65;color:#555;max-width:62ch}      .ewsh-tot{display:flex;flex-direction:column;gap:6px;margin:0 0 16px}      .ewsh-tot div{display:flex;justify-content:space-between;gap:16px;font-size:14px;color:#555}      .ewsh-tot div.ewsh-tot-sum{border-top:1px solid #e2e2e2;padding-top:9px;margin-top:3px;font-weight:700;color:#101010}';
+		. '.ewsh{font-family:"Instrument Sans",system-ui,sans-serif;color:#101010}.ewsh-wrap{display:flex;gap:52px;align-items:flex-start;max-width:1140px;margin:0 auto}.ewsh-gal{flex:0 0 470px;background:transparent;border-radius:0;padding:0}.ewsh-info{flex:1 1 auto;min-width:0}.ewsh-info h1,.ewsh-info h2{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:42px;line-height:1.03;letter-spacing:.5px;text-transform:uppercase;margin:0 0 6px;color:#101010}.ewsh-sub{font-size:14px;color:#777;margin:0 0 22px}.ewsh-price{font-family:Anton,Impact,sans-serif;font-size:26px;margin:0 0 4px;color:#101010}.ewsh-note{font-size:13px;color:#8a8a8a;margin:0 0 26px}.ewsh-lab{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin:0 0 10px}.ewsh-sizes{display:flex;gap:9px;flex-wrap:wrap;margin:0 0 26px}.ewsh-sizes button{min-width:62px;padding:13px 6px;background:#fff;border:1.5px solid #d6d6d6;border-radius:6px;font:inherit;font-size:14px;font-weight:600;cursor:pointer}.ewsh-sizes button.on{border-color:#101010;background:#101010;color:#fff}.ewsh-sizes button[disabled]{color:#c0c0c0;border-style:dashed;cursor:not-allowed;text-decoration:line-through}.ewsh-ful{display:flex;flex-direction:column;gap:10px;margin:0 0 26px}.ewsh-ful label{display:flex;gap:12px;align-items:flex-start;border:1.5px solid #d6d6d6;border-radius:8px;padding:15px 16px;cursor:pointer}.ewsh-ful label.on{border-color:#101010}.ewsh-ful b{display:block;font-size:15px;margin-bottom:3px}.ewsh-ful span span{display:block;font-size:13px;color:#777;line-height:1.45}.ewsh-pay{border:1.5px solid #e2e2e2;border-radius:10px;padding:22px;background:#fafafa}.ewsh-pay p{margin:0;font-size:14px;line-height:1.6;color:#666}.ewsh-pay b{display:block;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#101010;margin-bottom:6px}@media(max-width:900px){.ewsh-wrap{flex-direction:column;gap:26px}.ewsh-gal{flex:1 1 auto;width:100%}} .ewsh-fits{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 18px} .ewsh-fits button{font:700 13px/1 Inter,sans-serif;letter-spacing:.4px;padding:11px 18px; border:1.5px solid #d8d8dc;background:#fff;color:#111;border-radius:4px;cursor:pointer} .ewsh-fits button.on{border-color:#CC0000;background:#CC0000;color:#fff} .ewsh-sizes button[disabled]{opacity:.4;text-decoration:line-through;cursor:not-allowed} .ewsh-sizes button.on{border-color:#CC0000;background:#CC0000;color:#fff}      .ewsh-go{margin:0;width:100%;background:#CC0000;color:#fff;border:0;border-radius:6px;font:700 15px/1 Inter,sans-serif;letter-spacing:.4px;padding:17px 20px;cursor:pointer}      .ewsh-go:not([disabled]):hover{background:#b30000}      .ewsh-go[disabled]{background:#e6e6e8;color:#9b9b9f;cursor:not-allowed}      .ewsh-small{margin:12px 0 0;font-size:13px;color:#777;line-height:1.5}      .ewsh-co{margin:0}      .ewsh-mount{background:#fff;border-radius:6px;min-height:40px}      .ewsh-mount:empty{display:none}      .ewsh-msg{margin:10px 0 0;font-size:13px;color:#777}      .ewsh-thanks{border:1.5px solid #CC0000;border-radius:8px;padding:16px 18px;margin:0 0 22px;font-size:15px;color:#101010}      .ewsh-head{margin:0 0 14px}      .ewsh-head h2{margin:0}      .ewsh-back{margin:7px 0 0;font-size:13px;color:#777}      .ewsh-back button{background:none;border:0;padding:0;font:inherit;color:#777;cursor:pointer;text-decoration:underline}      .ewsh-back button:hover{color:#CC0000}      .ewsh-card{background:#fff;border:1.5px solid #e2e2e2;border-radius:10px;overflow:hidden}      .ewsh-sum{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 18px;border-bottom:1px solid #ececec}      .ewsh-sum p{margin:0;font-size:14px;color:#555}      .ewsh-sum p+p{font-family:Anton,Impact,sans-serif;font-size:24px;color:#101010;white-space:nowrap}      .ewsh-det{margin:0;padding:22px;background:#fafafa}      .ewsh-det .ewsh-ful{margin:0 0 18px}      .ewsh-sub-lab{margin-top:4px}      .ewsh-flab{display:block;font-size:13px;font-weight:600;margin:0 0 6px}      .ewsh-flab2{margin-top:14px}      .ewsh-email{width:100%;box-sizing:border-box;border:1.5px solid #d6d6d6;border-radius:6px;padding:13px 14px;font:400 15px "Instrument Sans",system-ui,sans-serif;color:#101010;background:#fff}      .ewsh-email:focus{outline:none;border-color:#101010}      .ewsh-fnote{margin:7px 0 0;font-size:12px;color:#777}      .ewsh-check{display:flex;align-items:center;gap:9px;margin:16px 0 20px;font-size:13px;color:#555;cursor:pointer}      .ewsh-cont{margin:0}      .ewsh-err{margin:10px 0 0;font-size:13px;color:#CC0000;font-weight:600}      .ewsh-err:empty{display:none}      .ewsh [hidden]{display:none}      .ewsh-stock{margin:0 0 24px;font-size:14px;font-weight:600;color:#1a7f4b}      .ewsh-stock:empty{display:none}      .ewsh-stock.out{color:#8a8a8a}      .ewsh-price{margin-bottom:20px}      .ewsh-rule{height:1px;background:#e2e2e2;margin:0 0 20px}      .ewsh-sizerow{display:flex;justify-content:space-between;align-items:baseline;gap:16px}      .ewsh-chart{font-size:13px;color:#555}      .ewsh-chart:hover{color:#CC0000}      .ewsh-share{display:flex;align-items:center;gap:14px;margin:26px 0 0;padding-top:18px;border-top:1px solid #e2e2e2;color:#555}      .ewsh-share span{font-size:13px;color:#777}      .ewsh-share a{color:#555;display:flex}      .ewsh-share a:hover{color:#CC0000}      .ewsh-order{max-width:460px}      .ewsh-print{margin:0 0 14px}      .ewsh-print.on{background:#fff;border:1.5px solid #e2e2e2;border-radius:8px;padding:16px 18px}      .ewsh-pbtn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:#101010;border:0;border-radius:6px;padding:17px 20px;font:700 13px/1 Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#fff;cursor:pointer}      .ewsh-pbtn:hover{background:#2a2a2a}      .ewsh-pbtn[disabled]{background:#e6e6e8;color:#9b9b9f;cursor:not-allowed}      .ewsh-pbtn[disabled]:hover{background:#e6e6e8}      .ewsh-print.on .ewsh-pbtn{background:#101010;color:#fff}      .ewsh-pfields{display:flex;gap:12px;margin:16px 0 0}      .ewsh-pf{flex:1 1 auto;min-width:0}      .ewsh-pf-num{flex:0 0 110px}      .ewsh-pname{letter-spacing:.08em;text-transform:uppercase;font-weight:600}      .ewsh-pwho{margin:16px 0 0}      .ewsh-pwho .ewsh-pf{flex:1 1 auto}      select.ewsh-email{padding-right:12px}      .ewsh-pwarn{margin:14px 0 0;font-size:13px;color:#777}      .ewsh-pay{border:0;padding:0;background:none}      .ewsh-ptitle{margin:0 0 10px;font-size:16px;font-weight:700;color:#101010}      .ewsh-pmodes{display:flex;gap:10px}      .ewsh-pmodes button{flex:1 1 0;min-width:0;background:#fff;color:#101010;border:1px solid #8a8a8a;border-radius:0;padding:16px 6px;font:700 15px/1 "Instrument Sans",system-ui,sans-serif;cursor:pointer}      .ewsh-pmodes button:hover{background:#f2f2f2;border-color:#101010}      .ewsh-pmodes button.on,.ewsh-pmodes button.on:hover{background:#000;border-color:#000;color:#fff}      .ewsh-pwho{margin:12px 0 0}      .ewsh-pwho select.ewsh-email{border-color:#8a8a8a;padding:15px 14px}      .ewsh-pay .ewsh-go{width:100%;font-size:15px;padding:19px 20px}      .ewsh-prt{margin:0;padding:22px;background:#fafafa}      .ewsh-printcta{margin:0 0 14px}      .ewsh-pchosen{margin:10px 0 0;font-size:13px;color:#777}      .ewsh-pchosen:empty{display:none}      .ewsh-prev{position:relative;width:100%;margin:0}      .ewsh-galface img{display:block;width:100%;height:auto}      .ewsh-prev img{display:block;width:100%;height:auto}      .ewsh-prev b,.ewsh-prev i{position:absolute;left:0;right:0;text-align:center;-webkit-text-fill-color:#fff;color:#fff;-webkit-text-stroke:3.9px rgba(40,0,6,.9);paint-order:stroke;font-family:Oswald,"Instrument Sans",sans-serif;font-weight:700}      .ewsh-prev b{top:17%;font-size:47px;line-height:34px;text-transform:uppercase}      .ewsh-prev i{top:36%;font-style:normal;font-size:174px;line-height:127px}      .ewsh-plead{margin:12px 0 0;font-size:13px;color:#777}      .ewsh-prt .ewsh-go{margin:18px 0 0}      .ewsh-guide{margin:0 0 26px;border-top:1px solid #e2e2e2;border-bottom:1px solid #e2e2e2}      .ewsh-guide summary{list-style:none;cursor:pointer;padding:15px 0;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#101010;display:flex;align-items:center;justify-content:space-between}      .ewsh-guide summary::-webkit-details-marker{display:none}      .ewsh-guide summary::after{content:"+";font-size:18px;font-weight:400;line-height:1;color:#777}      .ewsh-guide[open] summary::after{content:"\\2013"}      .ewsh-guide summary:hover{color:#CC0000}      .ewsh-guide-scroll{overflow-x:auto;padding:0 0 4px}      .ewsh-guide-tbl{width:100%;border-collapse:collapse;font-size:14px;margin:0 0 4px}      .ewsh-guide-tbl th,.ewsh-guide-tbl td{padding:11px 12px;text-align:center;white-space:nowrap}      .ewsh-guide-tbl thead th{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#777;border-bottom:1px solid #e2e2e2}      .ewsh-guide-tbl tbody th{text-align:left;font-weight:700;color:#101010}      .ewsh-guide-tbl tbody td{color:#555}      .ewsh-guide-tbl tbody tr+tr th,.ewsh-guide-tbl tbody tr+tr td{border-top:1px solid #f0f0f0}      .ewsh-guide-tbl thead th:first-child{text-align:left}      .ewsh-gfit{margin:0 0 12px;font:400 20px/1 Anton,Impact,sans-serif;letter-spacing:.5px;text-transform:uppercase;color:#101010}      .ewsh-guide-blk+.ewsh-guide-blk{margin-top:26px}      .ewsh-gnote{margin:0 0 18px;font-size:13px;color:#777;line-height:1.55;max-width:62ch}      .ewsh-tabs{max-width:1140px;margin:46px auto 0;padding:0}      .ewsh-tabrow{display:flex;gap:40px;flex-wrap:wrap;border-bottom:1px solid #e2e2e2}      .ewsh-tab{background:none;border:0;border-bottom:3px solid transparent;margin:0 0 -1px;padding:0 0 14px;font:400 20px/1 Anton,Impact,sans-serif;letter-spacing:.5px;text-transform:uppercase;color:#8a8a8a;cursor:pointer}      .ewsh-tab:hover{color:#101010}      .ewsh-tab.on{color:#101010;border-bottom-color:#CC0000}      .ewsh-panel{padding:30px 0 4px}      .ewsh-panel p{margin:0 0 14px;font-size:15px;line-height:1.65;color:#555;max-width:62ch}      .ewsh-tot{display:flex;flex-direction:column;gap:6px;margin:0 0 16px}      .ewsh-tot div{display:flex;justify-content:space-between;gap:16px;font-size:14px;color:#555}      .ewsh-tot div.ewsh-tot-sum{border-top:1px solid #e2e2e2;padding-top:9px;margin-top:3px;font-weight:700;color:#101010}      .ewsh-cols{display:flex;gap:10px;margin:0 0 22px}      .ewsh-cols button{width:46px;height:46px;padding:4px;border-radius:50%;background:#fff;border:2px solid #d6d6d6;cursor:pointer;display:flex;align-items:center;justify-content:center}      .ewsh-cols button.on{border-color:#101010}      .ewsh-cols button span{display:block;width:34px;height:34px;border-radius:50%;border:1px solid rgba(0,0,0,.12)}      .ewsh-colname{font-weight:600;letter-spacing:0;text-transform:none;color:#555;margin-left:6px}      .ewsh-thumbs{display:flex;gap:12px;justify-content:center;margin:14px 0 0}      .ewsh-thumbs button{width:84px;height:84px;padding:4px;background:#fff;border:1.5px solid #d6d6d6;border-radius:6px;cursor:pointer}      .ewsh-thumbs button.on{border-color:#101010}      .ewsh-thumbs img{display:block;width:100%;height:100%;object-fit:contain}';
 }
 
 /**
@@ -658,13 +699,18 @@ function ewStripeCheckout(stripe, opts){
  if(!W.fits || !W.fits.length) return;
 
  var API = '/wp-json/eastwood/v1/shop/item';
- var NAMES = {}, ORDER = [], SKUS = {};
+ var NAMES = {}, ORDER = [], SKUS = {}, COL = {}, PICS = {}, HEX = {};
  W.fits.forEach(function(f){
   NAMES[f.code] = f.name; ORDER.push(f.code);
+  COL[f.code] = f.colour || ''; PICS[f.code] = {front:f.front || '', back:f.back || ''};
+  if(f.colour && f.swatch){ HEX[f.colour] = f.swatch; }
   (SKUS[f.sku] = SKUS[f.sku] || []).push(f.code);
  });
 
  var model = {}, fit = null, size = null, post = false, checkout = null, stage = 'pick';
+ var colour = '', view = 'front';
+ function shown(have){ return have.filter(function(f){ return !colour || COL[f] === colour; }); }
+ function norm(t){ return String(t || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
  var P = W.print || null, printOn = false;
  var $ = function(id){ return document.getElementById(id); };
  function money(n){ return '\u00a3' + Number(n).toFixed(2); }
@@ -691,7 +737,7 @@ function ewStripeCheckout(stripe, opts){
    });
    var have = ORDER.filter(function(f){ return model[f]; });
    if(!have.length){ $('ewshNote').textContent = W.empty; return; }
-   fit = have[0];
+   fit = have[0]; colour = COL[fit] || '';
    $('ewshNote').textContent = '';
    drawFits(have); drawSizes(); drawFul(); drawPay(); showGuide();
    arrive(have);
@@ -708,7 +754,7 @@ function ewStripeCheckout(stripe, opts){
    var q = new URLSearchParams(window.location.search);
    var f = (q.get('fit') || '').toUpperCase(), sz = q.get('size') || '';
    if(!f || have.indexOf(f) < 0) return;
-   fit = f; size = null; post = false;
+   fit = f; colour = COL[f] || ''; size = null; post = false;
    var ok = model[fit].sizes.some(function(x){ return x.size === sz && x.stock; });
    if(ok) size = sz;
    post = ('1' === q.get('post')) && Number(model[fit].postage) > 0;
@@ -719,9 +765,64 @@ function ewStripeCheckout(stripe, opts){
   } catch(e) {}
  }
 
+ /* Colour: one swatch per colour the lines name. Changing colour keeps
+    the fit you were on (Adult stays Adult) and clears the size, the same
+    as changing fit does. A product with no colours never shows the row. */
+ function drawCols(have){
+  var wrap = $('ewshColWrap');
+  var cols = [];
+  have.forEach(function(f){ if(COL[f] && cols.indexOf(COL[f]) < 0){ cols.push(COL[f]); } });
+  if(!wrap || cols.length < 1){ return; }
+  wrap.hidden = false;
+  $('ewshColName').textContent = colour;
+  var w = $('ewshCols'); w.innerHTML = '';
+  cols.forEach(function(c){
+   var b = document.createElement('button');
+   b.type = 'button'; b.setAttribute('aria-label', c);
+   b.setAttribute('aria-pressed', c === colour ? 'true' : 'false');
+   if(c === colour) b.className = 'on';
+   var dot = document.createElement('span');
+   dot.style.background = HEX[c] || '#cccccc';
+   b.appendChild(dot);
+   b.addEventListener('click', function(){
+    if(c === colour) return;
+    var was = NAMES[fit];
+    colour = c;
+    var list = shown(have);
+    var same = list.filter(function(f){ return NAMES[f] === was; });
+    fit = same.length ? same[0] : list[0];
+    size = null; post = false; view = 'front';
+    drawFits(have); drawSizes(); drawFul(); drawPay(); showGuide();
+   });
+   w.appendChild(b);
+  });
+ }
+
+ /* The photographs for the colour on show, with front and back to flip
+    between when the line gives a back. */
+ function drawPics(){
+  var pic = PICS[fit] || {};
+  var img = $('ewshGalImg');
+  if(img && pic.front){ img.src = (view === 'back' && pic.back) ? pic.back : pic.front; img.alt = W.title + (colour ? ', ' + colour : ''); }
+  var t = $('ewshThumbs');
+  if(!t) return;
+  if(!pic.front || !pic.back){ t.hidden = true; return; }
+  t.hidden = false; t.innerHTML = '';
+  [['front', pic.front, W.frontlab], ['back', pic.back, W.backlab]].forEach(function(v){
+   var b = document.createElement('button');
+   b.type = 'button'; b.setAttribute('aria-label', v[2]);
+   if(v[0] === view) b.className = 'on';
+   var im = document.createElement('img'); im.src = v[1]; im.alt = '';
+   b.appendChild(im);
+   b.addEventListener('click', function(){ view = v[0]; drawPics(); });
+   t.appendChild(b);
+  });
+ }
+
  function drawFits(have){
+  drawCols(have); drawPics();
   var w = $('ewshFits'); w.innerHTML = '';
-  have.forEach(function(f){
+  shown(have).forEach(function(f){
    var b = document.createElement('button');
    b.type = 'button'; b.textContent = NAMES[f] || f;
    if(f === fit) b.className = 'on';
@@ -748,7 +849,7 @@ function ewStripeCheckout(stripe, opts){
   if(!named) return;
   Array.prototype.forEach.call(blks, function(b){
    var f = b.getAttribute('data-fit');
-   b.hidden = !!f && f !== fit;
+   b.hidden = !!f && f !== fit && f !== norm(NAMES[fit]);
   });
  }
 
