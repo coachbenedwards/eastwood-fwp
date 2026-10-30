@@ -158,6 +158,8 @@ function ew_shirt_size_rows( $text ) {
  * The size guide, split into one table per fit.
  *
  * A line in square brackets names a fit -- [Adult], [Women's], [Kids] --
+ * or, since a block field cannot hold a square bracket, a line starting
+ * with a hash does the same: # Adult, # Kids.
  * and the first row under it is that table's heading, because the three
  * are not measured the same way: a women's shirt is given as bust, waist
  * and hip, a men's as chest and waist, a child's by age and height. Each
@@ -171,7 +173,7 @@ function ew_shirt_size_rows( $text ) {
  * @return array[] Each: name, fit (the code the buttons use), head, rows.
  */
 function ew_shirt_size_tables( $text, $head ) {
-	if ( false === strpos( (string) $text, '[' ) ) {
+	if ( false === strpos( (string) $text, '[' ) && ! preg_match( '/^\s*#/m', (string) $text ) ) {
 		$rows = ew_shirt_size_rows( $text );
 		return $rows ? array( array(
 			'name' => '',
@@ -185,7 +187,7 @@ function ew_shirt_size_tables( $text, $head ) {
 	$here = null;
 	foreach ( preg_split( '/\r\n|\r|\n/', (string) $text ) as $line ) {
 		$line = trim( $line );
-		if ( preg_match( '/^\[(.+)\]$/', $line, $m ) ) {
+		if ( preg_match( '/^\[(.+)\]$/', $line, $m ) || preg_match( '/^#\s*(.+)$/', $line, $m ) ) {
 			if ( $here && $here['rows'] ) {
 				$out[] = $here;
 			}
