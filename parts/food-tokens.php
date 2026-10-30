@@ -326,6 +326,8 @@ function ew_food_shortcode( $atts ) {
 			'co_title'    => $a['co_title'],
 			'child_label' => $a['child_label'],
 			'child_need'  => $a['child_need'],
+			'child_add'   => $a['child_add'],
+			'child_help'  => $a['child_help'],
 			'email_label' => $a['email_label'],
 			'continue'    => $a['continue'],
 			'need'        => $a['need'],
