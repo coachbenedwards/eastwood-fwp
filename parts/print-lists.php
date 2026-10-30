@@ -26,6 +26,11 @@
  * shorter road. "Word" serves the identical sheet as a .doc, which Word
  * and Google Docs both open and edit.
  *
+ * A pass bought for a child carries the child's name, and that is what
+ * the sheet calls out and sorts on -- the card belongs to whoever paid,
+ * and they go on the line underneath. Same precedence the pass itself
+ * uses, so the paper and the phone agree.
+ *
  * One deliberate difference from the agenda: that sheet sets @page margin
  * to nought and pads each fixed A4 block itself, which it can do because
  * it knows how many pages it is. A list does not, so the margin goes on
@@ -100,6 +105,31 @@ function ew_pl_what( $id ) {
 	return implode( ' · ', $bits );
 }
 
+/**
+ * The name to call out.
+ *
+ * A food pass bought for a child carries the child's name, and that is
+ * the name on the pass and the name the gate shouts -- the card belongs
+ * to whoever paid. Same precedence the pass itself uses.
+ */
+function ew_pl_who( $b ) {
+	$child = trim( (string) get_post_meta( $b->ID, '_ewt_child', true ) );
+	if ( '' !== $child ) {
+		return $child;
+	}
+	$name = trim( (string) get_post_meta( $b->ID, '_ewt_name', true ) );
+	return '' !== $name ? $name : (string) $b->post_title;
+}
+
+/** Who paid, when that is somebody other than the name above. */
+function ew_pl_booked_by( $b ) {
+	if ( '' === trim( (string) get_post_meta( $b->ID, '_ewt_child', true ) ) ) {
+		return '';
+	}
+	$name = trim( (string) get_post_meta( $b->ID, '_ewt_name', true ) );
+	return '' !== $name ? $name : (string) $b->post_title;
+}
+
 /** What the two buttons and the screen are both filtered to. */
 function ew_pl_filters() {
 	// phpcs:disable WordPress.Security.NonceVerification
@@ -133,6 +163,12 @@ function ew_pl_rows( $event, $status ) {
 		}
 		$out[] = $b;
 	}
+	// A door list is read in the order the names are called, and that is
+	// the child's name where there is one, so the sort happens here
+	// rather than in the query.
+	usort( $out, function ( $a, $b ) {
+		return strnatcasecmp( ew_pl_who( $a ), ew_pl_who( $b ) );
+	} );
 	return $out;
 }
 
@@ -175,12 +211,12 @@ function ew_pl_css() {
 .ewpl-doc .zone .sub{font-size:9.5px;color:var(--faint);flex:1 1 auto;line-height:1.4}
 .ewpl-doc .zone .tot{font-family:var(--mono);font-size:9px;color:var(--faint-2);letter-spacing:.08em}
 .ewpl-doc .acts{display:flex;flex-direction:column}
-.ewpl-doc .acts .ah{display:grid;grid-template-columns:44mm 1fr 24mm 17mm 8mm;gap:0 4.5mm;
+.ewpl-doc .acts .ah{display:grid;grid-template-columns:52mm 1fr 24mm 17mm 8mm;gap:0 4.5mm;
  padding:1.8mm 0 1.4mm;border-bottom:1px solid var(--hair-2)}
 .ewpl-doc .acts .ah div{font-family:var(--mono);font-size:7.5px;letter-spacing:.14em;
  text-transform:uppercase;color:var(--faint-2)}
 .ewpl-doc .acts .ah .r{text-align:right}
-.ewpl-doc .acts .ar{display:grid;grid-template-columns:44mm 1fr 24mm 17mm 8mm;gap:0 4.5mm;
+.ewpl-doc .acts .ar{display:grid;grid-template-columns:52mm 1fr 24mm 17mm 8mm;gap:0 4.5mm;
  padding:2.4mm 0;border-bottom:1px solid var(--hair);align-items:baseline;min-height:9mm;
  break-inside:avoid;page-break-inside:avoid}
 .ewpl-doc .acts .ar .ow{font-size:11px;font-weight:600;line-height:1.3;min-width:0;overflow-wrap:anywhere}
@@ -220,7 +256,7 @@ function ew_pl_sheet( $rows, $event, $status ) {
 		. esc_html( $when ) . '</div></div>';
 
 	$h .= '<div class="zone"><span class="z">The list</span>'
-		. '<span class="sub">Alphabetical by name. Tick them off as they come in.</span>'
+		. '<span class="sub">Alphabetical by the name on the pass. Whoever paid is underneath. Tick them off as they come in.</span>'
 		. '<span class="tot">' . esc_html( $money( $paid ) ) . ' taken</span></div>';
 
 	$h .= '<div class="acts"><div class="ah"><div>Name</div><div>What</div><div>Code</div>'
@@ -232,11 +268,12 @@ function ew_pl_sheet( $rows, $event, $status ) {
 	foreach ( $rows as $b ) {
 		$st    = (string) get_post_meta( $b->ID, '_ewt_status', true );
 		$pence = (int) get_post_meta( $b->ID, '_ewt_paid', true );
-		$name  = (string) get_post_meta( $b->ID, '_ewt_name', true );
 		$email = (string) get_post_meta( $b->ID, '_ewt_email', true );
+		$by    = ew_pl_booked_by( $b );
+		$under = trim( ( '' !== $by ? $by . ( '' !== $email ? ' · ' : '' ) : '' ) . $email );
 		$h    .= '<div class="ar' . ( 'paid' === $st ? '' : ' unpaid' ) . '">';
-		$h    .= '<div class="ow">' . esc_html( '' !== $name ? $name : $b->post_title )
-			. ( '' !== $email ? '<em>' . esc_html( $email ) . '</em>' : '' ) . '</div>';
+		$h    .= '<div class="ow">' . esc_html( ew_pl_who( $b ) )
+			. ( '' !== $under ? '<em>' . esc_html( $under ) . '</em>' : '' ) . '</div>';
 		$h    .= '<div class="ac">' . esc_html( ew_pl_what( $b->ID ) ) . '</div>';
 		$h    .= '<div class="by">' . esc_html( (string) get_post_meta( $b->ID, '_ewt_key', true ) ) . '</div>';
 		$h    .= '<div class="mi">' . esc_html( $pence ? $money( $pence ) : ucfirst( $st ) ) . '</div>';
