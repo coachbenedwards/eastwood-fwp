@@ -33,6 +33,9 @@
  * charged three times, and one who never got through may turn up
  * believing they did.
  *
+ * The list is banded by letter, the way a directory is, so somebody
+ * looking for a name goes to the band rather than down the page.
+ *
  * The order is by surname -- the last word of the name on the pass --
  * because that is how somebody is found on a sheet of 38. A child given
  * no surname drops to the bottom instead of being filed under a first
@@ -149,6 +152,16 @@ function ew_pl_sortkey( $b ) {
 		return array( 1, $who, '' );
 	}
 	return array( 0, end( $words ), $who );
+}
+
+/** The letter a row files under, or '' when it has no surname. */
+function ew_pl_letter( $b ) {
+	$k = ew_pl_sortkey( $b );
+	if ( 1 === $k[0] ) {
+		return '';
+	}
+	$c = function_exists( 'mb_substr' ) ? mb_substr( $k[1], 0, 1, 'UTF-8' ) : substr( $k[1], 0, 1 );
+	return function_exists( 'mb_strtoupper' ) ? mb_strtoupper( $c, 'UTF-8' ) : strtoupper( $c );
 }
 
 /** The two keys compared, surname first, then the whole name. */
@@ -298,6 +311,12 @@ function ew_pl_css() {
 .ewpl-doc .acts .ah div{font-family:var(--mono);font-size:7.5px;letter-spacing:.14em;
  text-transform:uppercase;color:var(--faint-2)}
 .ewpl-doc .acts .ah .r{text-align:right}
+.ewpl-doc .acts .az{display:flex;align-items:baseline;gap:4mm;padding:3.2mm 0 1.3mm;
+ margin-top:2.5mm;border-bottom:1.5px solid var(--rule);break-after:avoid;page-break-after:avoid}
+.ewpl-doc .acts .az:first-of-type{margin-top:0}
+.ewpl-doc .acts .az b{font-family:var(--cond);font-weight:800;font-size:15px;letter-spacing:.18em;
+ text-transform:uppercase;color:var(--text)}
+.ewpl-doc .acts .az span{font-family:var(--mono);font-size:8px;letter-spacing:.1em;color:var(--faint-2)}
 .ewpl-doc .acts .ar{display:grid;grid-template-columns:52mm 1fr 24mm 17mm 8mm;gap:0 4.5mm;
  padding:2.4mm 0;border-bottom:1px solid var(--hair);align-items:baseline;min-height:9mm;
  break-inside:avoid;page-break-inside:avoid}
@@ -347,7 +366,7 @@ function ew_pl_sheet( $rows, $event, $status ) {
 		. esc_html( $when ) . '</div></div>';
 
 	$h .= '<div class="zone"><span class="z">The list</span>'
-		. '<span class="sub">By surname. Anyone entered without one is at the bottom. Whoever paid is underneath &mdash; tick them off as they come in.</span>'
+		. '<span class="sub">By surname. Whoever paid is underneath &mdash; tick them off as they come in.</span>'
 		. '<span class="tot">' . esc_html( $money( $paid ) ) . ' taken</span></div>';
 
 	$h .= '<div class="acts"><div class="ah"><div>Name</div><div>What</div><div>Code</div>'
@@ -356,7 +375,24 @@ function ew_pl_sheet( $rows, $event, $status ) {
 	if ( ! $rows ) {
 		$h .= '<p class="none">Nothing sold against this yet.</p>';
 	}
+
+	// How many sit under each letter, so the band can say so.
+	$count = array();
 	foreach ( $rows as $b ) {
+		$l           = ew_pl_letter( $b );
+		$count[ $l ] = ( $count[ $l ] ?? 0 ) + 1;
+	}
+
+	$letter = null;
+	foreach ( $rows as $b ) {
+		$now = ew_pl_letter( $b );
+		if ( $now !== $letter ) {
+			$letter = $now;
+			$n      = (int) ( $count[ $now ] ?? 0 );
+			$h     .= '<div class="az' . ( null === $letter ? ' first' : '' ) . '">'
+				. '<b>' . esc_html( '' !== $now ? $now : 'No surname given' ) . '</b>'
+				. '<span>' . esc_html( $n . ( 1 === $n ? ' name' : ' names' ) ) . '</span></div>';
+		}
 		$st    = (string) get_post_meta( $b->ID, '_ewt_status', true );
 		$pence = (int) get_post_meta( $b->ID, '_ewt_paid', true );
 		$email = (string) get_post_meta( $b->ID, '_ewt_email', true );
