@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.74.0
+ * Version: 3.75.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -113,6 +113,42 @@ function ew_person_name( $raw ) {
 		$words[ $i ] = $w;
 	}
 	return implode( ' ', $words );
+}
+
+/**
+ * Every child named on a booking, as an array.
+ *
+ * _ewt_kids is the list. Bookings taken before it existed hold one
+ * _ewt_child string, and a parent naming two children typed them both
+ * into it ("Sebby and Luca"), so those are split on the way out rather
+ * than rewritten in the database.
+ */
+function ew_booking_kids( $bid ) {
+	$kids = json_decode( (string) get_post_meta( (int) $bid, '_ewt_kids', true ), true );
+	if ( is_array( $kids ) ) {
+		$kids = array_values( array_filter( array_map( 'trim', array_map( 'strval', $kids ) ) ) );
+		if ( $kids ) {
+			return $kids;
+		}
+	}
+	$one = trim( (string) get_post_meta( (int) $bid, '_ewt_child', true ) );
+	if ( '' === $one ) {
+		return array();
+	}
+	$parts = preg_split( '/\s*(?:,|\band\b|&|\+)\s*/iu', $one );
+	$parts = array_values( array_filter( array_map( 'trim', (array) $parts ) ) );
+	return $parts ? $parts : array( $one );
+}
+
+/** "Cohen", "Cohen and Issac", "Cohen, Issac and Remy". */
+function ew_booking_kids_say( $kids ) {
+	$kids = array_values( array_filter( array_map( 'trim', (array) $kids ) ) );
+	$n    = count( $kids );
+	if ( $n < 2 ) {
+		return $n ? $kids[0] : '';
+	}
+	$last = array_pop( $kids );
+	return implode( ', ', $kids ) . ' and ' . $last;
 }
 
 /**
@@ -4020,7 +4056,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.74.0';
+const EW_FWP_VERSION = '3.75.0';
 
 /*
  * Parts loader.

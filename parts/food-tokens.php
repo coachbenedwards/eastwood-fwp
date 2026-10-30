@@ -160,6 +160,8 @@ add_filter( 'ew_tix_block', function ( $found, $post, $ev ) {
 			'need'     => $f['need'],
 			'child_label' => $f['child_label'],
 			'child_need'  => $f['child_need'],
+			'child_add'   => $f['child_add'],
+			'child_help'  => $f['child_help'],
 			'crm_hook' => $f['crm_hook'],
 			'greeting' => $f['greeting'],
 		),
@@ -179,8 +181,10 @@ function ew_food_defaults() {
 		'each'        => 'each',
 		'checkout'    => 'Checkout',
 		'co_title'    => 'Your order',
-		'child_label' => "Your child's name · it goes on the pass",
+		'child_label' => "Who is the pass for?",
 		'child_need'  => "Please add your child's name.",
+		'child_add'   => '+ Add another child',
+		'child_help'  => 'One name per child. Put them all on — staff ask who is using each token at the counter, so the tokens do not have to be split up now.',
 		'email_label' => 'Your email · we send your token pass here',
 		'continue'    => 'Continue to payment',
 		'need'        => 'Please add your email.',
@@ -227,6 +231,10 @@ function ew_food_defaults() {
 		'wrong_day'   => 'This pass is for {date}. Tokens only work on that day.',
 		'used_head'   => 'Used so far',
 		'used_none'   => 'Nothing used yet.',
+		'shared'      => "These are shared between {children}. They don't have to be split up — either of them can use any of them, and staff take them off one at a time.",
+		'ask_head'    => 'Who is the {deal} for?',
+		'ask_sub'     => 'More than one name on this pass. Tap the one eating.',
+		'ask_cancel'  => 'Cancel',
 	);
 }
 
@@ -476,7 +484,8 @@ function ew_food_pass_html( $bid, $a, $just_paid ) {
 	$url    = ew_food_pass_url( $bid );
 	$code   = (string) get_post_meta( $bid, '_ewt_code', true );
 	$tokens = ew_food_tokens( $bid );
-	$child  = trim( (string) get_post_meta( $bid, '_ewt_child', true ) );
+	$kids   = ew_booking_kids( $bid );
+	$child  = ew_booking_kids_say( $kids );
 	$staff  = current_user_can( 'edit_posts' );
 	$today  = current_time( 'Y-m-d' ) === $e['date'];
 
@@ -484,8 +493,10 @@ function ew_food_pass_html( $bid, $a, $just_paid ) {
 		. ' data-url="' . esc_url( $url ) . '"'
 		. ' data-text="' . esc_attr( ew_food_say( $a['share_text'], $map ) ) . '"'
 		. ' data-copied="' . esc_attr( $a['copied'] ) . '"'
+		. ' data-kids="' . esc_attr( (string) wp_json_encode( array_values( $kids ), JSON_UNESCAPED_UNICODE ) ) . '"'
 		. ( $staff ? ' data-rest="' . esc_url( rest_url( 'eastwood/v1/food/use' ) ) . '" data-nonce="' . esc_attr( wp_create_nonce( 'wp_rest' ) ) . '"'
-			. ' data-left="' . esc_attr( $a['left'] ) . '" data-done="' . esc_attr( $a['all_used'] ) . '"' : '' )
+			. ' data-left="' . esc_attr( $a['left'] ) . '" data-done="' . esc_attr( $a['all_used'] ) . '"'
+			. ' data-ask="' . esc_attr( $a['ask_head'] ) . '"' : '' )
 		. '>';
 
 	$h .= '<div class="ewft-passTop"><div class="ewft-passWords">';
@@ -506,6 +517,9 @@ function ew_food_pass_html( $bid, $a, $just_paid ) {
 	}
 	$h .= '<p class="ewft-only">' . esc_html( ew_food_say( $a['only'], $map ) ) . '</p>';
 	$h .= '</div>';
+	if ( count( $kids ) > 1 && '' !== trim( $a['shared'] ) ) {
+		$h .= '<p class="ewft-shared">' . esc_html( ew_food_say( $a['shared'], array( 'children' => $child ) ) ) . '</p>';
+	}
 
 	if ( $staff ) {
 		$h .= '<div class="ewft-staff"><p class="ewft-staffHead">' . esc_html( $a['staff_head'] ) . ' · '
@@ -522,7 +536,16 @@ function ew_food_pass_html( $bid, $a, $just_paid ) {
 		} else {
 			$h .= '<li>' . esc_html( $a['used_none'] ) . '</li>';
 		}
-		$h .= '</ul><p class="ewft-staffMsg" role="status"></p></div>';
+		$h .= '</ul><p class="ewft-staffMsg" role="status"></p>';
+		if ( count( $kids ) > 1 ) {
+			$h .= '<div class="ewft-ask" hidden><p class="ewft-askHead"></p>';
+			$h .= '<p class="ewft-askSub">' . esc_html( $a['ask_sub'] ) . '</p><div class="ewft-askWho">';
+			foreach ( $kids as $kid ) {
+				$h .= '<button type="button" class="ewft-askBtn" data-kid="' . esc_attr( $kid ) . '">' . esc_html( $kid ) . '</button>';
+			}
+			$h .= '</div><button type="button" class="ewft-askX">' . esc_html( $a['ask_cancel'] ) . '</button></div>';
+		}
+		$h .= '</div>';
 	}
 	$h .= '</div>';
 
@@ -608,8 +631,11 @@ function ew_food_icon( $which ) {
 /**
  * Take one of token $i off pass $bid. The one place a token is used, for
  * the pass page's "Use one" button and the app's scanner alike.
+ *
+ * $kid is the child eating it, asked for at the counter when the pass
+ * names more than one. Empty on a pass with a single name.
  */
-function ew_food_use( $bid, $i, $who ) {
+function ew_food_use( $bid, $i, $who, $kid = '' ) {
 	if ( ! $bid ) {
 		return new WP_Error( 'ewft_pass', 'No such pass.', array( 'status' => 404 ) );
 	}
@@ -629,7 +655,16 @@ function ew_food_use( $bid, $i, $who ) {
 
 	$log   = json_decode( (string) get_post_meta( $bid, '_ewt_tlog', true ), true );
 	$log   = is_array( $log ) ? $log : array();
-	$log[] = current_time( 'H:i' ) . ' · ' . $tokens[ $i ]['name'] . ' · ' . $who;
+	$kid   = trim( (string) $kid );
+	if ( '' !== $kid ) {
+		$known = ew_booking_kids( $bid );
+		if ( $known && ! in_array( $kid, $known, true ) ) {
+			$kid = '';
+		}
+	}
+	$log[] = current_time( 'H:i' ) . ' · ' . $tokens[ $i ]['name']
+		. ( '' !== $kid ? ' · ' . $kid : '' )
+		. ' · ' . $who;
 	update_post_meta( $bid, '_ewt_tlog', wp_slash( wp_json_encode( $log, JSON_UNESCAPED_UNICODE ) ) );
 
 	return array(
@@ -648,7 +683,12 @@ add_action( 'rest_api_init', function () {
 		},
 		'callback'            => function ( $req ) {
 			$who = wp_get_current_user();
-			return ew_food_use( ew_food_find( (string) $req->get_param( 'pass' ) ), (int) $req->get_param( 'i' ), $who && $who->exists() ? $who->display_name : '' );
+			return ew_food_use(
+				ew_food_find( (string) $req->get_param( 'pass' ) ),
+				(int) $req->get_param( 'i' ),
+				$who && $who->exists() ? $who->display_name : '',
+				mb_substr( sanitize_text_field( (string) $req->get_param( 'child' ) ), 0, 60 )
+			);
 		},
 	) );
 } );
@@ -912,6 +952,14 @@ body.ew-food .ewt-bar .ewt-bar-tot{color:#fff}
 .ewft-staff{margin-top:18px;border:1px solid #111;border-radius:8px;padding:16px 20px;background:#fff}
 .ewft .ewft-staffHead{font-family:Anton,Impact,sans-serif;text-transform:uppercase;font-size:16px}
 .ewft .ewft-staffMsg{margin-top:8px;color:#cc0000}
+.ewft .ewft-shared{margin:14px 0 0;padding:14px 18px;background:#fff;border:1px solid #111;border-radius:8px;font-size:15px;line-height:1.5;color:#111}
+.ewft .ewft-ask{margin:12px 0 4px;padding:16px 18px;background:#fff;border:2px solid #111;border-radius:6px}
+.ewft .ewft-ask[hidden]{display:none}
+.ewft .ewft-askHead{margin:0;font-family:Anton,Impact,sans-serif;text-transform:uppercase;font-size:17px;color:#111}
+.ewft .ewft-askSub{margin:4px 0 0;font-size:14px;color:#55555c}
+.ewft .ewft-askWho{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:14px}
+.ewft .ewft-askBtn{background:#111;color:#fff;border:0;font-family:Anton,Impact,sans-serif;text-transform:uppercase;font-size:18px;min-height:56px;cursor:pointer;border-radius:4px}
+.ewft .ewft-askX{background:none;border:0;padding:0;margin-top:12px;font:inherit;font-size:14px;font-weight:600;color:#55555c;cursor:pointer;text-decoration:underline}
 .ewft .ewt-title:empty{display:none}
 .ewft .ewft-wrong{margin-top:8px;color:#cc0000;font-weight:600}
 .ewft .ewft-staffSub{margin-top:12px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#55555c}
@@ -983,15 +1031,17 @@ function ew_food_js() {
  if(copyBtn){ copyBtn.addEventListener('click', copy); }
 
  if(!pass.dataset.rest){ return; }
- pass.addEventListener('click', function(e){
-  var b = e.target.closest('.ewft-use');
-  if(!b || b.disabled){ return; }
+
+ var ask = pass.querySelector('.ewft-ask');
+ var waiting = null;
+
+ function spend(b, kid){
   b.disabled = true;
   fetch(pass.dataset.rest, {
    method: 'POST',
    credentials: 'same-origin',
    headers: {'Content-Type':'application/json', 'X-WP-Nonce': pass.dataset.nonce},
-   body: JSON.stringify({pass: pass.dataset.pass, i: +b.dataset.i})
+   body: JSON.stringify({pass: pass.dataset.pass, i: +b.dataset.i, child: kid || ''})
   }).then(function(r){ return r.json(); }).then(function(j){
    if(!j.ok){ throw new Error(j.message || ''); }
    var row = b.closest('.ewft-tok');
@@ -999,11 +1049,41 @@ function ew_food_js() {
    if(j.left > 0){ b.disabled = false; } else { b.textContent = pass.dataset.done; }
    var log = pass.querySelector('.ewft-log');
    if(log){ log.innerHTML = ''; (j.log || []).forEach(function(t){ var li = document.createElement('li'); li.textContent = t; log.appendChild(li); }); }
+   var m = pass.querySelector('.ewft-staffMsg');
+   if(m){ m.textContent = ''; }
   }).catch(function(err){
    b.disabled = false;
    var m = pass.querySelector('.ewft-staffMsg');
    if(m){ m.textContent = (err && err.message) || 'That did not go through.'; }
   });
+ }
+
+ function closeAsk(){
+  if(!ask){ return; }
+  ask.hidden = true;
+  if(waiting){ waiting.disabled = false; waiting = null; }
+ }
+
+ pass.addEventListener('click', function(e){
+  var pick = e.target.closest('.ewft-askBtn');
+  if(pick && waiting){
+   var b = waiting; waiting = null; ask.hidden = true;
+   spend(b, pick.dataset.kid);
+   return;
+  }
+  if(e.target.closest('.ewft-askX')){ closeAsk(); return; }
+
+  var b = e.target.closest('.ewft-use');
+  if(!b || b.disabled){ return; }
+  // One name on the pass: nothing to ask, it behaves as it always has.
+  if(!ask){ spend(b, ''); return; }
+  closeAsk();
+  waiting = b;
+  b.disabled = true;
+  var deal = b.closest('.ewft-tok').querySelector('span').textContent;
+  ask.querySelector('.ewft-askHead').textContent = (pass.dataset.ask || '').replace('{deal}', deal);
+  ask.hidden = false;
+  ask.scrollIntoView({behavior:'smooth', block:'nearest'});
  });
 })();
 JS;

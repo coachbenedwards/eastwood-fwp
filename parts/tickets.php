@@ -204,6 +204,10 @@ function ew_tix_shortcode( $atts, $content = null ) {
 		// above the email and required whenever the label is set.
 		'child_label' => '',
 		'child_need'  => '',
+		// Set child_add to switch the block from one name to a list of them.
+		'child_add'    => '',
+		'child_help'   => '',
+		'child_remove' => 'Remove',
 		'email_label' => 'Email · your tickets are sent here',
 		'continue'    => 'Continue to payment',
 		'need'        => 'Please add your email.',
@@ -295,7 +299,21 @@ function ew_tix_shortcode( $atts, $content = null ) {
 	$h .= '<div class="ewt-co" hidden><h3 class="ewt-co-title">' . esc_html( $a['co_title'] ) . '</h3><div class="ewt-lines"></div>';
 	$h .= '<form class="ewt-who" novalidate>';
 	if ( '' !== trim( $a['child_label'] ) ) {
-		$h .= '<label><span>' . esc_html( $a['child_label'] ) . '</span><input type="text" name="child" autocomplete="off" maxlength="60" required></label>';
+		if ( '' === trim( $a['child_add'] ) ) {
+			$h .= '<label><span>' . esc_html( $a['child_label'] ) . '</span><input type="text" name="child" autocomplete="off" maxlength="60" required></label>';
+		} else {
+			$h .= '<div class="ewt-kids" data-max="6" data-remove="' . esc_attr( $a['child_remove'] ) . '">';
+			$h .= '<span class="ewt-kidsLab">' . esc_html( $a['child_label'] ) . '</span>';
+			$h .= '<div class="ewt-kidRows"><div class="ewt-kidRow">'
+				. '<input type="text" name="kids[]" autocomplete="off" maxlength="60" required>'
+				. '<button type="button" class="ewt-kidX" aria-label="' . esc_attr( $a['child_remove'] ) . '" hidden>&times;</button>'
+				. '</div></div>';
+			$h .= '<button type="button" class="ewt-kidAdd">' . esc_html( $a['child_add'] ) . '</button>';
+			if ( '' !== trim( $a['child_help'] ) ) {
+				$h .= '<p class="ewt-kidHelp">' . esc_html( $a['child_help'] ) . '</p>';
+			}
+			$h .= '</div>';
+		}
 	}
 	$h .= '<label><span>' . esc_html( $a['email_label'] ) . '</span><input type="email" name="email" autocomplete="email" required></label>';
 	$h .= '<button type="submit" class="ewt-go">' . esc_html( $a['continue'] ) . '</button></form>';
@@ -367,6 +385,22 @@ add_action( 'rest_api_init', function () {
 			$name  = ew_person_name( sanitize_text_field( (string) $req->get_param( 'name' ) ) );
 			$email = sanitize_email( (string) $req->get_param( 'email' ) );
 			$child = ew_person_name( mb_substr( sanitize_text_field( (string) $req->get_param( 'child' ) ), 0, 60 ) );
+			// A booking can name more than one child (food tokens: the pass covers them all).
+			$kids = array();
+			foreach ( (array) $req->get_param( 'kids' ) as $kid ) {
+				$kid = ew_person_name( mb_substr( sanitize_text_field( (string) $kid ), 0, 60 ) );
+				if ( '' !== $kid && ! in_array( $kid, $kids, true ) ) {
+					$kids[] = $kid;
+				}
+				if ( count( $kids ) >= 6 ) {
+					break;
+				}
+			}
+			if ( $kids ) {
+				$child = ew_booking_kids_say( $kids );
+			} elseif ( '' !== $child ) {
+				$kids = array( $child );
+			}
 			if ( '' !== trim( (string) ( $block['fields']['child_label'] ?? '' ) ) && '' === $child ) {
 				return new WP_Error( 'ewt_child', (string) ( $block['fields']['child_need'] ?? '' ) ?: 'Please add the name.', array( 'status' => 400 ) );
 			}
@@ -442,6 +476,9 @@ add_action( 'rest_api_init', function () {
 			$bid  = function_exists( 'ew_tix_booking_start' ) ? ew_tix_booking_start( $post, $event, $name, $email, implode( ', ', $said ), $total, $hook, (string) ( $block['fields']['greeting'] ?? '' ) ) : 0;
 			if ( $bid && '' !== $child ) {
 				update_post_meta( $bid, '_ewt_child', $child );
+			}
+			if ( $bid && $kids ) {
+				update_post_meta( $bid, '_ewt_kids', wp_slash( wp_json_encode( $kids, JSON_UNESCAPED_UNICODE ) ) );
 			}
 			if ( $bid ) {
 				do_action( 'ew_tix_started', (int) $bid, $block, $ev, $req );
@@ -551,6 +588,15 @@ function ew_tix_css() {
 .ewt-who input{width:100%;background:#0f0c0a;border:1px solid var(--ewt-line);color:var(--ewt-txt);padding:14px;font:inherit;font-size:16px;border-radius:0}
 .ewt-who input:focus{outline:none;border-color:rgba(232,213,176,.7)}
 .ewt-who .ewt-go{justify-self:end;margin-top:4px}
+.ewt-kidsLab{display:block;font-size:13px;color:var(--ewt-mut);margin-bottom:6px}
+.ewt-kidRow{display:flex;gap:8px;align-items:stretch;margin-bottom:8px}
+.ewt-kidRow input{flex:1;min-width:0}
+.ewt-kidX{flex:none;width:50px;background:#0f0c0a;border:1px solid var(--ewt-line);color:var(--ewt-mut);font:inherit;font-size:20px;line-height:1;cursor:pointer}
+.ewt-kidX:hover{color:var(--ewt-txt);border-color:rgba(232,213,176,.7)}
+.ewt-kidX[hidden]{display:none}
+.ewt-kidAdd{background:none;border:0;padding:0;font:inherit;font-size:15px;font-weight:600;color:var(--ewt-cream);cursor:pointer;text-decoration:underline}
+.ewt-kidAdd[hidden]{display:none}
+.ewt-kidHelp{margin:8px 0 0;font-size:13px;line-height:1.5;color:var(--ewt-mut)}
 .ewt-after{max-width:640px;margin:0 auto 48px;text-align:center}
 .ewt-up{border:1px solid var(--ewt-line);background:var(--ewt-card);padding:28px;text-align:left}
 .ewt .ewt-up-sub{color:var(--ewt-mut);font-size:16px;margin-bottom:18px}
@@ -609,19 +655,42 @@ function ewStripeCheckout(stripe, opts){
       if(checkout)return;
       who.hidden=false; msg.textContent='';
       bar.classList.remove('ewt-on');
-      var f=who.querySelector('input[name=child]')||who.querySelector('input[name=email]'); if(f&&!f.value)setTimeout(function(){f.focus({preventScroll:true});},400);
+      var f=who.querySelector('input[name=child]')||who.querySelector('[name="kids[]"]')||who.querySelector('input[name=email]'); if(f&&!f.value)setTimeout(function(){f.focus({preventScroll:true});},400);
     });
+    var kids=who.querySelector('.ewt-kids');
+    if(kids){
+      var rows=kids.querySelector('.ewt-kidRows'), addBtn=kids.querySelector('.ewt-kidAdd');
+      function tidy(){
+        var rs=rows.querySelectorAll('.ewt-kidRow');
+        rs.forEach(function(r){r.querySelector('.ewt-kidX').hidden=(rs.length<2);});
+        addBtn.hidden=(rs.length>=(+kids.dataset.max||6));
+      }
+      addBtn.addEventListener('click',function(){
+        var r=rows.querySelector('.ewt-kidRow').cloneNode(true);
+        r.querySelector('input').value=''; rows.appendChild(r); tidy();
+        r.querySelector('input').focus({preventScroll:true});
+      });
+      rows.addEventListener('click',function(e){
+        var x=e.target.closest('.ewt-kidX'); if(!x)return;
+        if(rows.querySelectorAll('.ewt-kidRow').length<2)return;
+        x.closest('.ewt-kidRow').remove(); tidy();
+      });
+      tidy();
+    }
     who.addEventListener('submit',function(e){
       e.preventDefault();
       var name='', email=who.querySelector('[name=email]').value.trim();
       var cf=who.querySelector('[name=child]'), child=cf?cf.value.trim():'';
       if(cf&&!child){msg.textContent=root.dataset.childNeed;cf.focus();return;}
+      var kidEls=who.querySelectorAll('[name="kids[]"]'), kidList=[];
+      for(var ki=0;ki<kidEls.length;ki++){var kv=kidEls[ki].value.trim(); if(kv)kidList.push(kv);}
+      if(kidEls.length&&!kidList.length){msg.textContent=root.dataset.childNeed;kidEls[0].focus();return;}
       if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){msg.textContent=root.dataset.need;return;}
       if(checkout)return;
       msg.textContent=root.dataset.loading;
       var stripe=window.Stripe(root.dataset.pk);
       ewStripeCheckout(stripe,{fetchClientSecret:function(){
-        return fetch(root.dataset.rest,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:+root.dataset.page,ev:root.dataset.ev||'',items:q,name:name,child:child,email:email,r:window.ewR||''})})
+        return fetch(root.dataset.rest,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page:+root.dataset.page,ev:root.dataset.ev||'',items:q,name:name,child:child,kids:kidList,email:email,r:window.ewR||''})})
           .then(function(r){return r.json();}).then(function(j){if(!j.clientSecret)throw new Error(j.message||'error');return j.clientSecret;});
       }}).then(function(c){checkout=c;msg.textContent='';who.hidden=true;c.mount(mount);})
         .catch(function(err){msg.textContent=(err&&err.message)||root.dataset.off;});

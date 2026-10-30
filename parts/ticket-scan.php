@@ -115,6 +115,7 @@ function ew_ticket_food_payload($id) {
 		// The child the tokens are for, when the parent gave one.
 		'name'   => get_post_meta($id, '_ewt_child', true) ?: (get_post_meta($id, '_ewt_name', true) ?: null),
 		'child'  => get_post_meta($id, '_ewt_child', true) ?: null,
+		'kids'   => ew_booking_kids($id),
 		'event'  => $e['name'] ?: null,
 		'date'   => $e['date'] ?: null,
 		'today'  => $e['date'] === current_time('Y-m-d'),
@@ -143,7 +144,13 @@ function ew_ticket_food_use(WP_REST_Request $r) {
 	if ('paid' !== get_post_meta($id, '_ewt_status', true)) {
 		return new WP_REST_Response(ew_ticket_food_payload($id), 200);
 	}
-	$res = ew_food_use($id, (int) ($body['i'] ?? -1), 'App');
+	$by  = wp_get_current_user();
+	$res = ew_food_use(
+		$id,
+		(int) ($body['i'] ?? -1),
+		$by && $by->exists() ? $by->display_name : 'App',
+		mb_substr(sanitize_text_field((string) ($body['child'] ?? '')), 0, 60)
+	);
 	$out = ew_ticket_food_payload($id);
 	if (is_wp_error($res)) {
 		$out['message'] = $res->get_error_message();
