@@ -220,6 +220,12 @@ function ew_tix_shortcode( $atts, $content = null ) {
 		'upsell_note'   => '',
 		'upsell_skip'   => '',
 		'upsell_done'   => 'Added to your booking.',
+		// The last page, after paying: the tickets in the app. The ticket
+		// reads its day and time from these, or else from the sub line.
+		'app_title'     => 'Your tickets are in the app',
+		'ticket_sub'    => '',
+		'ticket_date'   => '',
+		'ticket_time'   => '',
 		// Set by a page that sells for more than one event (food tokens);
 		// sent back with the checkout so the server prices the right one.
 		'ev'            => '',
@@ -598,6 +604,7 @@ function ew_tix_css() {
 .ewt-kidAdd[hidden]{display:none}
 .ewt-kidHelp{margin:8px 0 0;font-size:13px;line-height:1.5;color:var(--ewt-mut)}
 .ewt-after{max-width:640px;margin:0 auto 48px;text-align:center}
+.ewt-after.ewt-inapp{max-width:520px;text-align:left}
 .ewt-up{border:1px solid var(--ewt-line);background:var(--ewt-card);padding:28px;text-align:left}
 .ewt .ewt-up-sub{color:var(--ewt-mut);font-size:16px;margin-bottom:18px}
 .ewt-up-opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
@@ -728,7 +735,7 @@ add_action( 'wp_enqueue_scripts', function () {
 	}
 	wp_register_style( 'ew-tix', false, array(), EW_FWP_VERSION );
 	wp_enqueue_style( 'ew-tix' );
-	wp_add_inline_style( 'ew-tix', ew_tix_css() );
+	wp_add_inline_style( 'ew-tix', ew_tix_css() . ( function_exists( 'ew_inapp_css' ) ? ew_inapp_css() : '' ) );
 
 	$deps = array();
 	if ( '' !== ew_tix_pk() ) {

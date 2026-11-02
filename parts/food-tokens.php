@@ -193,6 +193,7 @@ function ew_food_defaults() {
 		'crm_hook'    => '',
 		'greeting'    => '',
 		// The pass.
+		'app_title'   => 'Your tokens are in the app',
 		'paid_kicker' => 'Paid · thank you',
 		'paid_title'  => "You're all set",
 		'paid_lede'   => "Your token pass is below and we've emailed it to {email}. Show it at the food counter on the day.",
@@ -273,6 +274,12 @@ function ew_food_shortcode( $atts ) {
 	if ( '' !== $sid ) {
 		$bid = ew_food_from_session( $sid, $page, $a );
 		if ( $bid && 'paid' === get_post_meta( $bid, '_ewt_status', true ) ) {
+			// The last page says the tokens are in the app; the pass stays
+			// underneath, because staff scan it at the counter.
+			$app = function_exists( 'ew_tix_inapp' ) ? ew_tix_inapp( $a['app_title'], ew_food_inapp_ticket( $bid ), $bid ) : '';
+			if ( '' !== $app ) {
+				return $h . '<div class="ewft-inapp">' . $app . '</div>' . ew_food_pass_html( $bid, $a, false ) . '</section>';
+			}
 			return $h . ew_food_pass_html( $bid, $a, true ) . '</section>';
 		}
 		if ( $bid ) {
@@ -343,6 +350,22 @@ function ew_food_shortcode( $atts ) {
 	return $h . '</section>';
 }
 add_shortcode( 'eastwood_food_tokens', 'ew_food_shortcode' );
+
+/** The ticket on the last page: the event's name, day and times, and what was bought. */
+function ew_food_inapp_ticket( $bid ) {
+	$e     = ew_food_pass_event( $bid );
+	$full  = ew_food_event( (string) get_post_meta( $bid, '_ewt_fev', true ) );
+	$times = $full ? trim( (string) ( $full['times'] ?? '' ) ) : '';
+	$ts    = '' !== (string) $e['date'] ? strtotime( (string) $e['date'] . ' 12:00:00' ) : 0;
+	$when  = function_exists( 'ew_tix_ticket_when' ) ? ew_tix_ticket_when( $ts, $times ) : array();
+	if ( ! $ts ) {
+		$when['time'] = strtoupper( $times );
+	}
+	return array(
+		'title' => (string) $e['name'],
+		'sub'   => (string) get_post_meta( $bid, '_ewt_lines', true ),
+	) + $when;
+}
 
 /* --- Bookings ----------------------------------------------------------- */
 
@@ -913,6 +936,7 @@ function ew_food_css() {
 .ewft{max-width:none;margin:0;padding:40px max(16px,calc((100% - 1248px) / 2)) 64px;color:#111;font-family:'Instrument Sans',system-ui,sans-serif;box-sizing:border-box}
 .ewft *{box-sizing:border-box}
 .ewft p{margin:0}
+.ewft-inapp{max-width:520px;margin:0 0 40px}
 .ewft .ewft-step{font-family:Anton,Impact,sans-serif;font-weight:400;text-transform:uppercase;font-size:30px;line-height:1.1;color:#111;margin:0 0 18px;background:none;padding:0}
 .ewft .ewft-step+*{margin-bottom:44px}
 .ewft-events{list-style:none;margin:0;padding:0;display:grid;gap:10px}

@@ -308,6 +308,14 @@ function ew_shirt_shortcode( $atts, $content = null ) {
 			'email_label'   => 'Email',
 			'email_note'    => 'Your receipt and anything about the order goes here.',
 			'email_bad'     => 'We need an email to send your receipt to.',
+			// The email step, on its own before the rest of the details.
+			'email_title'   => 'Your email',
+			'email_go'      => 'Continue',
+			'email_failed'  => 'Something went wrong. Please try again.',
+			// The last page, after paying: the order in the app.
+			'app_title'     => 'Your order is in the app',
+			'ticket_title'  => 'Your order',
+			'ticket_stub'   => 'Track it',
 			'consent'       => 'Tell me when new kit and home tickets go on sale',
 			'crm_hook'      => '',
 			'greeting'      => '',
@@ -391,6 +399,8 @@ function ew_shirt_shortcode( $atts, $content = null ) {
 		'totlab'    => $a['total_label'],
 		'printline' => $a['print_line'],
 		'emailbad'  => $a['email_bad'],
+		'efailed'   => $a['email_failed'],
+		'start'     => rest_url( 'eastwood/v1/shirt/start' ),
 		'title'     => $a['title'],
 		'backpick'  => $a['back_pick'],
 		'backdet'   => $a['back_det'],
@@ -425,10 +435,15 @@ function ew_shirt_shortcode( $atts, $content = null ) {
   <div class="ewsh-info">
    <?php
 	if ( isset( $_GET['ewsh_paid'] ) ) : // phpcs:ignore WordPress.Security.NonceVerification
-		ew_shirt_mark_paid( sanitize_text_field( wp_unslash( $_GET['ewsh_paid'] ) ), $a['crm_hook'] ); // phpcs:ignore WordPress.Security.NonceVerification
+		$ew_paid_bid = ew_shirt_mark_paid( sanitize_text_field( wp_unslash( $_GET['ewsh_paid'] ) ), $a['crm_hook'] ); // phpcs:ignore WordPress.Security.NonceVerification
+		// The last page: the order, in the app.
+		$ew_paid_app = ( $ew_paid_bid && function_exists( 'ew_tix_inapp' ) ) ? ew_tix_inapp( $a['app_title'], ew_shirt_inapp_ticket( $ew_paid_bid, $a ), $ew_paid_bid ) : '';
+		if ( '' !== $ew_paid_app ) :
+			echo '<div class="ewsh-inapp">' . $ew_paid_app . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput -- built from escaped parts
+		else :
 	?>
    <p class="ewsh-thanks"><?php echo esc_html( $a['thanks'] ); ?></p>
-   <?php endif; ?>
+   <?php endif; endif; ?>
    <div class="ewsh-pick">
     <h1><?php echo esc_html( $a['title'] ); ?></h1>
     <p class="ewsh-sub"><?php echo esc_html( $a['brand'] ); ?></p>
@@ -522,12 +537,20 @@ function ew_shirt_shortcode( $atts, $content = null ) {
             go through with it. The address is not here on purpose: Stripe
             collects that on the next step, where it autocompletes for
             free and a wallet fills it in without typing. */ ?>
-   <div class="ewsh-det" hidden>
-    <p class="ewsh-lab"><?php echo esc_html( $a['det_title'] ); ?></p>
-
+   <?php /* The email, on its own, first: written down as the order the
+            moment Continue is pressed, so it is ours even if they go no
+            further. */ ?>
+   <div class="ewsh-em" hidden>
+    <p class="ewsh-lab"><?php echo esc_html( $a['email_title'] ); ?></p>
     <label class="ewsh-flab" for="ewshEmail"><?php echo esc_html( $a['email_label'] ); ?></label>
     <input class="ewsh-email" id="ewshEmail" type="email" autocomplete="email" inputmode="email">
     <p class="ewsh-fnote"><?php echo esc_html( $a['email_note'] ); ?></p>
+    <button type="button" class="ewsh-go ewsh-enext"><?php echo esc_html( $a['email_go'] ); ?></button>
+    <p class="ewsh-err" id="ewshEErr"></p>
+   </div>
+
+   <div class="ewsh-det" hidden>
+    <p class="ewsh-lab"><?php echo esc_html( $a['det_title'] ); ?></p>
 
     <label class="ewsh-check">
      <input type="checkbox" id="ewshConsent">
@@ -710,6 +733,9 @@ function ewStripeCheckout(stripe, opts){
  });
 
  var model = {}, fit = null, size = null, post = false, checkout = null, stage = 'pick';
+ /* The order written down when the email was given, carried on to the card. */
+ var memo = 'ewsh:' + W.page, O = {bid: 0, key: '', email: ''};
+ try { var kept = JSON.parse(sessionStorage.getItem(memo) || 'null'); if(kept && kept.bid){ O = kept; } } catch(e){}
  var colour = '', view = 'front';
  function shown(have){ return have.filter(function(f){ return !colour || COL[f] === colour; }); }
  function norm(t){ return String(t || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
@@ -963,6 +989,8 @@ function ewStripeCheckout(stripe, opts){
   EL.querySelector('.ewsh-pick').hidden  = later;
   EL.querySelector('.ewsh-order').hidden = !later;
   EL.querySelector('.ewsh-det').hidden   = (s !== 'details');
+  var em = EL.querySelector('.ewsh-em');
+  if(em){ em.hidden = (s !== 'email'); }
   EL.querySelector('.ewsh-co').hidden    = (s !== 'pay');
   var prt = EL.querySelector('.ewsh-prt');
   if(prt){ prt.hidden = (s !== 'print'); }
@@ -1134,9 +1162,41 @@ function ewStripeCheckout(stripe, opts){
   } catch(e) {}
  }
 
+ /* Pay by card asks for the email first, on its own. Once it has been
+    given the order is written down, and coming back here goes straight
+    on to the rest of the details. */
  function openDetails(){
-  step('details');
-  var e = $('ewshEmail'); if(e) e.focus();
+  if(O.bid){ step('details'); return; }
+  step('email');
+  var e = $('ewshEmail'); if(e){ if(!e.value && O.email){ e.value = O.email; } e.focus(); }
+ }
+
+ function orderBody(){
+  var m = model[fit];
+  return {sku: m.sku, size: size, post: post, page: W.page,
+   print: printOn, pname: printName(), pnum: printNum(), bid: O.bid, key: O.key};
+ }
+
+ function emailNext(){
+  var err = $('ewshEErr'), box = $('ewshEmail'), btn = EL.querySelector('.ewsh-enext'),
+      email = (box.value || '').trim();
+  if(!size){ step('pick'); return; }
+  if(email.indexOf('@') < 1 || email.indexOf('.', email.indexOf('@')) < 0){
+   err.textContent = W.emailbad; box.focus(); return;
+  }
+  err.textContent = ''; btn.disabled = true;
+  var body = orderBody(); body.email = email;
+  fetch(W.start, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)})
+   .then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); })
+   .then(function(x){
+    btn.disabled = false;
+    if(!x.ok || !x.j.bid){ err.textContent = (x.j && x.j.message) || W.efailed; return; }
+    O = {bid: x.j.bid, key: x.j.key, email: email};
+    try { sessionStorage.setItem(memo, JSON.stringify(O)); } catch(e){}
+    if(window.ewTrack){ ewTrack('Lead', {what: 'Shirt'}); }
+    step('details');
+   })
+   .catch(function(){ btn.disabled = false; err.textContent = W.efailed; });
  }
 
  /* Any change of fit, size or delivery throws an open payment form away:
@@ -1157,15 +1217,11 @@ function ewStripeCheckout(stripe, opts){
       mount = EL.querySelector('.ewsh-mount'),
       msg = EL.querySelector('.ewsh-msg'),
       err = $('ewshErr'),
-      email = ($('ewshEmail').value || '').trim(),
       consent = $('ewshConsent').checked;
 
   if(!size){ return; }
-  if(email.indexOf('@') < 1 || email.indexOf('.', email.indexOf('@')) < 0){
-   err.textContent = W.emailbad;
-   $('ewshEmail').focus();
-   return;
-  }
+  /* No order written down yet: back to the email. */
+  if(!O.bid){ step('email'); return; }
   if(printOn && !printName() && !printNum()){
    err.textContent = P.bad;
    step('pick');
@@ -1184,22 +1240,31 @@ function ewStripeCheckout(stripe, opts){
      to send the receipt to. What any of it costs is read again on the
      server. */
   ewStripeCheckout(stripe, {fetchClientSecret: function(){
+   var body = orderBody(); body.consent = consent;
    return fetch(W.rest, {method:'POST', headers:{'Content-Type':'application/json'},
-     body: JSON.stringify({sku: m.sku, size: size, post: post, email: email, consent: consent, page: W.page,
-       print: printOn, pname: printName(), pnum: printNum()})})
+     body: JSON.stringify(body)})
     .then(function(r){ return r.json(); })
-    .then(function(j){ if(!j.clientSecret) throw new Error(j.message || 'error');
+    .then(function(j){
+      /* The saved order has gone (paid, or too old): ask for the email again. */
+      if(!j.clientSecret && j.code === 'ewsh_email'){ O = {bid: 0, key: '', email: O.email}; try { sessionStorage.removeItem(memo); } catch(e){} }
+      if(!j.clientSecret) throw new Error(j.message || 'error');
       return j.clientSecret; });
   }}).then(function(c){ checkout = c; msg.textContent = ''; c.mount(mount); })
-    .catch(function(e){ msg.textContent = (e && e.message) || W.off; });
+    .catch(function(e){
+      if(!O.bid){ step('email'); var ee = $('ewshEErr'); if(ee){ ee.textContent = (e && e.message) || W.efailed; } return; }
+      msg.textContent = (e && e.message) || W.off; });
  }
 
  EL.addEventListener('click', function(e){
   if(e.target.closest('.ewsh-cont')){ startPay(); return; }
+  if(e.target.closest('.ewsh-enext')){ emailNext(); return; }
   if(e.target.closest('#ewshBack')){
    if(stage === 'pay'){ closePay(); } else { step('pick'); }
   }
  });
+
+ var eBox = $('ewshEmail');
+ if(eBox){ eBox.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); emailNext(); } }); }
 
  wirePrint();
  wireTabs();
@@ -1234,7 +1299,7 @@ add_action( 'wp_enqueue_scripts', function () {
 	if ( ew_post_contains( $post, 'eastwood_shirt' ) ) {
 		wp_register_style( 'ew-shirt', false, array(), EW_FWP_VERSION );
 		wp_enqueue_style( 'ew-shirt' );
-		wp_add_inline_style( 'ew-shirt', ew_shirt_css() );
+		wp_add_inline_style( 'ew-shirt', ew_shirt_css() . '.ewsh-inapp{max-width:520px;margin:0 0 26px}.ewsh .ewsh-em .ewsh-enext{margin:18px 0 0}@media(max-width:640px){.ewsh-inapp .ewi{padding-left:14px;padding-right:14px}}' . ( function_exists( 'ew_inapp_css' ) ? ew_inapp_css() : '' ) );
 		// Oswald is the printing on the shirt, same as the home picker.
 		wp_enqueue_style( 'ew-shirt-oswald', 'https://fonts.googleapis.com/css2?family=Oswald:wght@700&display=swap', array(), null ); // phpcs:ignore WordPress.WP.EnqueuedResourceParameters.MissingVersion
 
@@ -1323,15 +1388,19 @@ function ew_shirt_booking( $post, $what, $name, $email, $lines, $pence, $hook, $
 function ew_shirt_mark_paid( $session_id, $hook ) {
 	if ( ! preg_match( '/^cs_[A-Za-z0-9_]+$/', (string) $session_id )
 		|| ! function_exists( 'ew_tix_stripe' ) || ! function_exists( 'ew_tix_booking_for' ) ) {
-		return;
+		return 0;
 	}
 	$s = ew_tix_stripe( 'GET', 'checkout/sessions/' . rawurlencode( $session_id ) );
 	if ( empty( $s['id'] ) || 'paid' !== ( $s['payment_status'] ?? '' ) ) {
-		return;
+		return 0;
 	}
 	$bid = ew_tix_booking_for( $s );
-	if ( ! $bid || 'paid' === get_post_meta( $bid, '_ewt_status', true ) ) {
-		return;
+	if ( ! $bid ) {
+		return 0;
+	}
+	// Paid already (a refresh of the last page): the same booking, nothing redone.
+	if ( 'paid' === get_post_meta( $bid, '_ewt_status', true ) ) {
+		return $bid;
 	}
 	update_post_meta( $bid, '_ewt_status', 'paid' );
 	update_post_meta( $bid, '_ewt_paid', (int) ( $s['amount_total'] ?? 0 ) );
@@ -1351,9 +1420,157 @@ function ew_shirt_mark_paid( $session_id, $hook ) {
 	if ( function_exists( 'ew_sq_record_sale' ) ) {
 		ew_sq_record_sale( $bid, $s );
 	}
+	return $bid;
+}
+
+/** The order that slides out of the phone on the last page: the shirt, no date. */
+function ew_shirt_inapp_ticket( $bid, $a ) {
+	$what  = trim( (string) get_post_meta( $bid, '_ewt_event', true ) );
+	$lines = (string) get_post_meta( $bid, '_ewt_lines', true );
+	$size  = trim( (string) strtok( $lines, '·' ) );
+	return array(
+		'title' => (string) $a['ticket_title'],
+		'sub'   => trim( $what . ( '' !== $size ? ' · ' . $size : '' ), ' ·' ),
+		'day'   => '',
+		'date'  => '',
+		'time'  => '',
+		'stub'  => (string) $a['ticket_stub'],
+		'stub2' => '',
+	);
+}
+
+/**
+ * What is being bought and what it costs, read again here from the shop
+ * and the block, never from the browser. Shared by both steps of paying.
+ */
+function ew_shirt_quote( $req ) {
+	$sku     = sanitize_text_field( (string) $req->get_param( 'sku' ) );
+	$size    = sanitize_text_field( (string) $req->get_param( 'size' ) );
+	$post    = (bool) $req->get_param( 'post' );
+	$want    = (bool) $req->get_param( 'print' );
+	$pname   = strtoupper( trim( preg_replace( "/[^A-Za-z '-]/", '', (string) $req->get_param( 'pname' ) ) ) );
+	$pnum    = (string) (int) preg_replace( '/[^0-9]/', '', (string) $req->get_param( 'pnum' ) );
+	$pnum    = ( $pnum > 0 && $pnum < 100 ) ? $pnum : '';
+	if ( '' === $sku || '' === $size ) {
+		return new WP_Error( 'ewsh_what', 'Choose a size first.', array( 'status' => 400 ) );
+	}
+
+	// The same endpoint the page reads, called inside this request
+	// rather than over HTTP.
+	$look = new WP_REST_Request( 'GET', '/eastwood/v1/shop/item' );
+	$look->set_query_params( array( 'sku' => $sku ) );
+	$found = rest_do_request( $look );
+	if ( $found->is_error() ) {
+		return new WP_Error( 'ewsh_item', 'No such shirt.', array( 'status' => 404 ) );
+	}
+	$item = (array) $found->get_data();
+
+	$in_stock = false;
+	foreach ( (array) ( $item['sizes'] ?? array() ) as $row ) {
+		if ( (string) ( $row['size'] ?? '' ) === $size ) {
+			$in_stock = ! empty( $row['in_stock'] );
+			break;
+		}
+	}
+	if ( ! $in_stock ) {
+		return new WP_Error( 'ewsh_stock', 'That size has gone.', array( 'status' => 409 ) );
+	}
+
+	$pence = (int) round( (float) ( $item['price'] ?? 0 ) * 100 );
+	$ship  = (int) round( (float) ( $item['postage'] ?? 0 ) * 100 );
+	if ( $pence <= 0 ) {
+		return new WP_Error( 'ewsh_price', 'This shirt has no price yet.', array( 'status' => 409 ) );
+	}
+	$post = $post && $ship > 0;
+
+	$page   = get_post( (int) $req->get_param( 'page' ) );
+	$block  = null;
+	$hook   = '';
+	$promos = false;
+	$hide   = array();
+	if ( $page ) {
+		$block  = ew_shirt_block_on( $page );
+		$hook   = (string) ( $block['fields']['crm_hook'] ?? '' );
+		$promos = in_array( strtolower( (string) ( $block['fields']['promos'] ?? '' ) ), array( 'yes', 'true', '1', 'on' ), true );
+		$hide   = array_values( array_filter( array_map(
+			function ( $v ) {
+				return preg_replace( '/[^a-z_]/', '', strtolower( trim( $v ) ) );
+			},
+			explode( ',', (string) ( $block['fields']['hide_pay'] ?? '' ) )
+		) ) );
+	}
+	// What the printing costs is read here, off the block, so the
+	// browser cannot talk the price down.
+	$pp = 0;
+	if ( $want && $page ) {
+		$pp = (int) round( (float) ( $block['fields']['print_price'] ?? 0 ) * 100 );
+	}
+	$pname = $pp > 0 ? substr( $pname, 0, max( 1, (int) ( $block['fields']['print_max'] ?? 12 ) ) ) : '';
+	$pnum  = $pp > 0 ? $pnum : '';
+	if ( $pp > 0 && '' === $pname && '' === $pnum ) {
+		return new WP_Error( 'ewsh_print', 'Give a name or a number to print.', array( 'status' => 400 ) );
+	}
+	$plabel = trim( $pname . ( '' !== $pname && '' !== $pnum ? ' ' : '' ) . $pnum );
+
+	return array(
+		'sku'    => $sku,
+		'size'   => $size,
+		'post'   => $post,
+		'item'   => $item,
+		'pence'  => $pence,
+		'ship'   => $ship,
+		'pp'     => $pp,
+		'plabel' => $plabel,
+		'page'   => $page,
+		'block'  => $block,
+		'hook'   => $hook,
+		'promos' => $promos,
+		'hide'   => $hide,
+		'what'   => trim( (string) ( $item['name'] ?? 'Shirt' ) ),
+		'lines'  => trim( $size . ' · ' . ( $post ? 'posted' : 'collecting' ) . ( $pp > 0 ? ' · printed ' . $plabel : '' ) ),
+		'total'  => $pence + ( $post ? $ship : 0 ) + $pp,
+	);
 }
 
 add_action( 'rest_api_init', function () {
+	/*
+	 * Step one of paying: the email, on its own. The order is written down
+	 * as a started Booking the moment it is given -- the CRM told, the
+	 * reminder set -- before the rest of the details and the card.
+	 */
+	register_rest_route( 'eastwood/v1', '/shirt/start', array(
+		'methods'             => 'POST',
+		'permission_callback' => '__return_true',
+		'callback'            => function ( $req ) {
+			$email = sanitize_email( (string) $req->get_param( 'email' ) );
+			$q     = ew_shirt_quote( $req );
+			if ( is_wp_error( $q ) ) {
+				return $q;
+			}
+			$f = (array) ( $q['block']['fields'] ?? array() );
+			if ( ! is_email( $email ) ) {
+				return new WP_Error( 'ewsh_email', (string) ( $f['email_bad'] ?? 'We need an email to send your receipt to.' ), array( 'status' => 400 ) );
+			}
+			if ( ! $q['page'] ) {
+				return new WP_Error( 'ewsh_page', 'No such shirt.', array( 'status' => 404 ) );
+			}
+			$bid = function_exists( 'ew_tix_carry' ) ? ew_tix_carry( $req ) : 0;
+			if ( $bid ) {
+				update_post_meta( $bid, '_ewt_email', $email );
+				update_post_meta( $bid, '_ewt_event', $q['what'] );
+				update_post_meta( $bid, '_ewt_lines', $q['lines'] );
+				update_post_meta( $bid, '_ewt_total', $q['total'] );
+			} else {
+				$bid = ew_shirt_booking( $q['page'], $q['what'], '', $email, $q['lines'], $q['total'], $q['hook'], (string) ( $f['greeting'] ?? '' ) );
+			}
+			if ( ! $bid ) {
+				return new WP_Error( 'ewsh_start', (string) ( $f['email_failed'] ?? 'Please try again.' ), array( 'status' => 500 ) );
+			}
+			update_post_meta( $bid, '_ewt_shirts', wp_json_encode( array( array( $q['sku'], $q['size'] ) ) ) );
+			return array( 'bid' => (int) $bid, 'key' => function_exists( 'ew_tix_key' ) ? ew_tix_key( $bid ) : '' );
+		},
+	) );
+
 	register_rest_route( 'eastwood/v1', '/shirt/checkout', array(
 		'methods'             => 'POST',
 		'permission_callback' => '__return_true',
@@ -1363,90 +1580,39 @@ add_action( 'rest_api_init', function () {
 				return new WP_Error( 'ewsh_off', 'Card payment is not switched on.', array( 'status' => 503 ) );
 			}
 
-			$sku  = sanitize_text_field( (string) $req->get_param( 'sku' ) );
-			$size = sanitize_text_field( (string) $req->get_param( 'size' ) );
-			$post    = (bool) $req->get_param( 'post' );
-			$email   = sanitize_email( (string) $req->get_param( 'email' ) );
-			$want    = (bool) $req->get_param( 'print' );
-			$pname   = strtoupper( trim( preg_replace( "/[^A-Za-z '-]/", '', (string) $req->get_param( 'pname' ) ) ) );
-			$pnum    = (string) (int) preg_replace( '/[^0-9]/', '', (string) $req->get_param( 'pnum' ) );
-			$pnum    = ( $pnum > 0 && $pnum < 100 ) ? $pnum : '';
 			$consent = (bool) $req->get_param( 'consent' );
-			if ( '' === $sku || '' === $size ) {
-				return new WP_Error( 'ewsh_what', 'Choose a size first.', array( 'status' => 400 ) );
+			$q       = ew_shirt_quote( $req );
+			if ( is_wp_error( $q ) ) {
+				return $q;
 			}
-			if ( ! is_email( $email ) ) {
-				return new WP_Error( 'ewsh_email', 'We need an email to send your receipt to.', array( 'status' => 400 ) );
-			}
+			$sku    = $q['sku'];
+			$size   = $q['size'];
+			$post   = $q['post'];
+			$item   = $q['item'];
+			$pence  = $q['pence'];
+			$ship   = $q['ship'];
+			$pp     = $q['pp'];
+			$plabel = $q['plabel'];
+			$page   = $q['page'];
+			$block  = $q['block'];
+			$promos = $q['promos'];
+			$hide   = $q['hide'];
 
-			// The same endpoint the page reads, called inside this request
-			// rather than over HTTP.
-			$look = new WP_REST_Request( 'GET', '/eastwood/v1/shop/item' );
-			$look->set_query_params( array( 'sku' => $sku ) );
-			$found = rest_do_request( $look );
-			if ( $found->is_error() ) {
-				return new WP_Error( 'ewsh_item', 'No such shirt.', array( 'status' => 404 ) );
-			}
-			$item = (array) $found->get_data();
-
-			$in_stock = false;
-			foreach ( (array) ( $item['sizes'] ?? array() ) as $row ) {
-				if ( (string) ( $row['size'] ?? '' ) === $size ) {
-					$in_stock = ! empty( $row['in_stock'] );
-					break;
+			// The booking step one saved, carried on. Without one (an older
+			// page still open), the email comes with the card as it used to.
+			$booking = function_exists( 'ew_tix_carry' ) ? ew_tix_carry( $req ) : 0;
+			if ( $booking ) {
+				$email = (string) get_post_meta( $booking, '_ewt_email', true );
+				update_post_meta( $booking, '_ewt_event', $q['what'] );
+				update_post_meta( $booking, '_ewt_lines', $q['lines'] );
+				update_post_meta( $booking, '_ewt_total', $q['total'] );
+			} else {
+				$email = sanitize_email( (string) $req->get_param( 'email' ) );
+				if ( ! is_email( $email ) ) {
+					return new WP_Error( 'ewsh_email', (string) ( $block['fields']['email_bad'] ?? 'We need an email to send your receipt to.' ), array( 'status' => 400 ) );
 				}
+				$booking = $page ? ew_shirt_booking( $page, $q['what'], '', $email, $q['lines'], $q['total'], $q['hook'], (string) ( $block['fields']['greeting'] ?? '' ) ) : 0;
 			}
-			if ( ! $in_stock ) {
-				return new WP_Error( 'ewsh_stock', 'That size has gone.', array( 'status' => 409 ) );
-			}
-
-			$pence = (int) round( (float) ( $item['price'] ?? 0 ) * 100 );
-			$ship  = (int) round( (float) ( $item['postage'] ?? 0 ) * 100 );
-			if ( $pence <= 0 ) {
-				return new WP_Error( 'ewsh_price', 'This shirt has no price yet.', array( 'status' => 409 ) );
-			}
-			$post = $post && $ship > 0;
-
-			// Written down before Stripe is called, so a checkout that never
-			// finishes is still somebody the club can reach.
-			$page   = get_post( (int) $req->get_param( 'page' ) );
-			$hook   = '';
-			$promos = false;
-			if ( $page ) {
-				$block  = ew_shirt_block_on( $page );
-				$hook   = (string) ( $block['fields']['crm_hook'] ?? '' );
-				$promos = in_array( strtolower( (string) ( $block['fields']['promos'] ?? '' ) ), array( 'yes', 'true', '1', 'on' ), true );
-				$hide   = array_values( array_filter( array_map(
-					function ( $v ) {
-						return preg_replace( '/[^a-z_]/', '', strtolower( trim( $v ) ) );
-					},
-					explode( ',', (string) ( $block['fields']['hide_pay'] ?? '' ) )
-				) ) );
-			}
-			// What the printing costs is read here, off the block, so the
-			// browser cannot talk the price down.
-			$pp = 0;
-			if ( $want && $page ) {
-				$pp = (int) round( (float) ( $block['fields']['print_price'] ?? 0 ) * 100 );
-			}
-			$pname = $pp > 0 ? substr( $pname, 0, max( 1, (int) ( $block['fields']['print_max'] ?? 12 ) ) ) : '';
-			$pnum  = $pp > 0 ? $pnum : '';
-			if ( $pp > 0 && '' === $pname && '' === $pnum ) {
-				return new WP_Error( 'ewsh_print', 'Give a name or a number to print.', array( 'status' => 400 ) );
-			}
-			$plabel = trim( $pname . ( '' !== $pname && '' !== $pnum ? ' ' : '' ) . $pnum );
-
-			$booking = $page ? ew_shirt_booking(
-				$page,
-				trim( (string) ( $item['name'] ?? 'Shirt' ) ),
-				'',
-				$email,
-				trim( $size . ' · ' . ( $post ? 'posted' : 'collecting' )
-					. ( $pp > 0 ? ' · printed ' . $plabel : '' ) ),
-				$pence + ( $post ? $ship : 0 ) + $pp,
-				$hook,
-				(string) ( $block['fields']['greeting'] ?? '' )
-			) : 0;
 			if ( $booking && $consent ) {
 				update_post_meta( $booking, '_ewt_consent', 'yes' );
 			}

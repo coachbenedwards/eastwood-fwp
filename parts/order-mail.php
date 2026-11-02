@@ -27,7 +27,7 @@ function ew_om_emails() {
 		'shop_paid'      => array(
 			'label'   => 'Shirt order – paid',
 			'subject' => 'Thanks for your order',
-			'body'    => "Hi {first_name},\n\nThanks for your order.\n\n{tickets}\nTotal paid: £{paid}\n\nYour receipt comes separately from Stripe. We'll be in touch about getting it to you.\n\nAny questions, just reply to this email.\n\nEastwood FC",
+			'body'    => "Hi {first_name},\n\nThanks for your order.\n\n{tickets}\nTotal paid: £{paid}\n\nYour booking reference is {ref}. Your tickets are in the Eastwood FC app: download it and sign in with this email and that reference ({app_url}).\n\nYour receipt comes separately from Stripe. We'll be in touch about getting it to you.\n\nAny questions, just reply to this email.\n\nEastwood FC",
 		),
 		'shop_reminder'  => array(
 			'label'   => 'Shirt order – not finished (an hour later)',
@@ -37,7 +37,7 @@ function ew_om_emails() {
 		'event_paid'     => array(
 			'label'   => 'Event tickets – paid',
 			'subject' => "You're in: {event}",
-			'body'    => "Hi {first_name},\n\nYou're booked for {event}.\n\n{tickets}\nTotal paid: £{paid}\n\nYour receipt comes separately from Stripe. On the night, just give your name at the door.\n\nAny questions, just reply to this email.\n\nSee you there,\nEastwood FC",
+			'body'    => "Hi {first_name},\n\nYou're booked for {event}.\n\n{tickets}\nTotal paid: £{paid}\n\nYour booking reference is {ref}. Your tickets are in the Eastwood FC app: download it and sign in with this email and that reference ({app_url}).\n\nYour receipt comes separately from Stripe. On the night, just give your name at the door.\n\nAny questions, just reply to this email.\n\nSee you there,\nEastwood FC",
 		),
 		'event_reminder' => array(
 			'label'   => 'Event tickets – not finished (an hour later)',

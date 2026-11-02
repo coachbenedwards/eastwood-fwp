@@ -58,6 +58,17 @@ function ew_mt_defaults() {
 		'hosp'       => 'Make a day of it — hospitality',
 		'hosp_url'   => '/hospitality/',
 		'hosp_sub'   => 'The whole afternoon rather than a better seat: in early, food at your table, and your match ticket included.',
+		// Step two: the email on its own, saved the moment it is given.
+		'email_label'  => 'Your email · your tickets are sent here',
+		'email_go'     => 'Continue to payment',
+		'need_email'   => 'Please add your email.',
+		'failed'       => 'Something went wrong. Please try again.',
+		'crm_hook'     => '',
+		'greeting'     => '',
+		// The last page, after paying: the ticket in the app.
+		'app_title'    => 'Your tickets are in the app',
+		'ticket_title' => 'Eastwood FC',
+		'ticket_sub'   => 'v {away}',
 	);
 }
 
@@ -210,6 +221,9 @@ function ew_mt_one( $m, $a ) {
 
 	$h .= '<div class="ewmt-tk" data-fx="' . $id . '" data-page="' . (int) get_the_ID() . '"'
 		. ' data-rest="' . esc_url( rest_url( 'eastwood/v1/tickets/match' ) ) . '"'
+		. ' data-start="' . esc_url( rest_url( 'eastwood/v1/tickets/match/start' ) ) . '"'
+		. ' data-need-email="' . esc_attr( $a['need_email'] ) . '"'
+		. ' data-failed="' . esc_attr( $a['failed'] ) . '"'
 		. ' data-pk="' . esc_attr( function_exists( 'ew_tix_pk' ) ? ew_tix_pk() : '' ) . '"'
 		. ' data-off="' . esc_attr( $a['payoff'] ) . '"'
 		. ' data-loading="' . esc_attr( $a['loading'] ) . '"'
@@ -253,6 +267,14 @@ function ew_mt_one( $m, $a ) {
 
 	$h .= '<div class="ewmt-pay" data-ewmt-pay hidden>';
 	$h .= '<h2 class="ewmt-h">' . esc_html( $a['pay_head'] ) . '</h2>';
+	// The email on its own, before the card: saved as soon as it is given,
+	// so somebody who stops at the card is still known.
+	$h .= '<div class="ewmt-email" data-ewmt-email>';
+	$h .= '<label class="ewmt-elab" for="ewmtEmail">' . esc_html( $a['email_label'] ) . '</label>';
+	$h .= '<div class="ewmt-erow"><input class="ewmt-ein" id="ewmtEmail" type="email" autocomplete="email" inputmode="email" required>';
+	$h .= '<button type="button" class="ewmt-go ewmt-enext" data-ewmt-next>' . esc_html( $a['email_go'] ) . '</button></div>';
+	$h .= '<p class="ewmt-err" role="alert" data-ewmt-err></p>';
+	$h .= '</div>';
 	$h .= '<div class="ewmt-mount" data-ewmt-mount></div>';
 	$h .= '</div>';
 
@@ -295,7 +317,27 @@ function ew_mt_done( $sid, $a ) {
 		return '';
 	}
 
-	$bid = ew_mt_booking( $s, $fx );
+	// The booking saved when the email was given is the one that is now
+	// paid. A session from before the email step has none, and gets one
+	// written now, as it always did.
+	$bid = function_exists( 'ew_tix_booking_for' ) ? ew_tix_booking_for( $s ) : 0;
+	if ( $bid && function_exists( 'ew_tix_mark_paid' ) ) {
+		ew_tix_mark_paid( $bid, $s, (string) get_post_meta( $bid, '_ewt_hook', true ) );
+		$phone = trim( (string) ( $s['customer_details']['phone'] ?? '' ) );
+		if ( '' !== $phone && '' === (string) get_post_meta( $bid, '_ewt_phone', true ) ) {
+			update_post_meta( $bid, '_ewt_phone', $phone );
+		}
+	} else {
+		$bid = ew_mt_booking( $s, $fx );
+	}
+
+	// The last page: the ticket, in the app.
+	if ( function_exists( 'ew_tix_inapp' ) ) {
+		$app = ew_tix_inapp( $a['app_title'], ew_mt_ticket( $fx, $a ), $bid );
+		if ( '' !== $app ) {
+			return '<div class="ewmt-inapp">' . $app . '</div>';
+		}
+	}
 
 	$h  = '<div class="ewmt-thanks">';
 	$h .= '<p class="ewmt-thanksT">' . esc_html( $a['thanks'] ) . '</p>';
@@ -305,6 +347,18 @@ function ew_mt_done( $sid, $a ) {
 	}
 	$h .= '<p class="ewmt-thanksG">' . esc_html( $a['gate'] ) . '</p>';
 	return $h . '</div>';
+}
+
+/** The match ticket that slides out of the phone on the last page. */
+function ew_mt_ticket( $fx, $a ) {
+	$game = ew_mt_game( $fx );
+	$ts   = $game ? strtotime( (string) ( $game['date'] ?? '' ) . ' ' . (string) ( $game['time'] ?? '15:00' ) ) : 0;
+	$away = $game ? (string) ( ( (array) ( $game['away-team'] ?? array() ) )['name'] ?? '' ) : '';
+	$when = function_exists( 'ew_tix_ticket_when' ) ? ew_tix_ticket_when( $ts ) : array();
+	return array(
+		'title' => (string) $a['ticket_title'],
+		'sub'   => '' !== $away ? str_replace( '{away}', $away, (string) $a['ticket_sub'] ) : '',
+	) + $when;
 }
 
 /**
@@ -374,6 +428,11 @@ function ew_mt_booking( $s, $fx ) {
 /* --- Checkout ----------------------------------------------------------- */
 
 add_action( 'rest_api_init', function () {
+	register_rest_route( 'eastwood/v1', '/tickets/match/start', array(
+		'methods'             => 'POST',
+		'permission_callback' => '__return_true',
+		'callback'            => 'ew_mt_start',
+	) );
 	register_rest_route( 'eastwood/v1', '/tickets/match', array(
 		'methods'             => 'POST',
 		'permission_callback' => '__return_true',
@@ -381,11 +440,58 @@ add_action( 'rest_api_init', function () {
 	) );
 } );
 
-function ew_mt_checkout( $req ) {
-	if ( ! function_exists( 'ew_tix_sk' ) || '' === ew_tix_sk() ) {
-		return new WP_Error( 'ewmt_off', 'Card payments are not switched on.', array( 'status' => 503 ) );
+/** The tickets page a request came from, and its block's fields. */
+function ew_mt_page( $req ) {
+	$post = get_post( (int) $req->get_param( 'page' ) );
+	if ( ! $post || 'publish' !== $post->post_status ) {
+		$post = get_page_by_path( 'tickets' );
 	}
-	$fx = (int) $req->get_param( 'fx' );
+	$block = ( $post && function_exists( 'ew_app_block_on' ) ) ? ew_app_block_on( $post, 'eastwood_match_tickets' ) : null;
+	return array( $post, shortcode_atts( ew_mt_defaults(), (array) ( $block['fields'] ?? array() ) ) );
+}
+
+/**
+ * Step one of paying: the email, on its own. A Booking is saved as started
+ * with the game, who is coming and the total, the CRM is told and the
+ * one-hour reminder is set -- before any card form is asked for.
+ * Pressing it again (after changing who is coming) updates the same one.
+ */
+function ew_mt_start( $req ) {
+	list( $post, $a ) = ew_mt_page( $req );
+	$email = sanitize_email( (string) $req->get_param( 'email' ) );
+	if ( ! is_email( $email ) ) {
+		return new WP_Error( 'ewmt_email', $a['need_email'], array( 'status' => 400 ) );
+	}
+	$b = ew_mt_basket( (int) $req->get_param( 'fx' ), (array) $req->get_param( 'items' ) );
+	if ( is_wp_error( $b ) ) {
+		return $b;
+	}
+	if ( ! $post || ! function_exists( 'ew_tix_booking_start' ) ) {
+		return new WP_Error( 'ewmt_failed', $a['failed'], array( 'status' => 500 ) );
+	}
+	$bid = function_exists( 'ew_tix_carry' ) ? ew_tix_carry( $req ) : 0;
+	if ( $bid ) {
+		update_post_meta( $bid, '_ewt_email', $email );
+		update_post_meta( $bid, '_ewt_event', $b['what'] );
+		update_post_meta( $bid, '_ewt_lines', implode( ', ', $b['lines'] ) );
+		update_post_meta( $bid, '_ewt_total', $b['total'] );
+	} else {
+		$bid = ew_tix_booking_start( $post, $b['what'], '', $email, implode( ', ', $b['lines'] ), $b['total'], $a['crm_hook'], $a['greeting'] );
+		if ( ! $bid ) {
+			return new WP_Error( 'ewmt_failed', $a['failed'], array( 'status' => 500 ) );
+		}
+	}
+	update_post_meta( $bid, '_ewt_fixture', (int) $b['fx'] );
+	update_post_meta( $bid, '_ewt_seats', (int) $b['seats'] );
+	return array( 'bid' => (int) $bid, 'key' => ew_tix_key( $bid ) );
+}
+
+/**
+ * What is being bought, priced here from On sale and never from the
+ * browser: the lines, the Stripe line items, the seats and the total.
+ */
+function ew_mt_basket( $fx, $items ) {
+	$fx = (int) $fx;
 	$st = ew_sales_state( $fx, 'tix' );
 	if ( 'on' !== $st['state'] ) {
 		return new WP_Error( 'ewmt_shut', 'Tickets for this game are not on sale.', array( 'status' => 409 ) );
@@ -400,7 +506,8 @@ function ew_mt_checkout( $req ) {
 	$what = 'Eastwood FC v ' . $away . ( $ts ? ', ' . date_i18n( 'j M Y', $ts ) : '' );
 
 	$types = ew_sales_types();
-	$items = (array) $req->get_param( 'items' );
+	$items = (array) $items;
+	$total = 0;
 	$seats = 0;
 	$paidn = 0;
 	$k     = 0;
@@ -420,6 +527,7 @@ function ew_mt_checkout( $req ) {
 			continue;
 		}
 		$paidn += $qty;
+		$total += $qty * (int) $t['pence'];
 		$body[ "line_items[$k][quantity]" ]                       = (string) $qty;
 		$body[ "line_items[$k][price_data][currency]" ]           = 'gbp';
 		$body[ "line_items[$k][price_data][unit_amount]" ]        = (string) $t['pence'];
@@ -445,8 +553,45 @@ function ew_mt_checkout( $req ) {
 		);
 	}
 
-	$page = (int) $req->get_param( 'page' );
-	$here = $page ? get_permalink( $page ) : home_url( '/tickets/' );
+	return array(
+		'fx'    => $fx,
+		'what'  => $what,
+		'lines' => $lines,
+		'seats' => $seats,
+		'total' => $total,
+		'body'  => $body,
+	);
+}
+
+/**
+ * Step two: the card. Carries on the Booking step one saved, so paying
+ * marks that booking paid; the email is handed to Stripe so nobody is
+ * asked for it twice.
+ */
+function ew_mt_checkout( $req ) {
+	if ( ! function_exists( 'ew_tix_sk' ) || '' === ew_tix_sk() ) {
+		return new WP_Error( 'ewmt_off', 'Card payments are not switched on.', array( 'status' => 503 ) );
+	}
+	list( $post, $a ) = ew_mt_page( $req );
+	$bid = function_exists( 'ew_tix_carry' ) ? ew_tix_carry( $req ) : 0;
+	if ( ! $bid ) {
+		return new WP_Error( 'ewmt_email', $a['need_email'], array( 'status' => 400 ) );
+	}
+	$b = ew_mt_basket( (int) $req->get_param( 'fx' ), (array) $req->get_param( 'items' ) );
+	if ( is_wp_error( $b ) ) {
+		return $b;
+	}
+	$fx    = $b['fx'];
+	$seats = $b['seats'];
+	$what  = $b['what'];
+	$lines = $b['lines'];
+	$body  = $b['body'];
+	// Who is coming may have changed since the email was given.
+	update_post_meta( $bid, '_ewt_lines', implode( ', ', $lines ) );
+	update_post_meta( $bid, '_ewt_total', $b['total'] );
+	update_post_meta( $bid, '_ewt_seats', (int) $seats );
+
+	$here = $post ? get_permalink( $post ) : home_url( '/tickets/' );
 
 	$body['ui_mode']                          = 'embedded_page';
 	$body['mode']                             = 'payment';
@@ -456,6 +601,11 @@ function ew_mt_checkout( $req ) {
 	$body['metadata[seats]']                  = (string) $seats;
 	$body['metadata[what]']                   = $what . ' — ' . implode( ' · ', $lines );
 	$body['metadata[kind]']                   = 'match';
+	$body['metadata[booking]']                = (string) $bid;
+	$email = (string) get_post_meta( $bid, '_ewt_email', true );
+	if ( is_email( $email ) ) {
+		$body['customer_email'] = $email;
+	}
 
 	$res = wp_remote_post( 'https://api.stripe.com/v1/checkout/sessions', array(
 		'timeout' => 20,
@@ -475,6 +625,10 @@ function ew_mt_checkout( $req ) {
 			(string) ( $j['error']['message'] ?? 'Stripe refused the booking.' ),
 			array( 'status' => 400 )
 		);
+	}
+	if ( ! empty( $j['id'] ) ) {
+		update_post_meta( $bid, '_ewt_open_session', (string) $j['id'] );
+		do_action( 'ew_tix_session', (int) $bid, (string) $j['id'] );
 	}
 	return array( 'clientSecret' => $j['client_secret'] );
 }
@@ -543,6 +697,18 @@ function ew_mt_css() {
 .ewmt-msg{margin:10px 0 0;font-size:13.5px;color:rgba(255,255,255,.75);min-height:18px}
 .ewmt-pay{margin-top:36px}
 .ewmt-mount{background:#fff;border-radius:6px;min-height:40px}
+.ewmt-mount:empty{display:none}
+.ewmt-email{background:#101010;color:#fff;border-radius:10px;padding:26px 30px;max-width:640px}
+.ewmt-elab{display:block;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+ color:rgba(255,255,255,.55);margin:0 0 10px}
+.ewmt-erow{display:flex;gap:10px;flex-wrap:wrap}
+.ewmt-ein{flex:1 1 260px;min-width:0;box-sizing:border-box;background:#fff;color:#101010;border:0;border-radius:6px;
+ padding:15px 14px;font:400 16px "Instrument Sans",system-ui,sans-serif}
+.ewmt-ein:focus{outline:2px solid rgba(255,255,255,.6);outline-offset:1px}
+.ewmt .ewmt-enext{flex:0 0 auto;width:auto;margin:0;padding:15px 24px}
+.ewmt .ewmt-enext[disabled]{opacity:.6;cursor:wait}
+.ewmt-err{margin:10px 0 0;font-size:13.5px;color:rgba(255,255,255,.75);min-height:18px}
+.ewmt-inapp{max-width:520px;margin:0 0 30px}
 
 .ewmt-thanks{background:#101010;color:#fff;border-radius:10px;padding:30px 34px;margin:0 0 30px}
 .ewmt-thanksT{font-family:Anton,Impact,sans-serif;font-size:34px;line-height:1;text-transform:uppercase;
@@ -560,6 +726,8 @@ function ew_mt_css() {
  font-size:15px;font-weight:700;text-decoration:none;white-space:nowrap}
 
 @media(max-width:860px){
+.ewmt-email{padding:22px 20px}
+.ewmt .ewmt-enext{flex:1 1 100%}
 .ewmt-tk{grid-template-columns:minmax(0,1fr)}
 .ewmt-tkStub{border-left:0;border-top:3px dashed rgba(255,255,255,.85)}
 .ewmt-tie{font-size:36px}
@@ -576,7 +744,14 @@ function ew_mt_js() {
  var pay = document.querySelector('[data-ewmt-pay]');
  var mount = document.querySelector('[data-ewmt-mount]');
  var msg = root.querySelector('[data-ewmt-msg]');
- var checkout = null;
+ var ebox = document.querySelector('[data-ewmt-email]');
+ var ein = document.getElementById('ewmtEmail');
+ var enext = document.querySelector('[data-ewmt-next]');
+ var eerr = document.querySelector('[data-ewmt-err]');
+ var checkout = null, basketNow = null;
+ /* The booking saved when the email was given, carried on to the card. */
+ var memo = 'ewmt:' + root.dataset.fx, O = {bid: 0, key: ''};
+ try{ var kept = JSON.parse(sessionStorage.getItem(memo) || 'null'); if(kept && kept.bid){ O = kept; if(kept.email && ein){ ein.value = kept.email; } } }catch(e){}
 
  function money(p){
   return '£' + (p % 100 === 0 ? (p/100).toLocaleString() : (p/100).toFixed(2));
@@ -603,7 +778,13 @@ function ew_mt_js() {
   root.querySelector('[data-ewmt-tot]').textContent = money(b.pence);
   // Changing the basket invalidates a mounted checkout, so it goes rather
   // than quietly charging for what was in it a moment ago.
-  if(checkout){ checkout.destroy(); checkout = null; mount.innerHTML = ''; pay.hidden = true; }
+  if(checkout){ checkout.destroy(); checkout = null; mount.innerHTML = ''; }
+  pay.hidden = true;
+ }
+
+ function post(url, body){
+  return fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)})
+   .then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); });
  }
 
  root.addEventListener('click', function(e){
@@ -625,27 +806,55 @@ function ew_mt_js() {
   if(!root.dataset.pk || !window.Stripe){ msg.textContent = root.dataset.off; return; }
   if(checkout){ return; }
 
-  msg.textContent = root.dataset.loading;
-  pay.hidden = false;
+  /* Step two: the email, on its own, before any card form. */
+  msg.textContent = ''; eerr.textContent = '';
+  basketNow = b;
+  pay.hidden = false; ebox.hidden = false;
+  pay.scrollIntoView({behavior:'smooth', block:'start'});
+  setTimeout(function(){ try{ ein.focus({preventScroll:true}); }catch(x){} }, 350);
+ });
+
+ function card(){
   var stripe = window.Stripe(root.dataset.pk);
   var make = stripe.createEmbeddedCheckoutPage || stripe.initEmbeddedCheckout;
+  eerr.textContent = root.dataset.loading;
   make.call(stripe, {fetchClientSecret: function(){
    return fetch(root.dataset.rest, {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({fx: +root.dataset.fx, page: +(root.dataset.page||0), items: b.items})
+    body: JSON.stringify({fx: +root.dataset.fx, page: +(root.dataset.page||0), items: basketNow.items, bid: O.bid, key: O.key})
    }).then(function(r){ return r.json(); }).then(function(j){
     if(!j.clientSecret){ throw new Error(j.message || 'error'); }
     return j.clientSecret;
    });
   }}).then(function(c){
-   checkout = c; msg.textContent = ''; c.mount(mount);
-   pay.scrollIntoView({behavior:'smooth', block:'start'});
+   checkout = c; eerr.textContent = ''; ebox.hidden = true; c.mount(mount);
   }).catch(function(err){
-   pay.hidden = true;
-   msg.textContent = (err && err.message) || root.dataset.off;
+   enext.disabled = false;
+   eerr.textContent = (err && err.message) || root.dataset.off;
   });
- });
+ }
+
+ function next(){
+  eerr.textContent = '';
+  var email = (ein.value || '').trim();
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ eerr.textContent = root.dataset.needEmail; ein.focus(); return; }
+  if(!basketNow || checkout){ return; }
+  enext.disabled = true;
+  /* Saved the moment the button is pressed: the booking, the CRM, the
+     reminder an hour later. Then the card. */
+  post(root.dataset.start, {fx: +root.dataset.fx, page: +(root.dataset.page||0), items: basketNow.items, email: email, bid: O.bid, key: O.key})
+   .then(function(x){
+    if(!x.ok || !x.j.bid){ enext.disabled = false; eerr.textContent = (x.j && x.j.message) || root.dataset.failed; return; }
+    O = {bid: x.j.bid, key: x.j.key, email: email};
+    try{ sessionStorage.setItem(memo, JSON.stringify(O)); }catch(e){}
+    if(window.ewTrack){ ewTrack('Lead', {what: 'Match tickets'}); }
+    card();
+   })
+   .catch(function(){ enext.disabled = false; eerr.textContent = root.dataset.failed; });
+ }
+ enext.addEventListener('click', next);
+ ein.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); next(); } });
 
  render();
 })();
@@ -663,7 +872,7 @@ add_action( 'wp_enqueue_scripts', function () {
 	}
 	wp_register_style( 'ew-mt', false, array(), EW_FWP_VERSION );
 	wp_enqueue_style( 'ew-mt' );
-	wp_add_inline_style( 'ew-mt', ew_mt_css() );
+	wp_add_inline_style( 'ew-mt', ew_mt_css() . ( function_exists( 'ew_inapp_css' ) ? ew_inapp_css() : '' ) );
 	wp_enqueue_script( 'stripe-js', 'https://js.stripe.com/v3/', array(), null, true ); // phpcs:ignore WordPress.WP.EnqueuedResourceParameters.MissingVersion
 	wp_register_script( 'ew-mt', '', array( 'stripe-js' ), EW_FWP_VERSION, true );
 	wp_enqueue_script( 'ew-mt' );

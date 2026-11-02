@@ -10,8 +10,9 @@
  *    still known.
  * 2. Stripe takes the card and keeps it for this customer.
  * 3. Back on the page, the payment is checked with Stripe, the Booking is
- *    marked paid and the CRM is told "paid". If the block has an upsell,
- *    it is offered there and then; one tap charges the same card.
+ *    marked paid and the CRM is told "paid". The page then says the
+ *    tickets are in the app (ew_tix_inapp). The one-tap upsell is kept in
+ *    code but no longer shown on the website; it moves into the app.
  *
  * The CRM is whatever answers the block's crm_hook field: a GoHighLevel
  * "Inbound Webhook" workflow, which files the contact and sends the emails.
@@ -284,6 +285,99 @@ function ew_tix_mark_paid( $bid, $s, $hook ) {
 	return true;
 }
 
+/**
+ * A started booking the browser is carrying on with -- the one saved when
+ * the email was given -- if the key matches and it has not been paid yet.
+ * Every paid checkout is two steps: the email first, saved at once, then
+ * the card, which finishes that same booking rather than making another.
+ */
+function ew_tix_carry( $req ) {
+	if ( function_exists( 'ew_optin_claim' ) ) {
+		return (int) ew_optin_claim( $req );
+	}
+	return 0;
+}
+
+/** The private key a started booking hands back to the page. */
+function ew_tix_key( $bid ) {
+	return function_exists( 'ew_booking_key' ) ? (string) ew_booking_key( $bid ) : '';
+}
+
+/**
+ * The last page of a paid checkout: "your tickets are in the app", with the
+ * ticket sliding out of the phone and the store buttons carrying the
+ * booking's private link. Drawn on the server, already open, because the
+ * page is only ever shown this way once the payment is checked.
+ */
+function ew_tix_inapp( $heading, $ticket, $bid ) {
+	if ( ! function_exists( 'ew_inapp_panel' ) ) {
+		return '';
+	}
+	$h = ew_inapp_panel( $heading, $ticket );
+	$h = preg_replace( '/^<div class="ewi" data-ewi hidden>/', '<div class="ewi" data-ewi>', $h, 1 );
+	if ( $bid && function_exists( 'ew_inapp_stores' ) && function_exists( 'ew_booking_key' ) ) {
+		$h = str_replace( ew_inapp_stores(), ew_inapp_stores( $bid . '.' . ew_booking_key( $bid ) ), $h );
+	}
+	return $h;
+}
+
+/**
+ * The day, date and time on an in-app ticket, from a timestamp, in the
+ * same shape the half-time show uses.
+ */
+function ew_tix_ticket_when( $ts, $time = '' ) {
+	if ( ! $ts ) {
+		return array( 'day' => '', 'date' => '', 'time' => strtoupper( (string) $time ), 'stub' => '', 'stub2' => '' );
+	}
+	return array(
+		'day'   => date_i18n( 'l', $ts ),
+		'date'  => strtoupper( date_i18n( 'j F Y', $ts ) ),
+		'time'  => strtoupper( '' !== (string) $time ? (string) $time : date_i18n( 'ga', $ts ) ),
+		'stub'  => date_i18n( 'jS', $ts ),
+		'stub2' => strtoupper( date_i18n( 'F Y', $ts ) ),
+	);
+}
+
+/**
+ * The event's ticket for the last page. The day, date and time come from
+ * the block's ticket_date / ticket_time fields, or else from its sub line
+ * ("Saturday 14 November · Doors 7pm · Coronation Park").
+ */
+function ew_tix_event_ticket( $a, $bid ) {
+	$when = trim( (string) ( $a['ticket_date'] ?? '' ) );
+	$time = trim( (string) ( $a['ticket_time'] ?? '' ) );
+	$bits = array_map( 'trim', explode( '·', (string) ( $a['sub'] ?? '' ) ) );
+	if ( '' === $when ) {
+		foreach ( $bits as $b ) {
+			if ( preg_match( '/\d/', $b ) && ! preg_match( '/\d\s*(am|pm)\b/i', $b ) && false !== strtotime( $b ) ) {
+				$when = $b;
+				break;
+			}
+		}
+	}
+	if ( '' === $time ) {
+		foreach ( $bits as $b ) {
+			if ( preg_match( '/(\d{1,2}(?:[:.]\d{2})?\s*(?:am|pm))/i', $b, $m ) ) {
+				$time = str_replace( ' ', '', $m[1] );
+				break;
+			}
+		}
+	}
+	$ts = '' !== $when ? strtotime( $when ) : 0;
+	// A date written without a year that has already gone is next year's.
+	if ( $ts && ! preg_match( '/\b\d{4}\b/', $when ) && $ts < strtotime( '-2 days', current_time( 'timestamp' ) ) ) {
+		$ts = strtotime( '+1 year', $ts );
+	}
+	$sub = trim( (string) ( $a['ticket_sub'] ?? '' ) );
+	if ( '' === $sub && $bid ) {
+		$sub = (string) get_post_meta( $bid, '_ewt_lines', true );
+	}
+	return array(
+		'title' => (string) ( $a['event'] ?? '' ),
+		'sub'   => $sub,
+	) + ew_tix_ticket_when( $ts, $time );
+}
+
 /** The upsell options written on the block: "label|price|note; ...". */
 function ew_tix_upsells( $raw ) {
 	$out = array();
@@ -316,6 +410,18 @@ function ew_tix_after_pay( $page_id, $a, $session_id ) {
 	$bid = ew_tix_booking_for( $s );
 	ew_tix_mark_paid( $bid, $s, $a['crm_hook'] );
 
+	// The last page is the tickets in the app. The one-tap extra is no
+	// longer offered here -- it is to be sold in the app -- so the upsell
+	// below is kept, but not shown.
+	$app = ew_tix_inapp( (string) ( $a['app_title'] ?? '' ), ew_tix_event_ticket( $a, $bid ), $bid );
+	if ( '' !== $app ) {
+		return '<div class="ewt-after ewt-inapp">' . $app . '</div>';
+	}
+	return '<div class="ewt-after"><p class="ewt-thanks">' . esc_html( $a['thanks'] ) . '</p></div>';
+}
+
+/** The one-tap extra after paying. Not shown on the website any more. */
+function ew_tix_upsell_html( $a, $s, $bid ) {
 	$h  = '<div class="ewt-after">';
 	$h .= '<p class="ewt-thanks">' . esc_html( $a['thanks'] ) . '</p>';
 	$ups = ew_tix_upsells( $a['upsell'] );
