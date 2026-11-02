@@ -55,7 +55,7 @@ add_shortcode( 'eastwood_app', 'ew_app_shortcode' );
 
 function ew_app_css() {
 	return '
-.ewa{max-width:1248px;margin:24px auto 64px;padding:0 16px;font-family:"Instrument Sans",system-ui,sans-serif}
+.ewa{margin:24px 0 64px;padding:0;font-family:"Instrument Sans",system-ui,sans-serif}
 .ewa-btns{display:flex;gap:16px;flex-wrap:wrap}
 .ewa-btn{display:inline-flex;align-items:center;gap:12px;min-height:60px;padding:0 24px;border-radius:12px;background:#0a0a0b;color:#fff !important;text-decoration:none !important;font-weight:700;font-size:18px;line-height:1.2}
 .ewa-btn:hover{background:#CC0000}
