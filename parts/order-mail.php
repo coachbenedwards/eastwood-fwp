@@ -104,7 +104,8 @@ add_action( 'ew_tix_step', function ( $booking_id, $step ) {
 	$signup = 'signup' === get_post_meta( $booking_id, '_ewt_kind', true );
 	// A sign-up's last step is named after the form (halftime, trial ...):
 	// for the emails it is simply done.
-	if ( $signup && ! in_array( $step, array( 'started', 'details', 'reminder' ), true ) ) {
+	// "invite" is the half-time show's bring-a-friend step, after done: no email of its own.
+	if ( $signup && ! in_array( $step, array( 'started', 'details', 'reminder', 'invite' ), true ) ) {
 		$step = 'done';
 	}
 	if ( ! in_array( $step, array( 'paid', 'reminder', 'done' ), true ) || ! ew_om_on() ) {

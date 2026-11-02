@@ -70,6 +70,25 @@ function ew_optin_claim( $req ) {
 	return 'started' === get_post_meta( $bid, '_ewt_status', true ) ? $bid : 0;
 }
 
+/**
+ * The booking a request is about once it is finished: the bid and key the
+ * last page was handed (ew_optin_finished's claim, "bid.key"). Any status;
+ * the caller says which ones it accepts.
+ */
+function ew_optin_owner( $req ) {
+	$bid = (int) $req->get_param( 'bid' );
+	$key = (string) $req->get_param( 'key' );
+	$cl  = (string) $req->get_param( 'claim' );
+	if ( ( ! $bid || '' === $key ) && false !== strpos( $cl, '.' ) ) {
+		list( $bid, $key ) = explode( '.', $cl, 2 );
+		$bid = (int) $bid;
+	}
+	if ( ! $bid || '' === $key || 'ewt_booking' !== get_post_type( $bid ) ) {
+		return 0;
+	}
+	return hash_equals( (string) get_post_meta( $bid, '_ewt_key', true ), (string) $key ) ? $bid : 0;
+}
+
 /** What a finished sign-up hands back to the page: the in-the-app panel. */
 function ew_optin_finished( $bid ) {
 	return array(
@@ -96,6 +115,20 @@ add_action( 'rest_api_init', function () {
 			if ( ! is_email( $email ) ) {
 				return new WP_REST_Response( array( 'message' => (string) ( $a['need_email'] ?? 'We need an email.' ) ), 400 );
 			}
+			// A form can ask for a name on step one too. Only sent when it
+			// does; the email-only forms never send one.
+			$name = '';
+			if ( null !== $req->get_param( 'name' ) ) {
+				$name = trim( sanitize_text_field( (string) $req->get_param( 'name' ) ) );
+				if ( '' !== $name && function_exists( 'ew_person_name' ) ) {
+					$name = ew_person_name( $name );
+				}
+				if ( '' === $name ) {
+					return new WP_REST_Response( array( 'message' => (string) ( $a['need_name'] ?? 'We need your name.' ) ), 400 );
+				}
+			}
+			// Somebody who came from an invite link (?ref=) carries it in.
+			$ref = substr( preg_replace( '/[^a-z0-9]/', '', strtolower( (string) $req->get_param( 'ref' ) ) ), 0, 40 );
 
 			// The same person pressing the button twice on the same page is
 			// one sign-up, not two.
@@ -114,16 +147,24 @@ add_action( 'rest_api_init', function () {
 			) );
 			if ( $again ) {
 				$bid = (int) $again[0];
+				if ( '' !== $name ) {
+					update_post_meta( $bid, '_ewt_name', $name );
+					wp_update_post( array( 'ID' => $bid, 'post_title' => $name ) );
+				}
 			} else {
 				if ( ! function_exists( 'ew_tix_booking_start' ) ) {
 					return new WP_REST_Response( array( 'message' => (string) ( $a['failed'] ?? 'Please try again.' ) ), 500 );
 				}
-				$bid = ew_tix_booking_start( $post, (string) ( $a['event'] ?? '' ), '', $email, '', 0, (string) ( $a['crm_hook'] ?? '' ) );
+				$bid = ew_tix_booking_start( $post, (string) ( $a['event'] ?? '' ), $name, $email, '', 0, (string) ( $a['crm_hook'] ?? '' ) );
 				if ( ! $bid ) {
 					return new WP_REST_Response( array( 'message' => (string) ( $a['failed'] ?? 'Please try again.' ) ), 500 );
 				}
 				update_post_meta( $bid, '_ewt_kind', 'signup' );
 				update_post_meta( $bid, '_ewt_form', $kind );
+			}
+			if ( '' !== $ref && '' === (string) get_post_meta( $bid, '_ewt_ref', true ) ) {
+				update_post_meta( $bid, '_ewt_ref', $ref );
+				do_action( 'ew_optin_ref', $bid, $ref, $kind );
 			}
 			return array( 'bid' => $bid, 'key' => ew_booking_key( $bid ) );
 		},
@@ -165,10 +206,19 @@ add_action( 'rest_api_init', function () {
 
 /* --- The shared front end --------------------------------------------- */
 
-/** The step-one card: a heading, one box, one button. */
-function ew_optin_step_one( $p, $a ) {
+/**
+ * The step-one card: a heading, one box, one button.
+ *
+ * $opt['name'] set to a label adds a name box above the email, sent with
+ * it and saved on the started booking. Without it the card is email only.
+ */
+function ew_optin_step_one( $p, $a, $opt = array() ) {
 	$h  = '<div class="ewo-one" data-ewo-one>';
 	$h .= '<p class="' . esc_attr( $p ) . '-head">' . esc_html( $a['form_title'] ) . '</p>';
+	if ( '' !== (string) ( $opt['name'] ?? '' ) ) {
+		$h .= '<label class="' . esc_attr( $p ) . '-lab" for="' . esc_attr( $p ) . 'StartName">' . esc_html( $opt['name'] ) . '</label>';
+		$h .= '<input class="' . esc_attr( $p ) . '-in" id="' . esc_attr( $p ) . 'StartName" type="text" autocomplete="name" required data-ewo-name>';
+	}
 	$h .= '<label class="' . esc_attr( $p ) . '-lab" for="' . esc_attr( $p ) . 'Email">' . esc_html( $a['email_label'] ) . '</label>';
 	$h .= '<input class="' . esc_attr( $p ) . '-in" id="' . esc_attr( $p ) . 'Email" type="email" autocomplete="email" required data-ewo-email>';
 	$h .= '<p class="' . esc_attr( $p ) . '-err" role="alert" data-ewo-err1></p>';
@@ -185,26 +235,31 @@ function ew_optin_words( $kind, $a ) {
 		'need_email' => (string) $a['need_email'],
 		'failed'     => (string) $a['failed'],
 		'what'       => (string) ( $a['track'] ?? $kind ),
+		'need_name'  => (string) ( $a['need_name'] ?? '' ),
 	);
 }
 
 /**
  * The step-one / step-two machine, shared by every sign-up block.
  *
- *   ewOptin(root, W, onDone)
+ *   ewOptin(root, W, on)
  *
  * root  the block's section; holds [data-ewo-one] and [data-ewo-two]
- * W     its words, with start / save / kind / need_email / failed / what
+ * W     its words, with start / save / kind / need_email / failed / what;
+ *       W.ref true sends ?ref= from the address with step one
+ * on    optional: on.open(o) runs whenever step two is shown
  *
- * Gives back an object the block's own submit uses: o.bid, o.key, o.email.
+ * Gives back an object the block's own submit uses: o.bid, o.key, o.email,
+ * and o.name when step one has a name box ([data-ewo-name]).
  * Boxes in step two marked data-ewo-save="phone|name|notes" save on blur.
  */
 function ew_optin_js() {
 	return <<<'JS'
-window.ewOptin = window.ewOptin || function(root, W){
- var o = {bid: 0, key: '', email: ''};
+window.ewOptin = window.ewOptin || function(root, W, on){
+ var o = {bid: 0, key: '', email: '', name: ''};
  var one = root.querySelector('[data-ewo-one]'), two = root.querySelector('[data-ewo-two]');
  var box = one.querySelector('[data-ewo-email]'), err = one.querySelector('[data-ewo-err1]'), btn = one.querySelector('[data-ewo-next]');
+ var nbox = one.querySelector('[data-ewo-name]');
  var page = root.getAttribute('data-page');
  var memo = 'ewo:' + W.kind + ':' + page;
  function post(url, body){
@@ -213,25 +268,31 @@ window.ewOptin = window.ewOptin || function(root, W){
  }
  function open(){
   one.hidden = true; two.hidden = false;
+  if(on && on.open){ try{ on.open(o); }catch(e){} }
   var f = two.querySelector('input:not([type=checkbox]),select,textarea'); if(f){ try{ f.focus(); }catch(e){} }
  }
- try{ var kept = JSON.parse(sessionStorage.getItem(memo) || 'null'); if(kept && kept.bid){ o.bid = kept.bid; o.key = kept.key; o.email = kept.email; open(); } }catch(e){}
+ try{ var kept = JSON.parse(sessionStorage.getItem(memo) || 'null'); if(kept && kept.bid){ o.bid = kept.bid; o.key = kept.key; o.email = kept.email; o.name = kept.name || ''; open(); } }catch(e){}
  function go(){
   err.textContent = '';
+  var name = nbox ? nbox.value.trim() : '';
+  if(nbox && !name){ err.textContent = W.need_name || W.need_email; return; }
   var email = box.value.trim();
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ err.textContent = W.need_email; return; }
+  var body = {kind: W.kind, page: page, email: email};
+  if(nbox) body.name = name;
+  if(W.ref){ try{ var ref = new URLSearchParams(location.search).get('ref'); if(ref) body.ref = ref; }catch(e){} }
   btn.disabled = true;
-  post(W.start, {kind: W.kind, page: page, email: email}).then(function(x){
+  post(W.start, body).then(function(x){
    btn.disabled = false;
    if(!x.ok || !x.j.bid){ err.textContent = (x.j && x.j.message) || W.failed; return; }
-   o.bid = x.j.bid; o.key = x.j.key; o.email = email;
-   try{ sessionStorage.setItem(memo, JSON.stringify(o)); }catch(e){}
+   o.bid = x.j.bid; o.key = x.j.key; o.email = email; o.name = name;
+   try{ sessionStorage.setItem(memo, JSON.stringify({bid: o.bid, key: o.key, email: o.email, name: o.name})); }catch(e){}
    if(window.ewTrack) ewTrack('Lead', {what: W.what});
    open();
   }).catch(function(){ btn.disabled = false; err.textContent = W.failed; });
  }
  btn.addEventListener('click', go);
- box.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); go(); } });
+ [box, nbox].forEach(function(b){ if(b) b.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); go(); } }); });
  two.addEventListener('focusout', function(e){
   var f = e.target.getAttribute && e.target.getAttribute('data-ewo-save');
   if(!f || !o.bid) return;
@@ -379,13 +440,16 @@ function ew_inapp_stores( $claim = '' ) {
 	return $h . '</div>';
 }
 
-/** The whole last page. The ticket and claim are filled in by the page once the sign-up is saved. */
-function ew_inapp_panel( $heading, $ticket ) {
+/**
+ * The whole last page. The ticket and claim are filled in by the page once
+ * the sign-up is saved. $after: the block's own markup under the store buttons.
+ */
+function ew_inapp_panel( $heading, $ticket, $after = '' ) {
 	$h  = '<div class="ewi" data-ewi hidden>';
 	$h .= '<p class="ewi-h">' . esc_html( $heading ) . '</p>';
 	$h .= '<div class="ewi-art">' . ew_inapp_phone() . ew_inapp_ticket( $ticket ) . '</div>';
 	$h .= ew_inapp_stores();
-	return $h . '</div>';
+	return $h . $after . '</div>';
 }
 
 function ew_inapp_css() {
