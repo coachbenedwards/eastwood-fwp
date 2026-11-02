@@ -98,3 +98,9 @@ add_action( 'wp_enqueue_scripts', function () {
 	wp_enqueue_script( 'ew-app' );
 	wp_add_inline_script( 'ew-app', ew_app_js() );
 }, 22 );
+
+/* The command channel lays this block out like the others. */
+add_filter( 'ew_blocks_allowed', function ( $tags ) {
+	$tags[] = 'eastwood_app';
+	return $tags;
+} );
