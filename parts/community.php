@@ -432,15 +432,11 @@ function ew_cm_req_sc( $atts, $content = null ) {
 		'form_title'  => '' !== $partner ? $a['head'] : $a['title'],
 		'email_label' => '' !== $partner ? $a['partner_email'] : $a['email_label'],
 	) ) );
-	// Step two: the rest, mobile first, each box saved as they leave it.
+	// Step two: the rest, each box saved as they leave it. The mobile is asked for in the app.
 	$h .= '<div class="ewcm-two" data-ewo-two hidden>';
 	$h .= '<div class="ewc-head"><span>' . esc_html( $a['head'] ) . '</span></div>';
 	if ( '' === $partner ) {
 		$h .= '<p class="ewcm-lede">' . esc_html( $a['lede'] ) . '</p>';
-	}
-	$h .= '<label class="ewc-lab" for="ewcmPhone">' . esc_html( $a['phone_label'] ) . '</label><input class="ewc-in" id="ewcmPhone" type="tel" autocomplete="tel" data-ewo-save="phone">';
-	if ( '' !== trim( (string) $a['phone_note'] ) ) {
-		$h .= '<p class="ewcm-pnote">' . esc_html( $a['phone_note'] ) . '</p>';
 	}
 	$h .= '<label class="ewc-lab" for="ewcmGame">' . esc_html( $a['game_label'] ) . '</label><select id="ewcmGame" class="ewc-in">';
 	foreach ( array_slice( $games, 0, 8 ) as $g ) {
@@ -531,10 +527,6 @@ add_action( 'rest_api_init', function () {
 			}
 			if ( ! is_email( $email ) ) {
 				return new WP_REST_Response( array( 'message' => $a['need_email'] ), 400 );
-			}
-			// Asked for on the two-step form; a request without the two-step (no booking carried) is let through as before.
-			if ( $bid && strlen( preg_replace( '/\D/', '', $phone ) ) < 10 ) {
-				return new WP_REST_Response( array( 'message' => $a['need_phone'] ), 400 );
 			}
 			$cap = max( 0, (int) $a['cap'] );
 			if ( $cap && ew_cm_taken( $game['id'] ) + $adults + $children > $cap ) {
@@ -814,7 +806,6 @@ function ew_cm_js() {
    e.preventDefault();
    var v = function(id){ var el = root.querySelector('#' + id); return el ? el.value.trim() : ''; };
    var name = v('ewcmName'), phone = v('ewcmPhone');
-   if(phone.replace(/\D/g,'').length < 10){ err.textContent = W.need_phone; return; }
    if(count.adults + count.children < 1){ err.textContent = W.need_people; return; }
    if(!name){ err.textContent = W.need_name; return; }
    err.textContent = '';

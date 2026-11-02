@@ -379,13 +379,9 @@ function ew_claim_shortcode( $atts, $content = null ) {
 	$h .= '<form class="ewc-step" novalidate>';
 	$h .= ew_optin_step_one( 'ewc', array_merge( $a, array( 'form_title' => $a['details_title'], 'send' => $a['continue'] ) ) );
 
-	/* Step 2: the rest on the same stub, mobile first, each box saved as they leave it. */
+	/* Step 2: the rest on the same stub, each box saved as they leave it. The mobile is asked for in the app. */
 	$h .= '<div class="ewc-step" data-step="2" data-ewo-two hidden>';
 	$h .= '<div class="ewc-head"><span>' . esc_html( $a['who_title'] ) . '</span></div>';
-	$h .= '<label class="ewc-lab" for="ewcPhone">' . esc_html( $a['phone_label'] ) . '</label><input class="ewc-in" id="ewcPhone" type="tel" autocomplete="tel" data-ewo-save="phone">';
-	if ( '' !== trim( (string) $a['phone_note'] ) ) {
-		$h .= '<p class="ewc-pnote">' . esc_html( $a['phone_note'] ) . '</p>';
-	}
 	$h .= '<label class="ewc-lab" for="ewcSchool">' . esc_html( $a['school_label'] ) . '</label>';
 	$h .= '<div class="ewc-search"><div class="ewc-sbox"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>';
 	$h .= '<input id="ewcSchool" type="text" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="ewcList"></div>';
@@ -526,10 +522,6 @@ add_action( 'rest_api_init', function () {
 			}
 			if ( $adults + $children < 1 ) {
 				return new WP_REST_Response( array( 'message' => $a['need_people'] ), 400 );
-			}
-			// Asked for on the two-step form; a claim without the two-step (no booking carried) is let through as before.
-			if ( $bid && strlen( preg_replace( '/\D/', '', $phone ) ) < 10 ) {
-				return new WP_REST_Response( array( 'message' => $a['need_phone'] ), 400 );
 			}
 			do {
 				$code = 'EFC-' . wp_rand( 1000, 9999 );
@@ -790,8 +782,7 @@ function ew_claim_js() {
  form.addEventListener('submit', function(e){
    e.preventDefault();
    if(s2.hidden) return;
-   var name = root.querySelector('#ewcName').value.trim(), phone = root.querySelector('#ewcPhone').value.trim();
-   if(phone.replace(/\D/g,'').length < 10){ err(s2, W.need_phone); return; }
+   var name = root.querySelector('#ewcName').value.trim(), phone = '';
    if(!school){
      var typed = norm(input.value), match = schools.filter(function(s){ return norm(s) === typed; })[0];
      if(match){ school = match; } else { err(s2, W.need_school); input.focus(); return; }
