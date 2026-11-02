@@ -41,6 +41,13 @@ function ew_halftime_defaults() {
 		'failed'      => 'Something went wrong. Please try again.',
 		'done_title'  => "You're in",
 		'done_note'   => "We'll be in touch before the game with where to be and when.",
+		'next_title'  => 'Nearly there',
+		'phone_note'  => 'For a text on the day if anything changes.',
+		'send2'       => 'Send',
+		'app_title'   => 'Your place is in the app',
+		'ticket_title' => 'Half time show',
+		'ticket_time' => '3pm',
+		'track'       => 'Half-time show',
 		'max'         => '6',
 		'crm_hook'    => '',
 	);
@@ -62,25 +69,52 @@ function ew_halftime_shortcode( $atts ) {
 		'remove'     => $a['remove'],
 		'max'        => $max,
 		'rest'       => esc_url_raw( rest_url( 'eastwood/v1/halftime' ) ),
-	);
+	) + ( function_exists( 'ew_optin_words' ) ? ew_optin_words( 'halftime', $a ) : array() );
 
 	$h  = '<section class="ewh" data-page="' . (int) ( $post ? $post->ID : 0 ) . '">';
 	$h .= '<form class="ewh-form" novalidate>';
-	$h .= '<p class="ewh-head">' . esc_html( $a['form_title'] ) . '</p>';
+	// Step one: the email on its own, saved the moment the button is pressed.
+	$h .= ew_optin_step_one( 'ewh', $a );
+	// Step two: the rest, mobile first, each box saved as they leave it.
+	$h .= '<div class="ewh-two" data-ewo-two hidden>';
+	$h .= '<p class="ewh-head">' . esc_html( $a['next_title'] ) . '</p>';
+	$h .= '<label class="ewh-lab" for="ewhPhone">' . esc_html( $a['phone_label'] ) . '</label><input class="ewh-in" id="ewhPhone" type="tel" autocomplete="tel" required data-ewo-save="phone">';
+	$h .= '<p class="ewh-note">' . esc_html( $a['phone_note'] ) . '</p>';
 	$h .= '<div class="ewh-kids"></div>';
 	$h .= '<button type="button" class="ewh-more"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>' . esc_html( $a['more'] ) . '</button>';
-	$h .= '<label class="ewh-lab" for="ewhName">' . esc_html( $a['name_label'] ) . '</label><input class="ewh-in" id="ewhName" type="text" autocomplete="name" required>';
-	$h .= '<label class="ewh-lab" for="ewhEmail">' . esc_html( $a['email_label'] ) . '</label><input class="ewh-in" id="ewhEmail" type="email" autocomplete="email" required>';
-	$h .= '<label class="ewh-lab" for="ewhPhone">' . esc_html( $a['phone_label'] ) . '</label><input class="ewh-in" id="ewhPhone" type="tel" autocomplete="tel" required>';
+	$h .= '<label class="ewh-lab" for="ewhName">' . esc_html( $a['name_label'] ) . '</label><input class="ewh-in" id="ewhName" type="text" autocomplete="name" required data-ewo-save="name">';
 	$h .= '<label class="ewh-tick"><input type="checkbox" id="ewhConsent" checked><span>' . esc_html( $a['consent'] ) . '</span></label>';
 	$h .= '<p class="ewh-err" role="alert"></p>';
-	$h .= '<button type="submit" class="ewh-btn">' . esc_html( $a['send'] ) . '</button>';
+	$h .= '<button type="submit" class="ewh-btn">' . esc_html( $a['send2'] ) . '</button>';
+	$h .= '</div>';
 	$h .= '</form>';
-	$h .= '<div class="ewh-done" hidden><p class="ewh-done-t">' . esc_html( $a['done_title'] ) . '</p><p class="ewh-done-n">' . esc_html( $a['done_note'] ) . '</p></div>';
+	// The last page: their place, in the app.
+	$h .= ew_inapp_panel( $a['app_title'], ew_halftime_ticket( $a ) );
 	$h .= '<script type="application/json" class="ewh-words">' . wp_json_encode( $words ) . '</script>';
 	return $h . '</section>';
 }
 add_shortcode( 'eastwood_halftime', 'ew_halftime_shortcode' );
+
+/** The place that slides out of the app on the last page, read from the event line. */
+function ew_halftime_ticket( $a ) {
+	$parts = array_map( 'trim', explode( ',', (string) $a['event'], 2 ) );
+	$when  = $parts[1] ?? '';
+	$ts    = '' !== $when ? strtotime( $when ) : 0;
+	return array(
+		'title' => (string) $a['ticket_title'],
+		'sub'   => $parts[0],
+		'day'   => $ts ? date_i18n( 'l', $ts ) : '',
+		'date'  => $ts ? strtoupper( date_i18n( 'j F Y', $ts ) ) : $when,
+		'time'  => strtoupper( (string) $a['ticket_time'] ),
+		'stub'  => $ts ? date_i18n( 'jS', $ts ) : '',
+		'stub2' => $ts ? strtoupper( date_i18n( 'F Y', $ts ) ) : '',
+	);
+}
+
+add_filter( 'ew_optin_forms', function ( $forms ) {
+	$forms['halftime'] = 'ew_halftime_block_on';
+	return $forms;
+} );
 
 /** The block on a page, read from the page itself, so a claim carries its words. */
 function ew_halftime_block_on( $post ) {
@@ -128,7 +162,9 @@ add_action( 'rest_api_init', function () {
 				return new WP_REST_Response( array( 'message' => 'no block' ), 400 );
 			}
 			$name  = ew_person_name( sanitize_text_field( (string) $req->get_param( 'name' ) ) );
-			$email = sanitize_email( (string) $req->get_param( 'email' ) );
+			// Step one already saved the email on a started booking; carry that on.
+			$bid   = function_exists( 'ew_optin_claim' ) ? ew_optin_claim( $req ) : 0;
+			$email = $bid ? (string) get_post_meta( $bid, '_ewt_email', true ) : sanitize_email( (string) $req->get_param( 'email' ) );
 			$phone = trim( sanitize_text_field( (string) $req->get_param( 'phone' ) ) );
 			$kids  = array();
 			foreach ( array_slice( (array) $req->get_param( 'children' ), 0, max( 1, min( 12, (int) $a['max'] ) ) ) as $k ) {
@@ -150,11 +186,16 @@ add_action( 'rest_api_init', function () {
 			if ( strlen( preg_replace( '/\D/', '', $phone ) ) < 10 ) {
 				return new WP_REST_Response( array( 'message' => $a['need_phone'] ), 400 );
 			}
-			$id = wp_insert_post( array(
-				'post_type'   => 'ewt_booking',
-				'post_status' => 'publish',
-				'post_title'  => $name,
-			) );
+			if ( $bid ) {
+				$id = $bid;
+				wp_update_post( array( 'ID' => $id, 'post_title' => $name ) );
+			} else {
+				$id = wp_insert_post( array(
+					'post_type'   => 'ewt_booking',
+					'post_status' => 'publish',
+					'post_title'  => $name,
+				) );
+			}
 			if ( ! $id || is_wp_error( $id ) ) {
 				return new WP_REST_Response( array( 'message' => $a['failed'] ), 500 );
 			}
@@ -178,7 +219,7 @@ add_action( 'rest_api_init', function () {
 			if ( function_exists( 'ew_tix_crm' ) ) {
 				ew_tix_crm( (string) $a['crm_hook'], $id, 'halftime' );
 			}
-			return array( 'ok' => 1 );
+			return function_exists( 'ew_optin_finished' ) ? ew_optin_finished( $id ) : array( 'ok' => 1 );
 		},
 	) );
 } );
@@ -205,6 +246,8 @@ function ew_halftime_css() {
 .ewh-done{background:#000;color:#fff;border-radius:14px;padding:48px 40px;text-align:center}
 .ewh .ewh-done-t{margin:0 0 10px;font-family:Anton,Impact,sans-serif;font-size:48px;line-height:1;text-transform:uppercase;color:#fff}
 .ewh .ewh-done-n{margin:0;font-size:17px;color:#fff}
+.ewh .ewh-note{margin:6px 0 4px;font-size:14px;color:rgba(255,255,255,.7)}
+.ewh-two .ewh-head{margin-bottom:4px}
 @media (max-width:640px){.ewh-form{padding:28px 20px 30px}.ewh-kid{grid-template-columns:minmax(0,1fr) 80px auto}}
 ';
 }
@@ -215,7 +258,7 @@ function ew_halftime_js() {
  var root = document.querySelector('.ewh'); if(!root) return;
  var wordsEl = root.querySelector('.ewh-words'); if(!wordsEl) return;
  var W = JSON.parse(wordsEl.textContent), page = root.getAttribute('data-page');
- var form = root.querySelector('.ewh-form'), kids = root.querySelector('.ewh-kids'), more = root.querySelector('.ewh-more'), err = root.querySelector('.ewh-err');
+ var form = root.querySelector('.ewh-form'), kids = root.querySelector('.ewh-kids'), more = root.querySelector('.ewh-more'), err = root.querySelector('.ewh-two .ewh-err');
  function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
  var n = 0;
  function addKid(){
@@ -230,6 +273,7 @@ function ew_halftime_js() {
  }
  addKid();
  more.addEventListener('click', addKid);
+ var O = window.ewOptin ? ewOptin(root, W) : {bid: 0, key: ''};
  form.addEventListener('submit', function(e){
    e.preventDefault(); err.textContent = '';
    var children = [];
@@ -237,18 +281,18 @@ function ew_halftime_js() {
      var i = r.querySelectorAll('input'); var name = i[0].value.trim(), age = parseInt(i[1].value, 10);
      if(name && age > 0) children.push({name: name, age: age});
    });
-   var name = root.querySelector('#ewhName').value.trim(), email = root.querySelector('#ewhEmail').value.trim(), phone = root.querySelector('#ewhPhone').value.trim();
+   var name = root.querySelector('#ewhName').value.trim(), phone = root.querySelector('#ewhPhone').value.trim();
+   if(phone.replace(/\D/g,'').length < 10){ err.textContent = W.need_phone; return; }
    if(!children.length){ err.textContent = W.need_child; return; }
    if(!name){ err.textContent = W.need_name; return; }
-   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ err.textContent = W.need_email; return; }
-   if(phone.replace(/\D/g,'').length < 10){ err.textContent = W.need_phone; return; }
-   var btn = form.querySelector('.ewh-btn'); btn.disabled = true;
-   fetch(W.rest, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({page: page, children: children, name: name, email: email, phone: phone, consent: root.querySelector('#ewhConsent').checked ? 1 : 0})})
+   var btn = form.querySelector('.ewh-btn[type=submit]'); btn.disabled = true;
+   fetch(W.rest, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({page: page, bid: O.bid, key: O.key, email: O.email, children: children, name: name, phone: phone, consent: root.querySelector('#ewhConsent').checked ? 1 : 0})})
    .then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); })
    .then(function(x){
      if(!x.ok){ err.textContent = (x.j && x.j.message) || W.failed; btn.disabled = false; return; }
-     form.hidden = true; root.querySelector('.ewh-done').hidden = false;
-     if(window.ewTrack) ewTrack('Lead', {what: 'Half-time show'});
+     form.hidden = true;
+     if(O.done) O.done();
+     if(window.ewInapp) ewInapp(root, x.j.claim || '');
    })
    .catch(function(){ err.textContent = W.failed; btn.disabled = false; });
  });
@@ -267,8 +311,8 @@ add_action( 'wp_enqueue_scripts', function () {
 	wp_enqueue_style( 'ewc-fonts', 'https://fonts.googleapis.com/css2?family=Anton&family=Instrument+Sans:wght@400;600;700&display=swap', array(), null ); // phpcs:ignore WordPress.WP.EnqueuedResourceParameters.MissingVersion
 	wp_register_style( 'ew-halftime', false, array(), EW_FWP_VERSION );
 	wp_enqueue_style( 'ew-halftime' );
-	wp_add_inline_style( 'ew-halftime', ew_halftime_css() );
+	wp_add_inline_style( 'ew-halftime', ew_halftime_css() . ( function_exists( 'ew_inapp_css' ) ? ew_inapp_css() : '' ) );
 	wp_register_script( 'ew-halftime', '', array(), EW_FWP_VERSION, true );
 	wp_enqueue_script( 'ew-halftime' );
-	wp_add_inline_script( 'ew-halftime', ew_halftime_js() );
+	wp_add_inline_script( 'ew-halftime', ( function_exists( 'ew_optin_js' ) ? ew_optin_js() . ew_inapp_js() : '' ) . ew_halftime_js() );
 }, 22 );

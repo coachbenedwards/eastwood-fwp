@@ -77,7 +77,19 @@ function ew_app_js() {
   var ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && 'ontouchend' in document);
   var android = /Android/i.test(ua);
   var to = ios ? box.getAttribute('data-ios') : (android ? box.getAttribute('data-android') : '');
-  if (to) location.replace(to);
+  if (!to) return;
+  // Sent here from a checkout or sign-up with ?claim=: if the app is already
+  // on the phone it opens straight onto that booking; if not, after a moment
+  // the store opens instead, as before.
+  var claim = (location.search.match(/[?&]claim=([^&]+)/) || [])[1];
+  if (claim) {
+    var gone = false;
+    document.addEventListener('visibilitychange', function () { if (document.hidden) gone = true; });
+    location.href = 'teameastwoodfc://claim?c=' + claim;
+    setTimeout(function () { if (!gone) location.replace(to); }, 1400);
+    return;
+  }
+  location.replace(to);
 })();
 JS;
 }

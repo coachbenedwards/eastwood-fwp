@@ -44,6 +44,16 @@ function ew_om_emails() {
 			'subject' => 'Your {event} tickets are still waiting',
 			'body'    => "{greeting},\n\nYou started booking {event} but didn't quite finish.\n\nYour tickets are still here if you want them:\n{event_url}\n\nAny questions, just reply to this email.\n\nEastwood FC",
 		),
+		'signup_done'     => array(
+			'label'   => 'Sign-up (half time show and the rest) – finished',
+			'subject' => "You're in: {event}",
+			'body'    => "Hi {first_name},\n\nYou're in for {event}.\n\nYour booking reference is {ref}.\n\nYour place is in the Eastwood FC app. Download it, sign in with this email and your booking reference, and it's there:\n{app_url}\n\nAny questions, just reply to this email.\n\nEastwood FC",
+		),
+		'signup_reminder' => array(
+			'label'   => 'Sign-up – not finished (an hour later)',
+			'subject' => 'You were nearly in: {event}',
+			'body'    => "{greeting},\n\nYou started signing up for {event} but didn't quite finish.\n\nIt only takes a minute:\n{event_url}\n\nAny questions, just reply to this email.\n\nEastwood FC",
+		),
 	);
 }
 
@@ -81,6 +91,8 @@ function ew_om_fill( $text, $booking_id ) {
 		'{paid}'       => number_format( (int) $m( 'paid' ) / 100, 2, '.', '' ),
 		'{total}'      => number_format( (int) $m( 'total' ) / 100, 2, '.', '' ),
 		'{event_url}'  => $m( 'url' ),
+		'{ref}'        => function_exists( 'ew_booking_code' ) ? ew_booking_code( $booking_id ) : $m( 'code' ),
+		'{app_url}'    => home_url( '/app/' ),
 	);
 	$out = strtr( (string) $text, $map );
 	// "Hi ," when nobody gave a name reads as a mistake; "Hi," does not.
@@ -89,7 +101,13 @@ function ew_om_fill( $text, $booking_id ) {
 
 /** Called for every step the CRM is told about. */
 add_action( 'ew_tix_step', function ( $booking_id, $step ) {
-	if ( ! in_array( $step, array( 'paid', 'reminder' ), true ) || ! ew_om_on() ) {
+	$signup = 'signup' === get_post_meta( $booking_id, '_ewt_kind', true );
+	// A sign-up's last step is named after the form (halftime, trial ...):
+	// for the emails it is simply done.
+	if ( $signup && ! in_array( $step, array( 'started', 'details', 'reminder' ), true ) ) {
+		$step = 'done';
+	}
+	if ( ! in_array( $step, array( 'paid', 'reminder', 'done' ), true ) || ! ew_om_on() ) {
 		return;
 	}
 	if ( apply_filters( 'ew_om_skip', false, $booking_id, $step ) ) {
@@ -120,7 +138,7 @@ add_action( 'ew_fwp_after_settings', function () {
 	}
 	echo '<h2>Order emails</h2>';
 	echo '<p>The emails a buyer gets after paying, and an hour after starting checkout without paying. They go from the website through Google. '
-		. 'Placeholders: {first_name} {greeting} {event} {tickets} {paid} {total} {event_url}.</p>';
+		. 'Placeholders: {first_name} {greeting} {event} {tickets} {paid} {total} {event_url} {ref} {app_url}.</p>';
 	echo '<form method="post">';
 	wp_nonce_field( 'ew_om_save' );
 	echo '<input type="hidden" name="ew_om_save" value="1">';

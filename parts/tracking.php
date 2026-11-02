@@ -65,7 +65,7 @@ add_action( 'wp_head', function () {
 		. 'var g={};if(money){g.value=p.value;g.currency="GBP";}'
 		. 'if(p.what){g.items=[{item_name:p.what}];}'
 		. 'if(p.id){g.transaction_id=p.id;}'
-		. 'gtag("event",name==="Purchase"?"purchase":"generate_lead",g);}'
+		. 'gtag("event",({Purchase:"purchase",CompleteRegistration:"sign_up",InitiateCheckout:"begin_checkout"})[name]||"generate_lead",g);}'
 		. '}catch(e){}};'
 		. '</script>' . "\n";
 }, 5 );
