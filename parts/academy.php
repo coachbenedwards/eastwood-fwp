@@ -97,6 +97,7 @@ function ew_acad_interest_defaults() {
 		'ticket_stub2'   => 'Invite to follow',
 		'track'          => 'Academy interest',
 		'meeting_page'   => '/academy/meeting/',
+		'invite_from'    => 'academy@eastwoodfc.com',
 		'invite_subject' => 'Your invitation to a 1:1 with the Eastwood FC Academy',
 		'invite_body'    => "Hi {parent},\n\nThank you for registering {player} with the Eastwood FC Academy. We would like to invite you to a 1:1 meeting with Lewis McGugan, Head of Academy, and Owen Betts, Head Tutor.\n\nPick a time that suits you here:\n{link}\n\nThank you,\nEastwood FC Academy",
 		'crm_hook'       => '',
@@ -488,7 +489,7 @@ function ew_acad_invite( $id ) {
 		ew_acad_m( $id, 'email' ),
 		wp_specialchars_decode( ew_acad_fill( $a['invite_subject'], $vals ), ENT_QUOTES ),
 		ew_acad_fill( str_replace( '\n', "\n", (string) $a['invite_body'] ), $vals ),
-		array( 'From: Eastwood FC <info@eastwoodfc.com>' )
+		array( 'From: Eastwood FC Academy <' . ew_acad_from( array( 'from' => $a['invite_from'] ) ) . '>' )
 	);
 	update_post_meta( $id, '_ewt_invited', time() );
 	if ( 'meeting' !== ew_acad_m( $id, 'status' ) ) {
