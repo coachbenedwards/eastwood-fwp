@@ -103,6 +103,13 @@ function ew_acad_meeting_defaults() {
 		'confirm_subject' => 'Your Eastwood FC Academy 1:1: {time}',
 		'confirm_body'    => "Hi {parent},\n\nYou are booked in for a 1:1 meeting about {player} with Lewis McGugan, Head of Academy, and Owen Betts, Head Tutor.\n\nWhen: {time}\n{where}\n\nIf you need to change it, reply to this email.\n\nThank you,\nEastwood FC Academy",
 		'crm_hook'        => '',
+		// The calendar invite each booking sends to the academy staff.
+		'from'            => '',
+		'invite_to'       => '',
+		'minutes'         => '30',
+		'invite_title'    => 'Academy 1:1: {player}',
+		'staff_subject'   => 'Academy 1:1 booked: {player}, {time}',
+		'staff_body'      => "{parent} has booked a 1:1 about {player}.\n\nWhen: {time}\n{where}\nEmail: {email}\nPhone: {phone}\n\nThe calendar invite is attached.",
 	);
 }
 
@@ -702,8 +709,9 @@ add_action( 'rest_api_init', function () {
 					ew_acad_m( $id, 'email' ),
 					wp_specialchars_decode( ew_acad_fill( $a['confirm_subject'], $vals ), ENT_QUOTES ),
 					preg_replace( "/\n{3,}/", "\n\n", ew_acad_fill( str_replace( '\n', "\n", (string) $a['confirm_body'] ), $vals ) ),
-					array( 'From: Eastwood FC <info@eastwoodfc.com>' )
+					array( 'From: Eastwood FC <' . ew_acad_from( $a ) . '>' )
 				);
+				ew_acad_send_invite( $id, $slot, $a, $vals );
 				if ( function_exists( 'ew_tix_crm' ) ) {
 					ew_tix_crm( (string) $a['crm_hook'], $id, 'meeting' );
 				}
@@ -712,6 +720,118 @@ add_action( 'rest_api_init', function () {
 		),
 	) );
 } );
+
+/* ------------------------------------------------------------------ */
+/* Calendar invite for a booked 1:1                                    */
+/* ------------------------------------------------------------------ */
+
+/** The address the invite comes from: the block's, if the site may send as it. */
+function ew_acad_from( $a ) {
+	$want = strtolower( sanitize_email( (string) $a['from'] ) );
+	if ( '' === $want ) {
+		$want = 'info@eastwoodfc.com';
+	}
+	$ok   = function_exists( 'ew_eb_froms' ) ? array_map( 'strtolower', ew_eb_froms() ) : array();
+	if ( '' !== $want && in_array( $want, $ok, true ) ) {
+		return $want;
+	}
+	return function_exists( 'ew_smtp_from' ) ? ew_smtp_from() : 'info@eastwoodfc.com';
+}
+
+function ew_acad_ics_text( $t ) {
+	return str_replace( array( '\\', ';', ',', "\r\n", "\n" ), array( '\\\\', '\\;', '\\,', '\\n', '\\n' ), (string) $t );
+}
+
+/** One .ics line, folded at 74 bytes as the standard asks. */
+function ew_acad_ics_line( $line ) {
+	$out = '';
+	while ( strlen( $line ) > 74 ) {
+		$cut = 74;
+		while ( $cut > 1 && ( ord( $line[ $cut ] ) & 0xC0 ) === 0x80 ) {
+			$cut--;
+		}
+		$out  .= substr( $line, 0, $cut ) . "\r\n ";
+		$line  = substr( $line, $cut );
+	}
+	return $out . $line . "\r\n";
+}
+
+/** The invite for booking $id at $slot (Y-m-d H:i, club time). */
+function ew_acad_ics( $id, $slot, $a, $summary, $desc, $org, $to ) {
+	$start = DateTime::createFromFormat( 'Y-m-d H:i', $slot, wp_timezone() );
+	if ( ! $start ) {
+		return '';
+	}
+	$start->setTimezone( new DateTimeZone( 'UTC' ) );
+	$end = clone $start;
+	$end->modify( '+' . max( 5, (int) $a['minutes'] ) . ' minutes' );
+	$rows = array(
+		'BEGIN:VCALENDAR',
+		'PRODID:-//Eastwood FC//Academy//EN',
+		'VERSION:2.0',
+		'CALSCALE:GREGORIAN',
+		'METHOD:REQUEST',
+		'BEGIN:VEVENT',
+		'UID:academy-1to1-' . (int) $id . '@eastwoodfc.com',
+		'DTSTAMP:' . gmdate( 'Ymd\THis\Z' ),
+		'DTSTART:' . $start->format( 'Ymd\THis\Z' ),
+		'DTEND:' . $end->format( 'Ymd\THis\Z' ),
+		'SUMMARY:' . ew_acad_ics_text( $summary ),
+		'DESCRIPTION:' . ew_acad_ics_text( $desc ),
+		'LOCATION:' . ew_acad_ics_text( $a['where'] ),
+		'ORGANIZER;CN=Eastwood FC Academy:mailto:' . $org,
+	);
+	foreach ( $to as $em ) {
+		$rows[] = 'ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:' . $em;
+	}
+	$rows = array_merge( $rows, array( 'SEQUENCE:0', 'STATUS:CONFIRMED', 'TRANSP:OPAQUE', 'END:VEVENT', 'END:VCALENDAR' ) );
+	return implode( '', array_map( 'ew_acad_ics_line', $rows ) );
+}
+
+/** Send the staff the invite for a booking that has just been made. */
+function ew_acad_send_invite( $id, $slot, $a, $vals ) {
+	$to = array();
+	foreach ( preg_split( '/[\s,;]+/', (string) $a['invite_to'] ) as $em ) {
+		$em = sanitize_email( $em );
+		if ( is_email( $em ) ) {
+			$to[] = $em;
+		}
+	}
+	if ( ! $to ) {
+		return false;
+	}
+	$org  = ew_acad_from( $a );
+	$vals = array_merge( $vals, array(
+		'email' => ew_acad_m( $id, 'email' ),
+		'phone' => ew_acad_m( $id, 'phone' ),
+	) );
+	$body = preg_replace( "/\n{3,}/", "\n\n", ew_acad_fill( str_replace( '\n', "\n", (string) $a['staff_body'] ), $vals ) );
+	$ics  = ew_acad_ics( $id, $slot, $a, ew_acad_fill( (string) $a['invite_title'], $vals ), $body, $org, $to );
+	if ( '' === $ics ) {
+		return false;
+	}
+	$hook = function ( $mail ) use ( $body, $ics ) {
+		$mail->isHTML( true );
+		$mail->Body    = function_exists( 'ew_mail_html' ) ? ew_mail_html( $body, array() ) : nl2br( esc_html( $body ) );
+		$mail->AltBody = $body;
+		$mail->Ical    = $ics;
+		$mail->addStringAttachment( $ics, 'invite.ics', 'base64', 'application/ics' );
+	};
+	add_action( 'phpmailer_init', $hook, 99 );
+	$ok = wp_mail(
+		$to,
+		wp_specialchars_decode( ew_acad_fill( (string) $a['staff_subject'], $vals ), ENT_QUOTES ),
+		$body,
+		array( 'From: Eastwood FC Academy <' . $org . '>' )
+	);
+	remove_action( 'phpmailer_init', $hook, 99 );
+	global $phpmailer;
+	if ( is_object( $phpmailer ) ) {
+		$phpmailer->Ical = '';
+	}
+	update_post_meta( $id, '_ewt_invite_sent', $ok ? time() : 0 );
+	return $ok;
+}
 
 /* ------------------------------------------------------------------ */
 /* Look and behaviour                                                  */
