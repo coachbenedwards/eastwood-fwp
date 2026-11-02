@@ -116,6 +116,13 @@ function ew_claim_defaults() {
 		'rec_shirt'      => '{what}, {size}',
 		'rec_print'      => 'Printed {what}',
 		'rec_total'      => 'Total',
+		'phone_label'   => 'Your mobile',
+		'phone_note'    => 'For a text about the game if anything changes.',
+		'need_phone'    => 'We need a mobile number for the day.',
+		'app_title'     => 'Your tickets are in the app',
+		'ticket_title'  => '{home} v {away}',
+		'ticket_sub'    => 'Coronation Park',
+		'track'         => 'School tickets',
 		'crm_hook'      => '',
 		/* The game after this one. At next_at (site time, "2026-10-24 15:40")
 		   the page turns over to it: the match, the stub, the background,
@@ -345,13 +352,15 @@ function ew_claim_shortcode( $atts, $content = null ) {
 		'need_people' => $a['need_people'],
 		'need_name'   => $a['need_name'],
 		'need_email'  => $a['need_email'],
+		'need_phone'  => $a['need_phone'],
 		'failed'      => $a['failed'],
 		'add'         => $a['school_add'],
+		'tk'          => array( 'title' => $a['ticket_title'], 'home' => $a['home'] ),
 		'one'         => array( $a['adult_one'], $a['child_one'] ),
 		'many'        => array( $a['adult_many'], $a['child_many'] ),
 		'schools'     => ew_claim_schools( $content ),
 		'rest'        => esc_url_raw( rest_url( 'eastwood/v1/claim' ) ),
-	);
+	) + ( function_exists( 'ew_optin_words' ) ? ew_optin_words( 'school', $a ) : array() );
 	$next_at = ew_claim_next_at( $a );
 	if ( $next_at && time() < $next_at ) {
 		$nf = ew_claim_next_fields( $a );
@@ -366,9 +375,17 @@ function ew_claim_shortcode( $atts, $content = null ) {
 
 	$h .= '<p class="ewc-big">' . esc_html( $a['stub_day'] ) . '</p><p class="ewc-month">' . esc_html( $a['stub_month'] ) . '</p>';
 
-	/* Step 1: which school, how many. */
-	$h .= '<div class="ewc-step" data-step="1">';
-	$h .= '<div class="ewc-head"><span>' . esc_html( $a['who_title'] ) . '</span><small>' . $step( 1 ) . '</small></div>';
+	/* Step 1: the email on its own, saved the moment the button is pressed. */
+	$h .= '<form class="ewc-step" novalidate>';
+	$h .= ew_optin_step_one( 'ewc', array_merge( $a, array( 'form_title' => $a['details_title'], 'send' => $a['continue'] ) ) );
+
+	/* Step 2: the rest on the same stub, mobile first, each box saved as they leave it. */
+	$h .= '<div class="ewc-step" data-step="2" data-ewo-two hidden>';
+	$h .= '<div class="ewc-head"><span>' . esc_html( $a['who_title'] ) . '</span></div>';
+	$h .= '<label class="ewc-lab" for="ewcPhone">' . esc_html( $a['phone_label'] ) . '</label><input class="ewc-in" id="ewcPhone" type="tel" autocomplete="tel" data-ewo-save="phone">';
+	if ( '' !== trim( (string) $a['phone_note'] ) ) {
+		$h .= '<p class="ewc-pnote">' . esc_html( $a['phone_note'] ) . '</p>';
+	}
 	$h .= '<label class="ewc-lab" for="ewcSchool">' . esc_html( $a['school_label'] ) . '</label>';
 	$h .= '<div class="ewc-search"><div class="ewc-sbox"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>';
 	$h .= '<input id="ewcSchool" type="text" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="ewcList"></div>';
@@ -378,19 +395,14 @@ function ew_claim_shortcode( $atts, $content = null ) {
 		$h .= '<div class="ewc-count" data-k="' . esc_attr( $k ) . '"><span><b>' . esc_html( $a[ $k ] ) . '</b>' . ( '' !== $note ? '<small>' . esc_html( $note ) . '</small>' : '' ) . '</span>';
 		$h .= '<span class="ewc-pm"><button type="button" data-d="-1" aria-label="&minus; ' . esc_attr( $a[ $k ] ) . '">&minus;</button><output>' . ( 'adults' === $k ? 1 : 0 ) . '</output><button type="button" data-d="1" aria-label="+ ' . esc_attr( $a[ $k ] ) . '">+</button></span></div>';
 	}
-	$h .= '</div><p class="ewc-err" role="alert"></p><button type="button" class="ewc-btn ewc-next">' . esc_html( $a['continue'] ) . '</button></div>';
-
-	/* Step 2: name and email. */
-	$h .= '<form class="ewc-step" data-step="2" hidden novalidate>';
-	$h .= '<div class="ewc-head"><span>' . esc_html( $a['details_title'] ) . '</span><small>' . $step( 2 ) . '</small></div>';
-	$h .= '<label class="ewc-lab" for="ewcName">' . esc_html( $a['name_label'] ) . '</label><input class="ewc-in" id="ewcName" type="text" autocomplete="name" required>';
-	$h .= '<label class="ewc-lab" for="ewcEmail">' . esc_html( $a['email_label'] ) . '</label><input class="ewc-in" id="ewcEmail" type="email" autocomplete="email" required>';
+	$h .= '</div>';
+	$h .= '<label class="ewc-lab" for="ewcName">' . esc_html( $a['name_label'] ) . '</label><input class="ewc-in" id="ewcName" type="text" autocomplete="name" required data-ewo-save="name">';
 	$h .= '<label class="ewc-tick"><input type="checkbox" id="ewcConsent" checked><span>' . esc_html( $a['consent'] ) . '</span></label>';
-	$h .= '<div class="ewc-recap"><span class="ewc-recap-t"></span><button type="button" class="ewc-back">' . esc_html( $a['change'] ) . '</button></div>';
-	$h .= '<p class="ewc-err" role="alert"></p><button type="submit" class="ewc-btn">' . esc_html( $a['claim'] ) . '</button></form>';
+	$h .= '<p class="ewc-err" role="alert"></p><button type="submit" class="ewc-btn">' . esc_html( $a['claim'] ) . '</button></div>';
+	$h .= '</form>';
 
-	/* Step 3: the pass, filled in by the script from the claim. */
-	$h .= '<div class="ewc-step ewc-passed" data-step="3" hidden></div>';
+	/* The last page: their tickets, in the app. Offers (the shirt) are in the app too, so none here. */
+	$h .= ew_inapp_panel( $a['app_title'], ew_claim_ticket( $a ) );
 
 	$h .= '</div></div>';
 	$h .= '<div class="ewc-after" hidden>' . ew_claim_extras_html( $a ) . '</div>';
@@ -398,6 +410,27 @@ function ew_claim_shortcode( $atts, $content = null ) {
 	return $h . '</section>';
 }
 add_shortcode( 'eastwood_claim', 'ew_claim_shortcode' );
+
+/** The ticket that slides out of the app on the last page: the game on the block. */
+function ew_claim_ticket( $a ) {
+	return array(
+		'title' => strtr( (string) $a['ticket_title'], array( '{home}' => $a['home'], '{away}' => $a['away'] ) ),
+		'sub'   => (string) $a['ticket_sub'],
+		'day'   => (string) $a['day'],
+		'date'  => strtoupper( (string) $a['date'] ),
+		'time'  => strtoupper( (string) $a['time'] ),
+		'stub'  => (string) $a['stub_day'],
+		'stub2' => strtoupper( (string) $a['stub_month'] ),
+	);
+}
+
+add_filter( 'ew_optin_forms', function ( $forms ) {
+	$forms['school'] = function ( $post ) {
+		$b = ew_claim_block_on( $post );
+		return $b ? $b['atts'] : null;
+	};
+	return $forms;
+} );
 
 /** The claim block on a page, read from the page itself. */
 function ew_claim_block_on( $post ) {
@@ -475,7 +508,10 @@ add_action( 'rest_api_init', function () {
 			}
 			$a        = $block['atts'];
 			$name     = ew_person_name( sanitize_text_field( (string) $req->get_param( 'name' ) ) );
-			$email    = sanitize_email( (string) $req->get_param( 'email' ) );
+			// Step one already saved the email on a started booking; carry that on.
+			$bid      = function_exists( 'ew_optin_claim' ) ? ew_optin_claim( $req ) : 0;
+			$email    = $bid ? (string) get_post_meta( $bid, '_ewt_email', true ) : sanitize_email( (string) $req->get_param( 'email' ) );
+			$phone    = trim( sanitize_text_field( (string) $req->get_param( 'phone' ) ) );
 			$school   = trim( sanitize_text_field( (string) $req->get_param( 'school' ) ) );
 			$adults   = max( 0, min( 20, (int) $req->get_param( 'adults' ) ) );
 			$children = max( 0, min( 20, (int) $req->get_param( 'children' ) ) );
@@ -491,14 +527,23 @@ add_action( 'rest_api_init', function () {
 			if ( $adults + $children < 1 ) {
 				return new WP_REST_Response( array( 'message' => $a['need_people'] ), 400 );
 			}
+			// Asked for on the two-step form; a claim without the two-step (no booking carried) is let through as before.
+			if ( $bid && strlen( preg_replace( '/\D/', '', $phone ) ) < 10 ) {
+				return new WP_REST_Response( array( 'message' => $a['need_phone'] ), 400 );
+			}
 			do {
 				$code = 'EFC-' . wp_rand( 1000, 9999 );
 			} while ( get_posts( array( 'post_type' => 'ewt_booking', 'post_status' => 'any', 'numberposts' => 1, 'fields' => 'ids', 'meta_key' => '_ewt_code', 'meta_value' => $code ) ) ); // phpcs:ignore WordPress.DB.SlowDBQuery
-			$id = wp_insert_post( array(
-				'post_type'   => 'ewt_booking',
-				'post_status' => 'publish',
-				'post_title'  => $name,
-			) );
+			if ( $bid ) {
+				$id = $bid;
+				wp_update_post( array( 'ID' => $id, 'post_title' => $name ) );
+			} else {
+				$id = wp_insert_post( array(
+					'post_type'   => 'ewt_booking',
+					'post_status' => 'publish',
+					'post_title'  => $name,
+				) );
+			}
 			if ( ! $id || is_wp_error( $id ) ) {
 				return new WP_REST_Response( array( 'message' => $a['failed'] ), 500 );
 			}
@@ -506,6 +551,7 @@ add_action( 'rest_api_init', function () {
 			foreach ( array(
 				'name'     => $name,
 				'email'    => $email,
+				'phone'    => $phone,
 				'event'    => $a['event'],
 				'page'     => $post->ID,
 				'url'      => get_permalink( $post ),
@@ -526,10 +572,8 @@ add_action( 'rest_api_init', function () {
 			if ( function_exists( 'ew_tix_crm' ) ) {
 				ew_tix_crm( (string) $a['crm_hook'], $id, 'claimed' );
 			}
-			return array(
-				'html'  => ew_claim_pass_html( $a, $id ),
-				'offer' => function_exists( 'ew_claim_offer_html' ) ? ew_claim_offer_html( $a, $id ) : '',
-			);
+			// The last page is the app; the shirt offer has moved into the app, so it is not sent.
+			return function_exists( 'ew_optin_finished' ) ? ew_optin_finished( $id ) : array( 'html' => ew_claim_pass_html( $a, $id ) );
 		},
 	) );
 
@@ -610,6 +654,9 @@ function ew_claim_css() {
 .ewc-tick input{width:20px;height:20px;margin:0;accent-color:#CC0000;flex:0 0 auto}
 .ewc-recap{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:14px;color:#e6e6e6;border-top:1px solid rgba(255,255,255,.25);border-bottom:1px solid rgba(255,255,255,.25);padding:12px 0;margin-bottom:18px}
 .ewc-back{background:none;border:0;padding:0;color:#fff;font:inherit;font-size:13px;text-decoration:underline;cursor:pointer}
+.ewc p.ewc-head{display:block;margin:0 0 16px;font-family:Anton,Impact,sans-serif;font-size:28px;line-height:1.05;text-transform:uppercase;color:#fff}
+.ewc .ewc-pnote{margin:-8px 0 16px;font-size:13px;line-height:1.45;color:#cfcfcf}
+.ewc-stub .ewi{background:transparent;padding:0}
 .ewc .ewc-err{margin:0 0 12px;font-size:14px;font-weight:600;color:#ff8a8a}
 .ewc .ewc-err:empty{display:none}
 .ewc-passed{flex:1 1 auto}
@@ -668,7 +715,8 @@ function ew_claim_js() {
  window.ewcRedraw = function(){ draw(); letin(); };
  var wordsEl = root.querySelector('.ewc-words'); if(!wordsEl) return;
  var W = JSON.parse(wordsEl.textContent), page = root.getAttribute('data-page');
- var s1 = root.querySelector('[data-step="1"]'), s2 = root.querySelector('[data-step="2"]'), s3 = root.querySelector('[data-step="3"]');
+ var form = root.querySelector('form.ewc-step'), s2 = root.querySelector('[data-step="2"]');
+ var O = window.ewOptin ? ewOptin(root, W) : {bid: 0, key: '', email: ''};
  var input = root.querySelector('#ewcSchool'), list = root.querySelector('#ewcList'), box = root.querySelector('.ewc-search');
  var school = '', schools = W.schools || [];
  var count = {adults: 1, children: 0};
@@ -685,6 +733,10 @@ function ew_claim_js() {
      if(f.away_crest && crests[1]){ crests[1].src = f.away_crest; if(f.away) crests[1].alt = f.away; }
      if(f.background){ var tk = root.querySelector('.ewc-tk'); if(tk) tk.style.backgroundImage = 'url(' + f.background + ')'; }
      set('.ewc-day', f.day); set('.ewc-date', f.date); set('.ewc-time', f.time); set('.ewc-big', f.stub_day); set('.ewc-month', f.stub_month);
+     /* and the ticket on the last page */
+     if(f.away && W.tk) set('.ewi-tkt', String(W.tk.title).replace('{home}', W.tk.home).replace('{away}', f.away));
+     set('.ewi-tkd', f.day); set('.ewi-tkw span', f.date && f.date.toUpperCase()); set('.ewi-tkw b', f.time && f.time.toUpperCase());
+     set('.ewi-stub b', f.stub_day); set('.ewi-stub span', f.stub_month && f.stub_month.toUpperCase());
    };
    turn(); setInterval(turn, 15000);
  }
@@ -735,43 +787,29 @@ function ew_claim_js() {
  });
 
  function err(step, t){ step.querySelector('.ewc-err').textContent = t || ''; }
- root.querySelector('.ewc-next').addEventListener('click', function(){
+ form.addEventListener('submit', function(e){
+   e.preventDefault();
+   if(s2.hidden) return;
+   var name = root.querySelector('#ewcName').value.trim(), phone = root.querySelector('#ewcPhone').value.trim();
+   if(phone.replace(/\D/g,'').length < 10){ err(s2, W.need_phone); return; }
    if(!school){
      var typed = norm(input.value), match = schools.filter(function(s){ return norm(s) === typed; })[0];
-     if(match){ school = match; } else { err(s1, W.need_school); input.focus(); return; }
+     if(match){ school = match; } else { err(s2, W.need_school); input.focus(); return; }
    }
-   if(count.adults + count.children < 1){ err(s1, W.need_people); return; }
-   err(s1, '');
-   root.querySelector('.ewc-recap-t').textContent = school + ' · ' + party();
-   s1.hidden = true; s2.hidden = false;
-   root.querySelector('#ewcName').focus();
- });
- root.querySelector('.ewc-back').addEventListener('click', function(){ s2.hidden = true; s1.hidden = false; });
- s2.addEventListener('submit', function(e){
-   e.preventDefault();
-   var name = root.querySelector('#ewcName').value.trim(), email = root.querySelector('#ewcEmail').value.trim();
+   if(count.adults + count.children < 1){ err(s2, W.need_people); return; }
    if(!name){ err(s2, W.need_name); return; }
-   if(email.indexOf('@') < 1 || email.indexOf('.', email.indexOf('@')) < 0){ err(s2, W.need_email); return; }
    err(s2, '');
    var go = s2.querySelector('button[type="submit"]'); go.disabled = true;
    fetch(W.rest, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
-     page: page, school: school, adults: count.adults, children: count.children,
-     name: name, email: email, consent: root.querySelector('#ewcConsent').checked})})
+     page: page, bid: O.bid, key: O.key, email: O.email, school: school, adults: count.adults, children: count.children,
+     name: name, phone: phone, consent: root.querySelector('#ewcConsent').checked})})
    .then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); })
    .then(function(res){
-     if(!res.ok || !res.j.html){ err(s2, (res.j && res.j.message) || W.failed); go.disabled = false; return; }
+     if(!res.ok || !res.j || !(res.j.ok || res.j.html)){ err(s2, (res.j && res.j.message) || W.failed); go.disabled = false; return; }
      root.querySelector('.ewc-big').hidden = true; root.querySelector('.ewc-month').hidden = true;
-     s2.hidden = true; s3.hidden = false;
-     if(window.ewTrack) ewTrack('Lead', {what: 'School tickets'});
-     if(res.j.offer && window.ewcOffer){
-       /* The shirt offer first; No thanks goes to the pass. */
-       s3.innerHTML = res.j.offer; window.ewcOffer(s3.querySelector('.ewc-offer'), res.j.html);
-     } else {
-       s3.innerHTML = res.j.html;
-       var after = root.querySelector('.ewc-after'); if(after) after.hidden = false;
-     }
-     draw(); letin();
-     root.scrollIntoView({behavior:'smooth', block:'start'});
+     form.hidden = true;
+     if(O.done) O.done();
+     if(window.ewInapp) ewInapp(root, res.j.claim || '');
    })
    .catch(function(){ err(s2, W.failed); go.disabled = false; });
  });
@@ -790,12 +828,12 @@ add_action( 'wp_enqueue_scripts', function () {
 	wp_enqueue_style( 'ewc-fonts', 'https://fonts.googleapis.com/css2?family=Anton&family=Instrument+Sans:wght@400;600;700&display=swap', array(), null ); // phpcs:ignore WordPress.WP.EnqueuedResourceParameters.MissingVersion
 	wp_register_style( 'ew-claim', false, array(), EW_FWP_VERSION );
 	wp_enqueue_style( 'ew-claim' );
-	wp_add_inline_style( 'ew-claim', ew_claim_css() );
+	wp_add_inline_style( 'ew-claim', ew_claim_css() . ( function_exists( 'ew_inapp_css' ) ? ew_inapp_css() : '' ) );
 	wp_enqueue_script( 'ew-qrcode', ew_hb_asset( 'claim/qrcode.js' ), array(), EW_FWP_VERSION, true );
 	if ( current_user_can( 'edit_posts' ) ) {
 		wp_enqueue_script( 'wp-api' );
 	}
 	wp_register_script( 'ew-claim', '', array( 'ew-qrcode' ), EW_FWP_VERSION, true );
 	wp_enqueue_script( 'ew-claim' );
-	wp_add_inline_script( 'ew-claim', ew_claim_js() );
+	wp_add_inline_script( 'ew-claim', ( function_exists( 'ew_optin_js' ) ? ew_optin_js() . ew_inapp_js() : '' ) . ew_claim_js() );
 }, 22 );

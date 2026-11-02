@@ -229,6 +229,15 @@ function ew_cm_req_defaults() {
 		'mail_body'      => "Hi {name},\n\nYou're in. Here's your pass for {game}:\n{pass}\n\nShow it at the \"Tickets\" queue on the day.\n\nSee you there,\nTeam EastwoodFC",
 		'no_subject'     => 'Community tickets for {game}',
 		'no_body'        => "Hi {name},\n\nThanks for asking. Sorry, we couldn't fit you in for {game}. Please do ask for another game.\n\nTeam EastwoodFC",
+		'phone_label'    => 'Your mobile',
+		'phone_note'     => 'For a text about the game if anything changes.',
+		'need_phone'     => 'We need a mobile number for the day.',
+		'send2'          => 'Send',
+		'app_title'      => 'Your tickets will be in the app',
+		'ticket_title'   => '{home} v {away}',
+		'ticket_sub'     => '{venue}',
+		'track'          => 'Community tickets',
+		'crm_hook'       => '',
 	);
 }
 
@@ -408,18 +417,31 @@ function ew_cm_req_sc( $atts, $content = null ) {
 		'many'        => array( $a['adult_many'], $a['child_many'] ),
 		'sent_line'   => $a['sent_line'],
 		'sent_note'   => $a['sent_note'],
+		'need_phone'  => $a['need_phone'],
 		'rest'        => esc_url_raw( rest_url( 'eastwood/v1/community' ) ),
 		'partner'     => '' !== $partner ? $pkey : '',
-	);
+	) + ( function_exists( 'ew_optin_words' ) ? ew_optin_words( 'community', $a ) : array() );
 
 	$h  = $open . ew_cm_match_html( $game, $a ) . '<div class="ewc-stub">';
 	$h .= '<form class="ewc-step ewcm-form" novalidate>';
 	if ( '' !== $partner ) {
 		$h .= '<div class="ewcm-partner"><small>' . esc_html( $a['partner_head'] ) . '</small><b>' . esc_html( $partner ) . '</b></div>';
-	} else {
-		$h .= '<p class="ewcm-t">' . esc_html( $a['title'] ) . '</p><p class="ewcm-lede">' . esc_html( $a['lede'] ) . '</p>';
 	}
+	// Step one: the email on its own, saved the moment the button is pressed.
+	$h .= ew_optin_step_one( 'ewc', array_merge( $a, array(
+		'form_title'  => '' !== $partner ? $a['head'] : $a['title'],
+		'email_label' => '' !== $partner ? $a['partner_email'] : $a['email_label'],
+	) ) );
+	// Step two: the rest, mobile first, each box saved as they leave it.
+	$h .= '<div class="ewcm-two" data-ewo-two hidden>';
 	$h .= '<div class="ewc-head"><span>' . esc_html( $a['head'] ) . '</span></div>';
+	if ( '' === $partner ) {
+		$h .= '<p class="ewcm-lede">' . esc_html( $a['lede'] ) . '</p>';
+	}
+	$h .= '<label class="ewc-lab" for="ewcmPhone">' . esc_html( $a['phone_label'] ) . '</label><input class="ewc-in" id="ewcmPhone" type="tel" autocomplete="tel" data-ewo-save="phone">';
+	if ( '' !== trim( (string) $a['phone_note'] ) ) {
+		$h .= '<p class="ewcm-pnote">' . esc_html( $a['phone_note'] ) . '</p>';
+	}
 	$h .= '<label class="ewc-lab" for="ewcmGame">' . esc_html( $a['game_label'] ) . '</label><select id="ewcmGame" class="ewc-in">';
 	foreach ( array_slice( $games, 0, 8 ) as $g ) {
 		$v    = ew_cm_vars( $g, $a['venue'] );
@@ -435,20 +457,43 @@ function ew_cm_req_sc( $atts, $content = null ) {
 	$h .= '</div>';
 	if ( '' !== $partner ) {
 		$h .= '<label class="ewc-lab" for="ewcmName">' . esc_html( $a['partner_family'] ) . '</label><input class="ewc-in" id="ewcmName" type="text" autocomplete="off">';
-		$h .= '<label class="ewc-lab" for="ewcmEmail">' . esc_html( $a['partner_email'] ) . '</label><input class="ewc-in" id="ewcmEmail" type="email">';
 		$h .= '<label class="ewc-lab" for="ewcmYou">' . esc_html( $a['partner_you'] ) . '</label><input class="ewc-in" id="ewcmYou" type="text" autocomplete="name">';
 	} else {
-		$h .= '<label class="ewc-lab" for="ewcmName">' . esc_html( $a['name_label'] ) . '</label><input class="ewc-in" id="ewcmName" type="text" autocomplete="name">';
-		$h .= '<label class="ewc-lab" for="ewcmEmail">' . esc_html( $a['email_label'] ) . '</label><input class="ewc-in" id="ewcmEmail" type="email" autocomplete="email">';
+		$h .= '<label class="ewc-lab" for="ewcmName">' . esc_html( $a['name_label'] ) . '</label><input class="ewc-in" id="ewcmName" type="text" autocomplete="name" data-ewo-save="name">';
 	}
-	$h .= '<label class="ewc-lab" for="ewcmNote">' . esc_html( $a['note_label'] ) . ' <span class="ewcm-opt">' . esc_html( $a['optional'] ) . '</span></label><textarea class="ewc-in ewcm-note" id="ewcmNote" rows="2"></textarea>';
+	$h .= '<label class="ewc-lab" for="ewcmNote">' . esc_html( $a['note_label'] ) . ' <span class="ewcm-opt">' . esc_html( $a['optional'] ) . '</span></label><textarea class="ewc-in ewcm-note" id="ewcmNote" rows="2" data-ewo-save="notes"></textarea>';
 	$h .= '<label class="ewc-tick"><input type="checkbox" id="ewcmConsent"><span>' . esc_html( $a['consent'] ) . '</span></label>';
-	$h .= '<p class="ewc-err" role="alert"></p><button type="submit" class="ewc-btn">' . esc_html( $a['send'] ) . '</button></form>';
-	$h .= '<div class="ewcm-sent" hidden><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M7 12.5l3.2 3.2L17 9"/></svg><p class="ewc-done">' . esc_html( $a['sent_title'] ) . '</p><p class="ewc-small ewcm-line"></p><p class="ewc-small ewcm-note2"></p></div>';
+	$h .= '<p class="ewc-err" role="alert"></p><button type="submit" class="ewc-btn">' . esc_html( $a['send2'] ) . '</button></div></form>';
+	// The last page: their tickets, in the app.
+	$h .= ew_inapp_panel( $a['app_title'], ew_cm_ticket( $game, $a ) );
 	$h .= '</div></div><script type="application/json" class="ewcm-words">' . wp_json_encode( $words ) . '</script></section>';
 	return $h;
 }
 add_shortcode( 'eastwood_community_request', 'ew_cm_req_sc' );
+
+/** The ticket that slides out of the app on the last page, for the game asked for. */
+function ew_cm_ticket( $m, $a ) {
+	$v  = ew_cm_vars( $m, $a['venue'] );
+	$dt = date_create( (string) $m['date'], wp_timezone() );
+	$ts = $dt ? $dt->getTimestamp() : 0;
+	return array(
+		'title' => ew_cm_fill( $a['ticket_title'], $v ),
+		'sub'   => ew_cm_fill( $a['ticket_sub'], $v ),
+		'day'   => $v['{day}'],
+		'date'  => strtoupper( $v['{date}'] . ' ' . $v['{year}'] ),
+		'time'  => strtoupper( $v['{time}'] ),
+		'stub'  => $ts ? wp_date( 'jS', $ts ) : '',
+		'stub2' => $ts ? strtoupper( wp_date( 'F Y', $ts ) ) : '',
+	);
+}
+
+add_filter( 'ew_optin_forms', function ( $forms ) {
+	$forms['community'] = function ( $post ) {
+		$b = ew_cm_block_on( $post );
+		return $b ? $b['atts'] : null;
+	};
+	return $forms;
+} );
 
 /* --- Asking ---------------------------------------------------------------- */
 
@@ -465,7 +510,10 @@ add_action( 'rest_api_init', function () {
 			$a        = $block['atts'];
 			$game     = ew_cm_game( (int) $req->get_param( 'game' ) );
 			$name     = ew_person_name( sanitize_text_field( (string) $req->get_param( 'name' ) ) );
-			$email    = sanitize_email( (string) $req->get_param( 'email' ) );
+			// Step one already saved the email on a started booking; carry that on.
+			$bid      = function_exists( 'ew_optin_claim' ) ? ew_optin_claim( $req ) : 0;
+			$email    = $bid ? (string) get_post_meta( $bid, '_ewt_email', true ) : sanitize_email( (string) $req->get_param( 'email' ) );
+			$phone    = trim( sanitize_text_field( (string) $req->get_param( 'phone' ) ) );
 			$note     = trim( sanitize_textarea_field( (string) $req->get_param( 'note' ) ) );
 			$adults   = max( 0, min( 10, (int) $req->get_param( 'adults' ) ) );
 			$children = max( 0, min( 10, (int) $req->get_param( 'children' ) ) );
@@ -484,6 +532,10 @@ add_action( 'rest_api_init', function () {
 			if ( ! is_email( $email ) ) {
 				return new WP_REST_Response( array( 'message' => $a['need_email'] ), 400 );
 			}
+			// Asked for on the two-step form; a request without the two-step (no booking carried) is let through as before.
+			if ( $bid && strlen( preg_replace( '/\D/', '', $phone ) ) < 10 ) {
+				return new WP_REST_Response( array( 'message' => $a['need_phone'] ), 400 );
+			}
 			$cap = max( 0, (int) $a['cap'] );
 			if ( $cap && ew_cm_taken( $game['id'] ) + $adults + $children > $cap ) {
 				return new WP_REST_Response( array( 'message' => $a['full'] ), 409 );
@@ -491,7 +543,12 @@ add_action( 'rest_api_init', function () {
 			do {
 				$code = 'EFC-' . wp_rand( 1000, 9999 );
 			} while ( get_posts( array( 'post_type' => 'ewt_booking', 'post_status' => 'any', 'numberposts' => 1, 'fields' => 'ids', 'meta_key' => '_ewt_code', 'meta_value' => $code ) ) ); // phpcs:ignore WordPress.DB.SlowDBQuery
-			$id = wp_insert_post( array( 'post_type' => 'ewt_booking', 'post_status' => 'publish', 'post_title' => $name ) );
+			if ( $bid ) {
+				$id = $bid;
+				wp_update_post( array( 'ID' => $id, 'post_title' => $name ) );
+			} else {
+				$id = wp_insert_post( array( 'post_type' => 'ewt_booking', 'post_status' => 'publish', 'post_title' => $name ) );
+			}
 			if ( ! $id || is_wp_error( $id ) ) {
 				return new WP_REST_Response( array( 'message' => $a['failed'] ), 500 );
 			}
@@ -502,6 +559,7 @@ add_action( 'rest_api_init', function () {
 				'kind'     => 'community',
 				'name'     => $name,
 				'email'    => $email,
+				'phone'    => $phone,
 				'event'    => 'Community tickets: ' . $label,
 				'game'     => (int) $game['id'],
 				'gamedate' => (string) $game['date'],
@@ -518,14 +576,20 @@ add_action( 'rest_api_init', function () {
 				'consent'  => $req->get_param( 'consent' ) ? 'yes' : 'no',
 				'code'     => $code,
 				'key'      => wp_generate_password( 12, false ),
+				'hook'     => (string) $a['crm_hook'],
 				'status'   => 'community',
 			) as $k => $val ) {
 				update_post_meta( $id, '_ewt_' . $k, $val );
 			}
-			return array(
-				'ok'    => true,
-				'line'  => strtr( $a['sent_line'], array( '{party}' => $party, '{game}' => $label ) ),
-				'note'  => strtr( $a['sent_note'], array( '{email}' => $email, '{game}' => $label ) ),
+			if ( function_exists( 'ew_tix_crm' ) ) {
+				ew_tix_crm( (string) $a['crm_hook'], $id, 'community' );
+			}
+			return array_merge(
+				function_exists( 'ew_optin_finished' ) ? ew_optin_finished( $id ) : array( 'ok' => 1 ),
+				array(
+					'line' => strtr( $a['sent_line'], array( '{party}' => $party, '{game}' => $label ) ),
+					'note' => strtr( $a['sent_note'], array( '{email}' => $email, '{game}' => $label ) ),
+				)
 			);
 		},
 	) );
@@ -695,6 +759,10 @@ function ew_cm_css() {
 .ewcm .ewc-head{margin-bottom:14px}
 .ewcm-sent,.ewcm-msg{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;text-align:center;gap:10px}
 .ewcm-sent svg{align-self:center;margin-bottom:8px}
+.ewcm [data-ewo-one] .ewc-head{display:block;border-top:0;padding-top:0;margin:0 0 16px;font-family:Anton,Impact,sans-serif;font-size:34px;line-height:1.05;text-transform:uppercase;color:#fff}
+.ewcm-partner+[data-ewo-one] .ewc-head{font-size:28px;border-top:1px solid rgba(255,255,255,.25);padding-top:14px}
+.ewcm .ewcm-pnote{margin:-8px 0 14px;font-size:13px;line-height:1.45;color:#cfcfcf}
+.ewc-stub .ewi{background:transparent;padding:0}
 .ewcm-sent[hidden]{display:none!important}
 @media(max-width:860px){
  .ewcm-feat{grid-template-columns:1fr;min-height:0}
@@ -729,7 +797,8 @@ function ew_cm_js() {
  });
  var wordsEl = root.querySelector('.ewcm-words'); if(!wordsEl) return;
  var W = JSON.parse(wordsEl.textContent), page = root.getAttribute('data-page');
- var form = root.querySelector('.ewcm-form'), sent = root.querySelector('.ewcm-sent'), err = form.querySelector('.ewc-err');
+ var form = root.querySelector('.ewcm-form'), err = form.querySelector('[data-ewo-two] .ewc-err');
+ var O = window.ewOptin ? ewOptin(root, W) : {bid: 0, key: '', email: ''};
  var count = {adults: 1, children: 0};
  root.querySelectorAll('.ewc-count').forEach(function(row){
    var k = row.getAttribute('data-k'), out = row.querySelector('output'), btns = row.querySelectorAll('button');
@@ -744,23 +813,21 @@ function ew_cm_js() {
  form.addEventListener('submit', function(e){
    e.preventDefault();
    var v = function(id){ var el = root.querySelector('#' + id); return el ? el.value.trim() : ''; };
-   var name = v('ewcmName'), email = v('ewcmEmail');
+   var name = v('ewcmName'), phone = v('ewcmPhone');
+   if(phone.replace(/\D/g,'').length < 10){ err.textContent = W.need_phone; return; }
    if(count.adults + count.children < 1){ err.textContent = W.need_people; return; }
    if(!name){ err.textContent = W.need_name; return; }
-   if(email.indexOf('@') < 1 || email.indexOf('.', email.indexOf('@')) < 0){ err.textContent = W.need_email; return; }
    err.textContent = '';
    var go = form.querySelector('button[type="submit"]'); go.disabled = true;
    fetch(W.rest, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
-     page: page, game: sel.value, adults: count.adults, children: count.children, name: name, email: email,
+     page: page, bid: O.bid, key: O.key, email: O.email, game: sel.value, adults: count.adults, children: count.children, name: name, phone: phone,
      you: v('ewcmYou'), note: v('ewcmNote'), partner: W.partner, consent: root.querySelector('#ewcmConsent').checked})})
    .then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); })
    .then(function(res){
      if(!res.ok || !res.j.ok){ err.textContent = (res.j && res.j.message) || W.failed; go.disabled = false; return; }
-     form.hidden = true; sent.hidden = false;
-     if(window.ewTrack) ewTrack('Lead', {what: 'Community tickets'});
-     sent.querySelector('.ewcm-line').textContent = res.j.line;
-     sent.querySelector('.ewcm-note2').textContent = res.j.note;
-     root.scrollIntoView({behavior:'smooth', block:'start'});
+     form.hidden = true;
+     if(O.done) O.done();
+     if(window.ewInapp) ewInapp(root, res.j.claim || '');
    })
    .catch(function(){ err.textContent = W.failed; go.disabled = false; });
  });
@@ -784,7 +851,7 @@ add_action( 'wp_enqueue_scripts', function () {
 	wp_enqueue_style( 'ewc-fonts', 'https://fonts.googleapis.com/css2?family=Anton&family=Instrument+Sans:wght@400;600;700&display=swap', array(), null ); // phpcs:ignore WordPress.WP.EnqueuedResourceParameters.MissingVersion
 	wp_register_style( 'ew-community', false, array(), EW_FWP_VERSION );
 	wp_enqueue_style( 'ew-community' );
-	wp_add_inline_style( 'ew-community', ( $req && function_exists( 'ew_claim_css' ) ? ew_claim_css() : '' ) . ew_cm_css() );
+	wp_add_inline_style( 'ew-community', ( $req && function_exists( 'ew_claim_css' ) ? ew_claim_css() : '' ) . ew_cm_css() . ( $req && function_exists( 'ew_inapp_css' ) ? ew_inapp_css() : '' ) );
 	if ( $req ) {
 		wp_enqueue_script( 'ew-qrcode', ew_hb_asset( 'claim/qrcode.js' ), array(), EW_FWP_VERSION, true );
 		if ( current_user_can( 'edit_posts' ) ) {
@@ -792,6 +859,6 @@ add_action( 'wp_enqueue_scripts', function () {
 		}
 		wp_register_script( 'ew-community', '', array( 'ew-qrcode' ), EW_FWP_VERSION, true );
 		wp_enqueue_script( 'ew-community' );
-		wp_add_inline_script( 'ew-community', ew_cm_js() );
+		wp_add_inline_script( 'ew-community', ( function_exists( 'ew_optin_js' ) ? ew_optin_js() . ew_inapp_js() : '' ) . ew_cm_js() );
 	}
 }, 24 );

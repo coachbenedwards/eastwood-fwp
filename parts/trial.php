@@ -50,6 +50,13 @@ function ew_trial_defaults() {
 		'failed'      => 'Something went wrong. Please try again.',
 		'done_title'  => 'You are down',
 		'done_note'   => 'We will be in touch before the day with the time to arrive and what to bring.',
+		'next_title'  => 'Nearly there',
+		'phone_note'  => 'For a text about the day if anything changes.',
+		'send2'       => 'Send',
+		'app_title'   => 'Your place is in the app',
+		'ticket_title' => 'Academy trial',
+		'ticket_time' => '',
+		'track'       => 'Academy trial',
 		'crm_hook'    => '',
 		/* The Google Form this also fills in, and which of its boxes takes what.
 		   Leave either empty and no form is filled. */
@@ -74,20 +81,30 @@ function ew_trial_shortcode( $atts ) {
 		'failed'     => $a['failed'],
 		'phone'      => ew_trial_on( $a['show_phone'] ) ? 1 : 0,
 		'rest'       => esc_url_raw( rest_url( 'eastwood/v1/trial' ) ),
-	);
+	) + ( function_exists( 'ew_optin_words' ) ? ew_optin_words( 'trial', $a ) : array() );
 
-	$field = function ( $id, $label, $type, $auto ) {
+	$field = function ( $id, $label, $type, $auto, $save = '' ) {
 		return '<label class="ewtr-lab" for="' . esc_attr( $id ) . '">' . esc_html( $label ) . '</label>'
-			. '<input class="ewtr-in" id="' . esc_attr( $id ) . '" type="' . esc_attr( $type ) . '" autocomplete="' . esc_attr( $auto ) . '">';
+			. '<input class="ewtr-in" id="' . esc_attr( $id ) . '" type="' . esc_attr( $type ) . '" autocomplete="' . esc_attr( $auto ) . '"' . ( '' !== $save ? ' data-ewo-save="' . esc_attr( $save ) . '"' : '' ) . '>';
 	};
 
 	$h  = '<section class="ewtr" data-page="' . (int) ( $post ? $post->ID : 0 ) . '">';
 	$h .= '<form class="ewtr-form" novalidate>';
-	$h .= '<p class="ewtr-head">' . esc_html( $a['form_title'] ) . '</p>';
+	// Step one: the email on its own, saved the moment the button is pressed.
+	$h .= ew_optin_step_one( 'ewtr', $a );
+	// Step two: the rest, mobile first, each box saved as they leave it.
+	$h .= '<div class="ewtr-step2" data-ewo-two hidden>';
+	$h .= '<p class="ewtr-head">' . esc_html( $a['next_title'] ) . '</p>';
 	if ( '' !== trim( (string) $a['form_note'] ) ) {
 		$h .= '<p class="ewtr-note">' . esc_html( $a['form_note'] ) . '</p>';
 	}
-	$h .= $field( 'ewtrName', $a['name_label'], 'text', 'name' );
+	if ( ew_trial_on( $a['show_phone'] ) ) {
+		$h .= $field( 'ewtrPhone', $a['phone_label'], 'tel', 'tel', 'phone' );
+		if ( '' !== trim( (string) $a['phone_note'] ) ) {
+			$h .= '<p class="ewtr-pnote">' . esc_html( $a['phone_note'] ) . '</p>';
+		}
+	}
+	$h .= $field( 'ewtrName', $a['name_label'], 'text', 'name', 'name' );
 
 	/*
 	 * Position and date of birth share a row only when both are asked for.
@@ -119,25 +136,45 @@ function ew_trial_shortcode( $atts ) {
 	if ( ew_trial_on( $a['show_school'] ) ) {
 		$h .= $field( 'ewtrSchool', $a['school_label'], 'text', 'off' );
 	}
-	$h .= $field( 'ewtrEmail', $a['email_label'], 'email', 'email' );
-	if ( ew_trial_on( $a['show_phone'] ) ) {
-		$h .= $field( 'ewtrPhone', $a['phone_label'], 'tel', 'tel' );
-	}
 	if ( ew_trial_on( $a['show_guard'] ) ) {
 		$h .= $field( 'ewtrGuard', $a['guard_label'], 'tel', 'off' );
 	}
 	$h .= '<label class="ewtr-tick"><input type="checkbox" id="ewtrConsent" checked><span>' . esc_html( $a['consent'] ) . '</span></label>';
 	$h .= '<p class="ewtr-err" role="alert"></p>';
-	$h .= '<button type="submit" class="ewtr-btn">' . esc_html( $a['send'] ) . '</button>';
+	$h .= '<button type="submit" class="ewtr-btn">' . esc_html( $a['send2'] ) . '</button>';
 	if ( '' !== trim( (string) $a['free_note'] ) ) {
 		$h .= '<p class="ewtr-free">' . esc_html( $a['free_note'] ) . '</p>';
 	}
+	$h .= '</div>';
 	$h .= '</form>';
-	$h .= '<div class="ewtr-done" hidden><p class="ewtr-done-t">' . esc_html( $a['done_title'] ) . '</p><p class="ewtr-done-n">' . esc_html( $a['done_note'] ) . '</p></div>';
+	// The last page: their place, in the app.
+	$h .= ew_inapp_panel( $a['app_title'], ew_trial_ticket( $a, $post ) );
 	$h .= '<script type="application/json" class="ewtr-words">' . wp_json_encode( $words ) . '</script>';
 	return $h . '</section>';
 }
 add_shortcode( 'eastwood_trial', 'ew_trial_shortcode' );
+
+/** The place that slides out of the app on the last page, read from the event line. */
+function ew_trial_ticket( $a, $post ) {
+	$event = '' !== trim( (string) $a['event'] ) ? (string) $a['event'] : ( $post ? get_the_title( $post ) : '' );
+	$parts = array_map( 'trim', explode( ',', $event, 2 ) );
+	$when  = $parts[1] ?? '';
+	$ts    = '' !== $when ? strtotime( $when ) : 0;
+	return array(
+		'title' => (string) $a['ticket_title'],
+		'sub'   => $parts[0],
+		'day'   => $ts ? date_i18n( 'l', $ts ) : '',
+		'date'  => $ts ? strtoupper( date_i18n( 'j F Y', $ts ) ) : $when,
+		'time'  => strtoupper( (string) $a['ticket_time'] ),
+		'stub'  => $ts ? date_i18n( 'jS', $ts ) : '',
+		'stub2' => $ts ? strtoupper( date_i18n( 'F Y', $ts ) ) : '',
+	);
+}
+
+add_filter( 'ew_optin_forms', function ( $forms ) {
+	$forms['trial'] = 'ew_trial_block_on';
+	return $forms;
+} );
 
 /** The block on a page, read from the page itself, so a sign-up carries its words. */
 function ew_trial_block_on( $post ) {
@@ -185,7 +222,9 @@ add_action( 'rest_api_init', function () {
 				return new WP_REST_Response( array( 'message' => 'no block' ), 400 );
 			}
 			$name  = ew_person_name( sanitize_text_field( (string) $req->get_param( 'name' ) ) );
-			$email = sanitize_email( (string) $req->get_param( 'email' ) );
+			// Step one already saved the email on a started booking; carry that on.
+			$bid   = function_exists( 'ew_optin_claim' ) ? ew_optin_claim( $req ) : 0;
+			$email = $bid ? (string) get_post_meta( $bid, '_ewt_email', true ) : sanitize_email( (string) $req->get_param( 'email' ) );
 			$phone = trim( sanitize_text_field( (string) $req->get_param( 'phone' ) ) );
 			$pos   = trim( sanitize_text_field( (string) $req->get_param( 'pos' ) ) );
 			$dob   = trim( sanitize_text_field( (string) $req->get_param( 'dob' ) ) );
@@ -219,11 +258,16 @@ add_action( 'rest_api_init', function () {
 				$about[] = $school;
 			}
 			$about = implode( ', ', $about );
-			$id    = wp_insert_post( array(
-				'post_type'   => 'ewt_booking',
-				'post_status' => 'publish',
-				'post_title'  => $name,
-			) );
+			if ( $bid ) {
+				$id = $bid;
+				wp_update_post( array( 'ID' => $id, 'post_title' => $name ) );
+			} else {
+				$id = wp_insert_post( array(
+					'post_type'   => 'ewt_booking',
+					'post_status' => 'publish',
+					'post_title'  => $name,
+				) );
+			}
 			if ( ! $id || is_wp_error( $id ) ) {
 				return new WP_REST_Response( array( 'message' => $a['failed'] ), 500 );
 			}
@@ -262,7 +306,7 @@ add_action( 'rest_api_init', function () {
 				'guard'  => $guard,
 				'event'  => $event,
 			) );
-			return array( 'ok' => 1 );
+			return function_exists( 'ew_optin_finished' ) ? ew_optin_finished( $id ) : array( 'ok' => 1 );
 		},
 	) );
 } );
@@ -330,6 +374,8 @@ function ew_trial_css() {
 .ewtr-done{background:#0b0b0b;color:#fff;border-radius:14px;padding:48px 40px;text-align:center}
 .ewtr .ewtr-done-t{margin:0 0 10px;font-family:Anton,Impact,sans-serif;font-size:48px;line-height:1;text-transform:uppercase;color:#fff}
 .ewtr .ewtr-done-n{margin:0;font-size:17px;line-height:1.5;color:#fff}
+.ewtr .ewtr-pnote{margin:6px 0 0;font-size:14px;line-height:1.45;color:rgba(255,255,255,.7)}
+.ewtr-step2 .ewtr-head{margin-bottom:4px}
 @media (max-width:640px){.ewtr-form{padding:28px 20px 32px}.ewtr-two{grid-template-columns:minmax(0,1fr)}}
 ';
 }
@@ -340,18 +386,18 @@ function ew_trial_js() {
  var root = document.querySelector('.ewtr'); if(!root) return;
  var wordsEl = root.querySelector('.ewtr-words'); if(!wordsEl) return;
  var W = JSON.parse(wordsEl.textContent), page = root.getAttribute('data-page');
- var form = root.querySelector('.ewtr-form'), err = root.querySelector('.ewtr-err');
+ var form = root.querySelector('.ewtr-form'), err = root.querySelector('.ewtr-step2 .ewtr-err');
  function val(id){ var el = root.querySelector('#' + id); return el ? el.value.trim() : ''; }
+ var O = window.ewOptin ? ewOptin(root, W) : {bid: 0, key: '', email: ''};
  form.addEventListener('submit', function(e){
    e.preventDefault(); err.textContent = '';
-   var name = val('ewtrName'), email = val('ewtrEmail'), phone = val('ewtrPhone');
-   if(!name){ err.textContent = W.need_name; return; }
-   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ err.textContent = W.need_email; return; }
+   var name = val('ewtrName'), phone = val('ewtrPhone');
    if(W.phone && phone.replace(/\D/g,'').length < 10){ err.textContent = W.need_phone; return; }
+   if(!name){ err.textContent = W.need_name; return; }
    var tick = root.querySelector('#ewtrConsent');
-   var btn = form.querySelector('.ewtr-btn'); btn.disabled = true;
+   var btn = form.querySelector('.ewtr-btn[type=submit]'); btn.disabled = true;
    fetch(W.rest, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
-     page: page, name: name, email: email, phone: phone,
+     page: page, bid: O.bid, key: O.key, email: O.email, name: name, phone: phone,
      pos: val('ewtrPos'), dob: val('ewtrDob'), club: val('ewtrClub'),
      loc: val('ewtrLoc'), school: val('ewtrSchool'), guard: val('ewtrGuard'),
      consent: (tick && tick.checked) ? 1 : 0
@@ -359,8 +405,9 @@ function ew_trial_js() {
    .then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); })
    .then(function(x){
      if(!x.ok){ err.textContent = (x.j && x.j.message) || W.failed; btn.disabled = false; return; }
-     form.hidden = true; root.querySelector('.ewtr-done').hidden = false;
-     if(window.ewTrack) ewTrack('Lead', {what: 'Academy trial'});
+     form.hidden = true;
+     if(O.done) O.done();
+     if(window.ewInapp) ewInapp(root, x.j.claim || '');
    })
    .catch(function(){ err.textContent = W.failed; btn.disabled = false; });
  });
@@ -379,8 +426,8 @@ add_action( 'wp_enqueue_scripts', function () {
 	wp_enqueue_style( 'ewc-fonts', 'https://fonts.googleapis.com/css2?family=Anton&family=Instrument+Sans:wght@400;600;700&display=swap', array(), null ); // phpcs:ignore WordPress.WP.EnqueuedResourceParameters.MissingVersion
 	wp_register_style( 'ew-trial', false, array(), EW_FWP_VERSION );
 	wp_enqueue_style( 'ew-trial' );
-	wp_add_inline_style( 'ew-trial', ew_trial_css() );
+	wp_add_inline_style( 'ew-trial', ew_trial_css() . ( function_exists( 'ew_inapp_css' ) ? ew_inapp_css() : '' ) );
 	wp_register_script( 'ew-trial', '', array(), EW_FWP_VERSION, true );
 	wp_enqueue_script( 'ew-trial' );
-	wp_add_inline_script( 'ew-trial', ew_trial_js() );
+	wp_add_inline_script( 'ew-trial', ( function_exists( 'ew_optin_js' ) ? ew_optin_js() . ew_inapp_js() : '' ) . ew_trial_js() );
 }, 22 );

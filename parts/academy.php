@@ -78,6 +78,15 @@ function ew_acad_interest_defaults() {
 		'failed'         => 'Something went wrong. Please try again.',
 		'done_title'     => 'Thank you',
 		'done_note'      => 'We will be in touch by email to invite you to a 1:1 meeting.',
+		'next_title'     => 'Nearly there',
+		'phone_note'     => 'For a text about the 1:1 if anything changes.',
+		'send2'          => 'Send',
+		'app_title'      => 'Your registration is in the app',
+		'ticket_title'   => 'Academy',
+		'ticket_sub'     => '',
+		'ticket_stub'    => '1:1',
+		'ticket_stub2'   => 'Invite to follow',
+		'track'          => 'Academy interest',
 		'meeting_page'   => '/academy/meeting/',
 		'invite_subject' => 'Your invitation to a 1:1 with the Eastwood FC Academy',
 		'invite_body'    => "Hi {parent},\n\nThank you for registering {player} with the Eastwood FC Academy. We would like to invite you to a 1:1 meeting with Lewis McGugan, Head of Academy, and Owen Betts, Head Tutor.\n\nPick a time that suits you here:\n{link}\n\nThank you,\nEastwood FC Academy",
@@ -254,14 +263,22 @@ function ew_acad_interest_shortcode( $atts ) {
 		'need_phone' => $a['need_phone'],
 		'failed'     => $a['failed'],
 		'rest'       => esc_url_raw( rest_url( 'eastwood/v1/academy/interest' ) ),
-	);
+	) + ( function_exists( 'ew_optin_words' ) ? ew_optin_words( 'academy_interest', $a ) : array() );
 	$h  = '<section class="ewtr ewac ewac-int" data-page="' . (int) ( $post ? $post->ID : 0 ) . '">';
 	$h .= '<form class="ewtr-form" novalidate>';
-	$h .= '<p class="ewtr-head">' . esc_html( $a['form_title'] ) . '</p>';
+	// Step one: the email on its own, saved the moment the button is pressed.
+	$h .= ew_optin_step_one( 'ewtr', $a );
+	// Step two: the rest, mobile first, each box saved as they leave it.
+	$h .= '<div class="ewtr-step2" data-ewo-two hidden>';
+	$h .= '<p class="ewtr-head">' . esc_html( $a['next_title'] ) . '</p>';
 	if ( '' !== trim( (string) $a['form_note'] ) ) {
 		$h .= '<p class="ewtr-note">' . esc_html( $a['form_note'] ) . '</p>';
 	}
-	$h .= ew_acad_field( 'ewacName', $a['name_label'], 'text', 'off' );
+	$h .= ew_acad_field( 'ewacPhone', $a['phone_label'], 'tel', 'tel', ' data-ewo-save="phone"' );
+	if ( '' !== trim( (string) $a['phone_note'] ) ) {
+		$h .= '<p class="ewtr-pnote">' . esc_html( $a['phone_note'] ) . '</p>';
+	}
+	$h .= ew_acad_field( 'ewacName', $a['name_label'], 'text', 'off', ' data-ewo-save="name"' );
 	if ( ew_acad_on( $a['show_dob'] ) ) {
 		$h .= ew_acad_field( 'ewacDob', $a['dob_label'], 'date', 'off' );
 	}
@@ -277,20 +294,39 @@ function ew_acad_interest_shortcode( $atts ) {
 	if ( ew_acad_on( $a['show_parent'] ) ) {
 		$h .= ew_acad_field( 'ewacParent', $a['parent_label'], 'text', 'name' );
 	}
-	$h .= ew_acad_field( 'ewacEmail', $a['email_label'], 'email', 'email' );
-	$h .= ew_acad_field( 'ewacPhone', $a['phone_label'], 'tel', 'tel' );
 	$h .= '<label class="ewtr-tick"><input type="checkbox" id="ewacConsent" checked><span>' . esc_html( $a['consent'] ) . '</span></label>';
 	$h .= '<p class="ewtr-err" role="alert"></p>';
-	$h .= '<button type="submit" class="ewtr-btn">' . esc_html( $a['send'] ) . '</button>';
+	$h .= '<button type="submit" class="ewtr-btn">' . esc_html( $a['send2'] ) . '</button>';
 	if ( '' !== trim( (string) $a['free_note'] ) ) {
 		$h .= '<p class="ewtr-free">' . esc_html( $a['free_note'] ) . '</p>';
 	}
+	$h .= '</div>';
 	$h .= '</form>';
-	$h .= '<div class="ewtr-done" hidden><p class="ewtr-done-t">' . esc_html( $a['done_title'] ) . '</p><p class="ewtr-done-n">' . esc_html( $a['done_note'] ) . '</p></div>';
+	// The last page: their registration, in the app. The 1:1 is booked later, from the emailed link.
+	$h .= ew_inapp_panel( $a['app_title'], array(
+		'title' => (string) $a['ticket_title'],
+		'sub'   => '' !== trim( (string) $a['ticket_sub'] ) ? (string) $a['ticket_sub'] : (string) $a['event'],
+		'day'   => '',
+		'date'  => '',
+		'time'  => '',
+		'stub'  => (string) $a['ticket_stub'],
+		'stub2' => strtoupper( (string) $a['ticket_stub2'] ),
+	) );
 	$h .= '<script type="application/json" class="ewac-words">' . wp_json_encode( $w ) . '</script>';
 	return $h . '</section>';
 }
 add_shortcode( 'eastwood_interest', 'ew_acad_interest_shortcode' );
+
+/** The interest block on a page, with its words, for step one of the sign-up. */
+function ew_acad_interest_on( $post ) {
+	$blk = ew_acad_block_on( $post, 'eastwood_interest' );
+	return $blk ? shortcode_atts( ew_acad_interest_defaults(), $blk['atts'], 'eastwood_interest' ) : null;
+}
+
+add_filter( 'ew_optin_forms', function ( $forms ) {
+	$forms['academy_interest'] = 'ew_acad_interest_on';
+	return $forms;
+} );
 
 /* ------------------------------------------------------------------ */
 /* [eastwood_meeting]                                                  */
@@ -582,7 +618,9 @@ add_action( 'rest_api_init', function () {
 			foreach ( array( 'name', 'dob', 'school', 'club', 'loc', 'parent', 'phone' ) as $k ) {
 				$v[ $k ] = trim( sanitize_text_field( (string) $req->get_param( $k ) ) );
 			}
-			$email = sanitize_email( (string) $req->get_param( 'email' ) );
+			// Step one already saved the email on a started booking; carry that on.
+			$bid   = function_exists( 'ew_optin_claim' ) ? ew_optin_claim( $req ) : 0;
+			$email = $bid ? (string) get_post_meta( $bid, '_ewt_email', true ) : sanitize_email( (string) $req->get_param( 'email' ) );
 			if ( '' === $v['name'] ) {
 				return new WP_REST_Response( array( 'message' => $a['need_name'] ), 400 );
 			}
@@ -598,8 +636,8 @@ add_action( 'rest_api_init', function () {
 				$v['club'],
 				$v['loc'],
 			) );
-			$about = implode( ', ', $about );
-			$id    = ew_acad_booking( $v['name'], array(
+			$about  = implode( ', ', $about );
+			$fields = array(
 				'name'     => $v['name'],
 				'dob'      => $v['dob'],
 				'school'   => $v['school'],
@@ -618,14 +656,27 @@ add_action( 'rest_api_init', function () {
 				'consent'  => $req->get_param( 'consent' ) ? 'yes' : 'no',
 				'hook'     => (string) $a['crm_hook'],
 				'status'   => 'interest',
-			) );
+			);
+			if ( $bid ) {
+				// Same order as a new booking: everything else first, status last.
+				$id = $bid;
+				wp_update_post( array( 'ID' => $id, 'post_title' => $v['name'] ) );
+				$status = $fields['status'];
+				unset( $fields['status'] );
+				foreach ( $fields as $k => $val ) {
+					update_post_meta( $id, '_ewt_' . $k, $val );
+				}
+				update_post_meta( $id, '_ewt_status', $status );
+			} else {
+				$id = ew_acad_booking( $v['name'], $fields );
+			}
 			if ( ! $id ) {
 				return new WP_REST_Response( array( 'message' => $a['failed'] ), 500 );
 			}
 			if ( function_exists( 'ew_tix_crm' ) ) {
 				ew_tix_crm( (string) $a['crm_hook'], $id, 'interest' );
 			}
-			return array( 'ok' => 1 );
+			return function_exists( 'ew_optin_finished' ) ? ew_optin_finished( $id ) : array( 'ok' => 1 );
 		},
 	) );
 
@@ -888,20 +939,22 @@ function ew_acad_js() {
 
    if(root.classList.contains('ewac-int')){
      var g = root.querySelector('.ewtr-form');
+     err = root.querySelector('.ewtr-step2 .ewtr-err');
+     var O = window.ewOptin ? ewOptin(root, W) : {bid: 0, key: '', email: ''};
      g.addEventListener('submit', function(e){
        e.preventDefault(); err.textContent = '';
-       var name = val('ewacName'), email = val('ewacEmail'), phone = val('ewacPhone');
-       if(!name){ err.textContent = W.need_name; return; }
-       if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ err.textContent = W.need_email; return; }
+       var name = val('ewacName'), phone = val('ewacPhone');
        if(phone.replace(/\D/g,'').length < 10){ err.textContent = W.need_phone; return; }
+       if(!name){ err.textContent = W.need_name; return; }
        var tick = root.querySelector('#ewacConsent');
-       var b = g.querySelector('.ewtr-btn'); b.disabled = true;
-       post(W.rest, {page:page, name:name, dob:val('ewacDob'), school:val('ewacSchool'), club:val('ewacClub'),
-         loc:val('ewacLoc'), parent:val('ewacParent'), email:email, phone:phone, consent:(tick && tick.checked) ? 1 : 0})
+       var b = g.querySelector('.ewtr-btn[type=submit]'); b.disabled = true;
+       post(W.rest, {page:page, bid:O.bid, key:O.key, email:O.email, name:name, dob:val('ewacDob'), school:val('ewacSchool'), club:val('ewacClub'),
+         loc:val('ewacLoc'), parent:val('ewacParent'), phone:phone, consent:(tick && tick.checked) ? 1 : 0})
        .then(function(x){
          if(!x.ok){ b.disabled = false; err.textContent = (x.j && x.j.message) || W.failed; return; }
-         g.hidden = true; root.querySelector('.ewtr-done').hidden = false;
-         if(window.ewTrack) ewTrack('Lead', {what:'Academy interest'});
+         g.hidden = true;
+         if(O.done) O.done();
+         if(window.ewInapp) ewInapp(root, x.j.claim || '');
        }).catch(function(){ b.disabled = false; err.textContent = W.failed; });
      });
      return;
@@ -968,10 +1021,10 @@ add_action( 'wp_enqueue_scripts', function () {
 	wp_register_style( 'ew-academy', false, array(), EW_FWP_VERSION );
 	wp_enqueue_style( 'ew-academy' );
 	// The forms wear the trial form look, so the funnel reads as one thing.
-	wp_add_inline_style( 'ew-academy', ( function_exists( 'ew_trial_css' ) ? ew_trial_css() : '' ) . ew_acad_css() );
+	wp_add_inline_style( 'ew-academy', ( function_exists( 'ew_trial_css' ) ? ew_trial_css() : '' ) . ew_acad_css() . ( function_exists( 'ew_inapp_css' ) ? ew_inapp_css() : '' ) );
 	wp_register_script( 'ew-academy', '', array(), EW_FWP_VERSION, true );
 	wp_enqueue_script( 'ew-academy' );
-	wp_add_inline_script( 'ew-academy', ew_acad_js() );
+	wp_add_inline_script( 'ew-academy', ( function_exists( 'ew_optin_js' ) ? ew_optin_js() . ew_inapp_js() : '' ) . ew_acad_js() );
 }, 22 );
 
 /* The command channel may lay these out like any other block. */
