@@ -81,7 +81,16 @@ function ew_acad_interest_defaults() {
 		'next_title'     => 'Nearly there',
 		'phone_note'     => 'For a text about the 1:1 if anything changes.',
 		'send2'          => 'Send',
-		'app_title'      => 'Your registration is in the app',
+		'app_title'      => 'You’re registered',
+		'app_note'       => 'Your registration and what happens next are in the Eastwood FC app.',
+		'card_kicker'    => 'Eastwood FC Academy',
+		'card_title'     => 'Registration confirmed',
+		'card_player'    => 'Player',
+		'card_born'      => 'Born',
+		'card_club'      => 'Club',
+		'card_parent'    => 'Parent',
+		'card_next_k'    => 'What happens next',
+		'card_next'      => 'A 1:1 with Lewis McGugan, Head of Academy. Your invite comes by email.',
 		'ticket_title'   => 'Academy',
 		'ticket_sub'     => '',
 		'ticket_stub'    => '1:1',
@@ -303,14 +312,21 @@ function ew_acad_interest_shortcode( $atts ) {
 	$h .= '</div>';
 	$h .= '</form>';
 	// The last page: their registration, in the app. The 1:1 is booked later, from the emailed link.
+	// No event or date here, so a confirmation card with their details, not a ticket.
 	$h .= ew_inapp_panel( $a['app_title'], array(
-		'title' => (string) $a['ticket_title'],
-		'sub'   => '' !== trim( (string) $a['ticket_sub'] ) ? (string) $a['ticket_sub'] : (string) $a['event'],
-		'day'   => '',
-		'date'  => '',
-		'time'  => '',
-		'stub'  => (string) $a['ticket_stub'],
-		'stub2' => strtoupper( (string) $a['ticket_stub2'] ),
+		'note' => (string) $a['app_note'],
+		'card' => array(
+			'kicker' => (string) $a['card_kicker'],
+			'title'  => (string) $a['card_title'],
+			'rows'   => array(
+				'player' => (string) $a['card_player'],
+				'born'   => (string) $a['card_born'],
+				'club'   => (string) $a['card_club'],
+				'parent' => (string) $a['card_parent'],
+			),
+			'next_k' => (string) $a['card_next_k'],
+			'next'   => (string) $a['card_next'],
+		),
 	) );
 	$h .= '<script type="application/json" class="ewac-words">' . wp_json_encode( $w ) . '</script>';
 	return $h . '</section>';
@@ -954,7 +970,9 @@ function ew_acad_js() {
          if(!x.ok){ b.disabled = false; err.textContent = (x.j && x.j.message) || W.failed; return; }
          g.hidden = true;
          if(O.done) O.done();
-         if(window.ewInapp) ewInapp(root, x.j.claim || '');
+         var dob = val('ewacDob'), born = '';
+         if(/^\d{4}-\d{2}-\d{2}$/.test(dob)){ try{ born = new Date(dob + 'T12:00:00').toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'}); }catch(e2){ born = dob; } }
+         if(window.ewInapp) ewInapp(root, x.j.claim || '', {player:name, born:born, club:val('ewacClub'), parent:val('ewacParent')});
        }).catch(function(){ b.disabled = false; err.textContent = W.failed; });
      });
      return;

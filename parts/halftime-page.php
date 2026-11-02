@@ -219,6 +219,7 @@ function ew_hts_store_defaults() {
  * NAME crest V crest NAME. $foot is optional markup for the strip under it.
  */
 function ew_hts_fixture( $m, $a, $foot = '' ) {
+	$btns = ew_hts_fx_btns( $a );
 	$home  = (array) ( $m['home-team'] ?? array() );
 	$away  = (array) ( $m['away-team'] ?? array() );
 	$ts    = strtotime( (string) ( $m['date'] ?? '' ) . ' ' . (string) ( $m['time'] ?? '15:00' ) );
@@ -248,9 +249,31 @@ function ew_hts_fixture( $m, $a, $foot = '' ) {
 	$h .= '<img src="' . esc_url( ew_hts_crest( $away['id'] ?? 0 ) ) . '" alt="' . esc_attr( (string) ( $away['name'] ?? '' ) ) . '" loading="lazy" decoding="async" onerror="this.style.visibility=\'hidden\'">';
 	$h .= '</span>';
 	$h .= '<span class="ewhp-tieName">' . esc_html( (string) ( $away['name'] ?? '' ) ) . '</span>';
-	$h .= '</div></div>';
+	$h .= '</div>' . $btns . '</div>';
 	$h .= $foot;
 	return $h . '</div>';
+}
+
+/** The two buttons under a fixture: the vote, and the form at the top. Blank words hide a button. */
+function ew_hts_fx_btns( $a ) {
+	$out = '';
+	if ( '' !== trim( (string) ( $a['vote_btn'] ?? '' ) ) ) {
+		$out .= '<a class="ewhp-fxBtn is-line" href="' . esc_url( (string) ( $a['vote_url'] ?? '#vote' ) ) . '" data-ewhp-scroll>' . esc_html( $a['vote_btn'] ) . '</a>';
+	}
+	if ( '' !== trim( (string) ( $a['reg_btn'] ?? '' ) ) ) {
+		$out .= '<a class="ewhp-fxBtn" href="' . esc_url( (string) ( $a['reg_url'] ?? '#form' ) ) . '" data-ewhp-scroll>' . esc_html( $a['reg_btn'] ) . '</a>';
+	}
+	return '' !== $out ? '<p class="ewhp-fxBtns">' . $out . '</p>' : '';
+}
+
+/** Fields shared by every fixture on the page. */
+function ew_hts_fx_btn_defaults() {
+	return array(
+		'vote_btn' => 'Vote for the game',
+		'vote_url' => '#vote',
+		'reg_btn'  => 'Register your child',
+		'reg_url'  => '#form',
+	);
 }
 
 /* ------------------------------------------------------------------
@@ -273,18 +296,18 @@ function ew_hts_next_defaults() {
 		'guest_name'    => 'Jamie Bigg',
 		'guest_line'    => 'Giant, from Gladiators',
 		'guest_img'     => '',
-		'pitch_text'    => 'Kids from the crowd step up and take him on from the spot, in front of Coronation Park.',
-		'pitch_btn'     => 'Put your child forward',
+		'pitch_text'    => '',
+		'pitch_btn'     => 'Register your child',
 		'pitch_url'     => '#form',
 		'screen_tag'    => 'On the big screen · Featured app game',
 		'screen_img'    => '',
 		'screen_title'  => 'Curby with Curtis',
 		'played_kicker' => 'Played on',
-		'played_name'   => 'Team EastwoodFC app',
+		'played_name'   => 'Eastwood FC app',
 		'played_line'   => 'Anyone in the ground can play',
 		'played_img'    => '',
-		'screen_text'   => 'Join the queue in the app at half time. When it’s your go, you’re on the big screen.',
-	) + ew_hts_store_defaults();
+		'screen_text'   => '',
+	) + ew_hts_fx_btn_defaults() + ew_hts_store_defaults();
 }
 
 function ew_hts_next_sc( $atts ) {
@@ -304,12 +327,13 @@ function ew_hts_next_sc( $atts ) {
 
 	$h .= '<div class="ewhp-feat">';
 
-	// On the pitch.
-	$h .= '<article class="ewhp-card">';
-	$h .= '<div class="ewhp-cardMedia">' . ew_hts_picture( $a['pitch_img'], $a['pitch_title'], 'ewhp-cardImg', $a['pitch_alt'] );
+	// On the pitch. The red label sits above the card, across its full width.
+	$h .= '<div class="ewhp-cardCol">';
 	if ( '' !== $a['pitch_tag'] ) {
 		$h .= '<p class="ewhp-tag">' . esc_html( $a['pitch_tag'] ) . '</p>';
 	}
+	$h .= '<article class="ewhp-card">';
+	$h .= '<div class="ewhp-cardMedia">' . ew_hts_picture( $a['pitch_img'], $a['pitch_title'], 'ewhp-cardImg', $a['pitch_alt'] );
 	$h .= '</div><div class="ewhp-cardBody">';
 	$h .= '<h3 class="ewhp-cardTitle">' . esc_html( $a['pitch_title'] ) . '</h3>';
 	if ( '' !== $a['guest_name'] ) {
@@ -328,14 +352,15 @@ function ew_hts_next_sc( $atts ) {
 	if ( '' !== $a['pitch_btn'] ) {
 		$h .= '<a class="ewhp-btn" href="' . esc_url( $a['pitch_url'] ) . '" data-ewhp-scroll>' . esc_html( $a['pitch_btn'] ) . '</a>';
 	}
-	$h .= '</div></article>';
+	$h .= '</div></article></div>';
 
 	// On the big screen.
-	$h .= '<article class="ewhp-card">';
-	$h .= '<div class="ewhp-cardMedia is-contain">' . ew_hts_picture( $a['screen_img'], $a['screen_title'], 'ewhp-cardImg', $a['screen_title'] );
+	$h .= '<div class="ewhp-cardCol">';
 	if ( '' !== $a['screen_tag'] ) {
 		$h .= '<p class="ewhp-tag">' . esc_html( $a['screen_tag'] ) . '</p>';
 	}
+	$h .= '<article class="ewhp-card">';
+	$h .= '<div class="ewhp-cardMedia">' . ew_hts_picture( $a['screen_img'], $a['screen_title'], 'ewhp-cardImg', $a['screen_title'] );
 	$h .= '</div><div class="ewhp-cardBody">';
 	$h .= '<h3 class="ewhp-cardTitle">' . esc_html( $a['screen_title'] ) . '</h3>';
 	if ( '' !== $a['played_name'] ) {
@@ -354,7 +379,7 @@ function ew_hts_next_sc( $atts ) {
 	if ( '' !== $stores ) {
 		$h .= '<div class="ewhp-stores">' . $stores . '</div>';
 	}
-	$h .= '</div></article>';
+	$h .= '</div></article></div>';
 
 	$h .= '</div>';
 	return $h . '</div>';
@@ -369,12 +394,12 @@ add_shortcode( 'eastwood_hts_next', 'ew_hts_next_sc' );
 
 function ew_hts_steps_defaults() {
 	return array(
-		'left'  => 'On the pitch',
-		'right' => 'On the big screen',
-		'lines' => "Before|the game|Put your child forward with the form at the top of this page.|Download the Team EastwoodFC app.\n"
-			. "On|the day|We text you where to be and when.|Open the app and join the half time queue.\n"
-			. "15:45|half time|Out on the pitch in front of the crowd.|Your go, live on the big screen.\n"
-			. '16:00|second half|Back to your seat for the second half.|',
+		'left'  => '',
+		'right' => '',
+		'lines' => "1|your details|Enter your name and email at the top of this page.|\n"
+			. "2|who is playing|Tell us if that is you or your child, add any other children, and add your mobile.|\n"
+			. "3|bring a friend|Invite another family. When they sign up, you both get rewards.|\n"
+			. '4|in the app|Your place is in the Eastwood FC app. Download it and sign in with the same email.|',
 	);
 }
 
@@ -387,7 +412,9 @@ function ew_hts_steps_sc( $atts, $content = '' ) {
 	}
 
 	$h  = '<div class="ewhp ewhp-steps">';
-	$h .= '<div class="ewhp-stHead" aria-hidden="true"><span></span><p>' . esc_html( $a['left'] ) . '</p><p>' . esc_html( $a['right'] ) . '</p></div>';
+	if ( '' !== trim( $a['left'] . $a['right'] ) ) {
+		$h .= '<div class="ewhp-stHead" aria-hidden="true"><span></span><p>' . esc_html( $a['left'] ) . '</p><p>' . esc_html( $a['right'] ) . '</p></div>';
+	}
 	$n  = count( $lines );
 	foreach ( $lines as $i => $line ) {
 		$c    = array_pad( array_map( 'trim', explode( '|', $line ) ), 4, '' );
@@ -498,7 +525,10 @@ add_shortcode( 'eastwood_hts_past', 'ew_hts_past_sc' );
 
 function ew_hts_coming_defaults() {
 	return array(
-		'count'     => '5',
+		'count'     => '12',
+		'show'      => '3',
+		'more'      => 'Show the rest of the season',
+		'less'      => 'Hide the rest of the season',
 		'skip'      => '1',
 		'home_word' => 'Home',
 		'away_word' => 'Away',
@@ -508,7 +538,7 @@ function ew_hts_coming_defaults() {
 		'game'      => '[Half time game]',
 		'status'    => 'Not announced yet',
 		'empty'     => 'The next home games will be here once they are fixed.',
-	);
+	) + ew_hts_fx_btn_defaults();
 }
 
 function ew_hts_coming_sc( $atts, $content = '' ) {
@@ -531,7 +561,19 @@ function ew_hts_coming_sc( $atts, $content = '' ) {
 	$h     = '<div class="ewhp ewhp-coming">';
 	$month = '';
 	$open  = false;
-	foreach ( $games as $m ) {
+	$show  = max( 1, (int) $a['show'] );
+	$rest  = max( 0, count( $games ) - $show );
+	foreach ( $games as $i => $m ) {
+		// Past the first few, the rest wait behind a button, as on /matches.
+		if ( $rest && $i === $show ) {
+			if ( $open ) {
+				$h  .= '</div>';
+				$open = false;
+			}
+			$h    .= '<p class="ewhp-moreWrap"><button type="button" class="ewhp-more" data-ewhp-more data-more="' . esc_attr( $a['more'] ) . '" data-less="' . esc_attr( $a['less'] ) . '" aria-expanded="false">'
+				. esc_html( $a['more'] ) . ' <b>' . (int) $rest . '</b></button></p><div class="ewhp-rest" data-ewhp-rest hidden>';
+			$month = '';
+		}
 		$ts  = strtotime( (string) ( $m['date'] ?? '' ) );
 		$key = $ts ? date_i18n( 'F Y', $ts ) : '';
 		if ( $key !== $month ) {
@@ -551,6 +593,9 @@ function ew_hts_coming_sc( $atts, $content = '' ) {
 		$h     .= ew_hts_fixture( $m, $a, $foot );
 	}
 	if ( $open ) {
+		$h .= '</div>';
+	}
+	if ( $rest ) {
 		$h .= '</div>';
 	}
 	return $h . '</div>';
@@ -787,7 +832,7 @@ add_action( 'rest_api_init', function () {
 
 function ew_hts_play_defaults() {
 	return array(
-		'app'          => 'Team EastwoodFC',
+		'app'          => 'Eastwood FC',
 		'app_icon'     => '',
 		'sponsor_by'   => 'Queue sponsored by',
 		'sponsor_logo' => '',
@@ -820,7 +865,7 @@ function ew_hts_play_defaults() {
 		'p3_you'       => 'You',
 		'p3_note'      => 'You’re up next. Head to the tunnel.',
 		// Under the phones.
-		'get_app'      => 'Get the Team EastwoodFC app',
+		'get_app'      => 'Get the Eastwood FC app',
 		'lines'        => "01|Join the queue|Before the game, from home or on the way.\n"
 			. "02|Jump places|Food, drink and the club shop earn points. Points move you up.\n"
 			. '03|Watch the queue live|It sits in the match centre next to the score, so you never miss your go.',
@@ -935,12 +980,12 @@ function ew_hts_on_page( $post ) {
 function ew_hts_css() {
 	return '
 .e-con.ewhp-sec{background:#f3f3f3;padding:0 24px 80px!important;display:block!important}
-.e-con.ewhp-sec.ewhp-first{padding-top:96px!important}
+.e-con.ewhp-sec.ewhp-first{padding-top:60px!important}
 .ewhp-sec>.elementor-widget,.ewhp-sec>.e-con-inner>.elementor-widget{max-width:1248px!important;width:100%!important;margin-left:auto!important;margin-right:auto!important}
 .ewhp-sec h2.elementor-heading-title.elementor-heading-title{font-family:Anton,Impact,sans-serif!important;font-weight:400!important;font-size:34px!important;line-height:1.5!important;letter-spacing:0!important;text-transform:uppercase;color:#101010!important;margin:0 0 10px!important;padding:0!important;background:none!important;width:auto!important;max-width:none!important;position:static!important;left:auto!important;transform:none!important}
 .ewhp-sec .elementor-widget-heading:has(+ .elementor-widget-shortcode) h2.elementor-heading-title.elementor-heading-title{margin-bottom:28px!important}
 .ewhp-sec .elementor-widget-text-editor p{font-family:"Instrument Sans",system-ui,sans-serif;font-size:18px;line-height:1.45;color:#333;margin:0 0 28px;max-width:none}
-.ewhp-sec .elementor-widget-text-editor p.ewhp-note{margin:24px 0 0;font-size:16px;line-height:normal;color:#444}
+.ewhp-sec .elementor-widget-text-editor p.ewhp-note{margin:24px 0 0;font-size:16px;line-height:normal;color:#444;text-align:center}
 .ewhp-sec .elementor-widget-text-editor p.ewhp-note a{color:#CC0000;font-weight:700;text-decoration:underline}
 .ewhp{font-family:"Instrument Sans",system-ui,sans-serif;color:#101010;line-height:normal;-webkit-font-smoothing:antialiased}
 .ewhp *,.ewhp *::before,.ewhp *::after{box-sizing:border-box}
@@ -974,15 +1019,27 @@ function ew_hts_css() {
 .ewhp-month{margin:30px 0 14px!important;text-align:center;font-size:18px;font-weight:700;color:#212121}
 .ewhp-coming>.ewhp-month:first-child{margin-top:2px!important}
 .ewhp-rows{display:flex;flex-direction:column;gap:14px}
+.ewhp-fxBtns{margin:26px 0 0!important;display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.ewhp a.ewhp-fxBtn{display:inline-flex;align-items:center;justify-content:center;min-height:50px;padding:12px 14px;border-radius:8px;border:1px solid #CC0000;background:#CC0000;color:#fff;text-decoration:none;text-transform:uppercase;font-size:16px;font-weight:700;letter-spacing:.03em}
+.ewhp a.ewhp-fxBtn:hover{background:#b00000;border-color:#b00000;color:#fff}
+.ewhp a.ewhp-fxBtn.is-line{background:transparent;color:#CC0000}
+.ewhp a.ewhp-fxBtn.is-line:hover{background:#CC0000;color:#fff}
+.ewhp-moreWrap{margin:18px 0 0!important;text-align:center}
+.ewhp-more{display:inline-flex;align-items:center;gap:9px;min-height:50px;padding:12px 26px;background:#fff;border:1px solid #d9d9dd;border-radius:8px;cursor:pointer;font-family:"Instrument Sans",system-ui,sans-serif;font-size:15px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:#101010}
+.ewhp-more:hover{border-color:#CC0000;color:#CC0000}
+.ewhp-more b{font-weight:700;color:#8a8a8a}
+.ewhp-more:hover b{color:#CC0000}
+.ewhp-rest[hidden]{display:none}
 
 /* the two feature cards */
 .ewhp-feat{display:flex;gap:24px;margin-top:24px}
+.ewhp-cardCol{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
 .ewhp-card{flex:1;min-width:0;background:#0b0b0b;color:#fff;border-radius:8px;overflow:hidden;display:flex;flex-direction:column}
 .ewhp-cardMedia{position:relative;background:#17171a}
 .ewhp .ewhp-cardImg{width:100%;height:340px;object-fit:cover;object-position:50% 40%;display:block}
 .ewhp .ewhp-cardMedia.is-contain img.ewhp-cardImg{object-fit:contain}
 .ewhp-cardMedia .ewhp-tile span{font-size:120px;opacity:.18}
-.ewhp-tag{position:absolute;left:20px;top:20px;padding:7px 12px;border-radius:4px;background:#CC0000;color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;line-height:1.3}
+.ewhp-tag{padding:10px 14px;border-radius:4px;background:#CC0000;color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;line-height:1.3;text-align:center}
 .ewhp-cardBody{padding:28px 30px 32px;display:flex;flex-direction:column;gap:16px;flex:1}
 .ewhp-cardTitle{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:48px;line-height:1;text-transform:uppercase;color:#fff;letter-spacing:0}
 .ewhp-who{display:flex;align-items:center;gap:16px;padding:16px;border-radius:8px;background:#17171a}
@@ -996,7 +1053,7 @@ function ew_hts_css() {
 .ewhp-cardText{font-size:18px;line-height:1.5;color:#d6d6db}
 .ewhp a.ewhp-btn{margin-top:auto;display:flex;align-items:center;justify-content:center;height:56px;border-radius:8px;background:#CC0000;color:#fff;text-decoration:none;font-family:Anton,Impact,sans-serif;font-size:20px;text-transform:uppercase;letter-spacing:0}
 .ewhp a.ewhp-btn:hover{background:#b00000;color:#fff}
-.ewhp-stores{margin-top:auto;display:flex;flex-wrap:wrap;gap:10px}
+.ewhp-stores{margin-top:auto;display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
 .ewhp a.ewhp-store{display:inline-flex;align-items:center;gap:9px;text-decoration:none;border-radius:8px}
 .ewhp-store span{display:flex;flex-direction:column;line-height:1.1}
 .ewhp-store small{font-size:10px;opacity:.8}
@@ -1138,7 +1195,7 @@ function ew_hts_css() {
 }
 @media (max-width:767px){
  .e-con.ewhp-sec{padding:0 16px 56px!important}
- .e-con.ewhp-sec.ewhp-first{padding-top:56px!important}
+ .e-con.ewhp-sec.ewhp-first{padding-top:40px!important}
  .ewhp-sec h2.elementor-heading-title.elementor-heading-title{font-size:30px!important}
  .ewhp-sec .elementor-widget-text-editor p{font-size:16px;margin-bottom:22px}
  .ewhp-fxTop{padding:12px 16px;min-height:64px}
@@ -1165,6 +1222,7 @@ function ew_hts_css() {
  .ewhp-stTime b{font-size:26px}
  .ewhp-stTime span{margin-top:0}
  .ewhp-stBox{grid-column:2;font-size:16px;padding:14px 16px}
+ .ewhp-stBox.is-wide em{display:none}
  .ewhp-stBox em{display:block;font-style:normal;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#CC0000;margin-bottom:4px}
  .ewhp-pastTop{height:auto;min-height:64px;padding:12px 16px}
  .ewhp .ewhp-pastBadge{height:40px}
@@ -1203,6 +1261,17 @@ function ew_hts_css() {
 function ew_hts_js() {
 	return <<<'JS'
 (function(){
+ // Coming up: the rest of the season behind a button, as on /matches.
+ [].forEach.call(document.querySelectorAll('[data-ewhp-more]'), function(btn){
+  btn.addEventListener('click', function(){
+   var box = btn.parentNode.nextElementSibling;
+   if (!box || !box.hasAttribute('data-ewhp-rest')) { return; }
+   var open = !box.hasAttribute('hidden');
+   if (open) { box.setAttribute('hidden', ''); } else { box.removeAttribute('hidden'); }
+   btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+   btn.firstChild.nodeValue = (open ? btn.getAttribute('data-more') : btn.getAttribute('data-less')) + ' ';
+  });
+ });
  // The red button on the pitch card goes to the form at the top of the page.
  document.addEventListener('click', function(e){
   var a = e.target.closest ? e.target.closest('[data-ewhp-scroll]') : null;

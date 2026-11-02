@@ -58,6 +58,14 @@ function ew_mt_defaults() {
 		'hosp'       => 'Make a day of it — hospitality',
 		'hosp_url'   => '/hospitality/',
 		'hosp_sub'   => 'The whole afternoon rather than a better seat: in early, food at your table, and your match ticket included.',
+		// Each game on the list is the /matches fixture card.
+		'hosp_btn'   => 'Book hospitality',
+		'home_word'  => 'Home',
+		'venue'      => 'Coronation Park',
+		'v'          => 'V',
+		'show'       => '3',
+		'more'       => 'Show the rest of the season',
+		'less'       => 'Hide the rest of the season',
 		// Step two: the email on its own, saved the moment it is given.
 		'email_label'  => 'Your email · your tickets are sent here',
 		'email_go'     => 'Continue to payment',
@@ -152,41 +160,72 @@ function ew_mt_many( $a ) {
 		return $h . '<p class="ewmt-empty">' . esc_html( $a['empty'] ) . '</p>';
 	}
 
-	$any  = false;
-	$rows = '';
-	foreach ( $games as $m ) {
-		$id  = (int) ( $m['id'] ?? 0 );
-		$st  = ew_sales_state( $id, 'tix' );
-		$ts  = strtotime( (string) ( $m['date'] ?? '' ) . ' ' . (string) ( $m['time'] ?? '15:00' ) );
-		$opp = (string) ( ( (array) ( $m['away-team'] ?? array() ) )['name'] ?? '' );
+	$any   = false;
+	$rows  = '';
+	$show  = max( 1, (int) $a['show'] );
+	$rest  = max( 0, count( $games ) - $show );
+	foreach ( $games as $i => $m ) {
+		// Past the first few, the rest wait behind a button, as on /matches.
+		if ( $rest && $i === $show ) {
+			$rows .= '</div><p class="ewmt-moreWrap"><button type="button" class="ewmt-more" data-ewmt-more data-more="' . esc_attr( $a['more'] ) . '" data-less="' . esc_attr( $a['less'] ) . '" aria-expanded="false">'
+				. esc_html( $a['more'] ) . ' <b>' . (int) $rest . '</b></button></p><div class="ewmt-rows ewmt-rest" data-ewmt-rest hidden>';
+		}
+		$id    = (int) ( $m['id'] ?? 0 );
+		$st    = ew_sales_state( $id, 'tix' );
+		$ts    = strtotime( (string) ( $m['date'] ?? '' ) . ' ' . (string) ( $m['time'] ?? '15:00' ) );
+		$home  = (array) ( $m['home-team'] ?? array() );
+		$away  = (array) ( $m['away-team'] ?? array() );
+		$comp  = (string) ( $m['competition']['name'] ?? '' );
+		$badge = function_exists( 'ew_hts_comp' ) ? ew_hts_comp( $m ) : '';
+		$crest = function ( $tid ) {
+			return function_exists( 'ew_hts_crest' ) ? ew_hts_crest( (int) $tid ) : '';
+		};
 
-		$rows .= '<li class="ewmt-row is-' . esc_attr( $st['state'] ) . '">';
-		$rows .= '<span class="ewmt-when"><b>' . esc_html( $ts ? date_i18n( 'D j M', $ts ) : '' ) . '</b>'
-			. '<i>' . esc_html( $ts ? date_i18n( 'H:i', $ts ) : '' ) . '</i></span>';
-		$rows .= '<span class="ewmt-who"><b>' . esc_html( $opp ) . '</b>'
-			. '<i>' . esc_html( (string) ( $m['competition']['name'] ?? '' ) ) . '</i></span>';
+		$rows .= '<div class="ewmt-fx is-' . esc_attr( $st['state'] ) . '">';
+		$rows .= '<div class="ewmt-fxTop">';
+		if ( '' !== $badge ) {
+			$rows .= '<span class="ewmt-fxBadge"><img src="' . esc_url( $badge ) . '" alt="" loading="lazy" decoding="async" onerror="this.parentNode.remove()"></span>';
+		}
+		$rows .= '<b>' . esc_html( $ts ? date_i18n( 'D j M', $ts ) : '' ) . '</b><i>' . esc_html( $ts ? date_i18n( 'H:i', $ts ) : '' ) . '</i>';
+		if ( '' !== $comp ) {
+			$rows .= '<span class="ewmt-fxComp">' . esc_html( $comp ) . '</span>';
+		}
+		$rows .= '</div><div class="ewmt-fxBody">';
+		$rows .= '<p class="ewmt-fxWhere"><em>' . esc_html( $a['home_word'] ) . '</em>' . esc_html( $a['venue'] ) . '</p>';
+		$rows .= '<div class="ewmt-fxTie"><span class="ewmt-fxName">' . esc_html( (string) ( $home['name'] ?? '' ) ) . '</span><span class="ewmt-fxMid">'
+			. '<img src="' . esc_url( $crest( $home['id'] ?? 0 ) ) . '" alt="' . esc_attr( (string) ( $home['name'] ?? '' ) ) . '" loading="lazy" onerror="this.style.visibility=\'hidden\'">'
+			. '<b>' . esc_html( $a['v'] ) . '</b>'
+			. '<img src="' . esc_url( $crest( $away['id'] ?? 0 ) ) . '" alt="' . esc_attr( (string) ( $away['name'] ?? '' ) ) . '" loading="lazy" onerror="this.style.visibility=\'hidden\'">'
+			. '</span><span class="ewmt-fxName">' . esc_html( (string) ( $away['name'] ?? '' ) ) . '</span></div>';
 
 		if ( 'on' === $st['state'] ) {
 			$any   = true;
-			$note  = $st['cap']
-				? '<i>' . esc_html( str_replace( '{n}', number_format_i18n( $st['left'] ), $a['left'] ) ) . '</i>'
-				: '';
-			$rows .= '<span class="ewmt-act">' . $note . '<a class="ewmt-buy" href="'
-				. esc_url( add_query_arg( 'fx', $id, get_permalink() ) ) . '">'
-				. esc_html( $a['buy'] ) . '</a></span>';
+			$rows .= '<p class="ewmt-fxBtns">';
+			if ( '' !== trim( (string) $a['hosp_btn'] ) ) {
+				$rows .= '<a class="ewmt-fxBtn is-line" href="' . esc_url( home_url( $a['hosp_url'] ) ) . '">' . esc_html( $a['hosp_btn'] ) . '</a>';
+			}
+			$rows .= '<a class="ewmt-fxBtn" href="' . esc_url( add_query_arg( 'fx', $id, get_permalink() ) ) . '">' . esc_html( $a['buy'] ) . '</a></p>';
+		}
+		$rows .= '</div>';
+
+		// The strip under the card: how many are left, or why it is not on sale yet.
+		if ( 'on' === $st['state'] ) {
+			$foot = $st['cap'] ? str_replace( '{n}', number_format_i18n( $st['left'] ), $a['left'] ) : '';
 		} else {
-			$word = 'soon' === $st['state'] && $st['when']
+			$foot = 'soon' === $st['state'] && $st['when']
 				? str_replace( '{when}', date_i18n( 'D j M, ga', $st['when'] ), $a['soon'] )
 				: ( 'out' === $st['state'] ? $a['out'] : $a['off'] );
-			$rows .= '<span class="ewmt-act"><em>' . esc_html( $word ) . '</em></span>';
 		}
-		$rows .= '</li>';
+		if ( '' !== $foot ) {
+			$rows .= '<p class="ewmt-fxFoot">' . esc_html( $foot ) . '</p>';
+		}
+		$rows .= '</div>';
 	}
 
 	if ( ! $any ) {
 		$h .= '<p class="ewmt-empty">' . esc_html( $a['empty'] ) . '</p>';
 	}
-	return $h . '<ul class="ewmt-rows">' . $rows . '</ul>' . ew_mt_hosp( $a );
+	return $h . '<div class="ewmt-rows">' . $rows . '</div>' . ew_mt_hosp( $a );
 }
 
 /** The one line out to hospitality, where there is something to sell. */
@@ -233,9 +272,9 @@ function ew_mt_one( $m, $a ) {
 
 	$h .= '<div class="ewmt-tkMatch">';
 	$h .= '<p class="ewmt-tie"><span>' . esc_html( (string) ( $home['name'] ?? '' ) ) . '</span>'
-		. '<em>v</em><span>' . esc_html( (string) ( $away['name'] ?? '' ) ) . '</span></p>';
+		. '<em>' . esc_html( $a['v'] ) . '</em><span>' . esc_html( (string) ( $away['name'] ?? '' ) ) . '</span></p>';
 	$h .= '<p class="ewmt-tkWhen"><b>' . esc_html( $ts ? date_i18n( 'l j F Y', $ts ) : '' ) . '</b>'
-		. '<i>' . esc_html( $ts ? date_i18n( 'ga', $ts ) : '' ) . '</i></p>';
+		. '<i>' . esc_html( $ts ? date_i18n( 'H:i', $ts ) : '' ) . '</i></p>';
 	$h .= '<p class="ewmt-tkAt">Coronation Park, Chewton Street, Eastwood NG16 3HB</p>';
 	if ( $st['cap'] ) {
 		$h .= '<p class="ewmt-tkLeft">' . esc_html( str_replace( '{n}', number_format_i18n( $st['left'] ), $a['left'] ) ) . '</p>';
@@ -637,107 +676,149 @@ function ew_mt_checkout( $req ) {
 
 function ew_mt_css() {
 	return '
-.ewmt{max-width:1180px;margin:0 auto;font-family:"Instrument Sans",system-ui,sans-serif;color:#101010}
+.ewmt{max-width:none;margin:0;font-family:"Instrument Sans",system-ui,sans-serif;color:#101010}
 .ewmt p{margin:0}
-.ewmt .ewmt-h{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:32px;line-height:1;
- letter-spacing:.5px;text-transform:uppercase;margin:0 0 16px;background:none;padding:0}
-.ewmt-empty{font-size:16px;line-height:1.6;color:#666;margin:0 0 20px}
-.ewmt-rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
-.ewmt-row{list-style:none;display:flex;align-items:center;gap:20px;background:#fff;
- border:1.5px solid #e2e2e2;border-radius:10px;padding:16px 20px}
-.ewmt-row.is-on{border-color:#CC0000}
-.ewmt-row.is-off,.ewmt-row.is-out{opacity:.62}
-.ewmt-when{flex:0 0 118px}
-.ewmt-when b{display:block;font-family:Anton,Impact,sans-serif;font-weight:400;font-size:24px;line-height:1}
-.ewmt-when i{display:block;font-style:normal;font-size:13px;color:#777;margin-top:3px}
-.ewmt-who{flex:1 1 auto;min-width:0}
-.ewmt-who b{display:block;font-size:21px;font-weight:700;letter-spacing:-.3px}
-.ewmt-who i{display:block;font-style:normal;font-size:14px;color:#777}
-.ewmt-act{flex:0 0 auto;display:flex;align-items:center;gap:14px}
-.ewmt-act i{font-style:normal;font-size:13px;color:#777}
-.ewmt-act em{font-style:normal;font-size:14px;font-weight:700;letter-spacing:.04em;
- text-transform:uppercase;color:#777}
-.ewmt-buy{display:inline-block;background:#CC0000;color:#fff;border-radius:6px;padding:13px 22px;
- font-size:15px;font-weight:700;text-decoration:none;white-space:nowrap}
+.ewmt .ewmt-h{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:34px;line-height:1.5;
+ letter-spacing:0;text-transform:uppercase;margin:0 0 28px;background:none;padding:0;color:#101010}
+.ewmt-empty{font-size:18px;line-height:1.45;color:#333;margin:0 0 20px}
+
+/* each game is the /matches fixture card */
+.ewmt-rows{display:flex;flex-direction:column;gap:14px}
+.ewmt-rest[hidden]{display:none}
+.ewmt-fx{background:#fff;border-radius:8px;overflow:hidden}
+.ewmt-fxTop{display:flex;align-items:center;gap:16px;min-height:81px;padding:16px;background:#fafafa;border-bottom:1px solid #efefef}
+.ewmt-fxBadge{display:flex;align-items:center;justify-content:center;width:48px;height:48px;flex:none;margin-right:4px}
+.ewmt .ewmt-fxBadge img{max-width:100%;max-height:100%;width:auto;height:auto;display:block}
+.ewmt-fxTop b{font-weight:400;font-size:20px;text-transform:uppercase;color:#111}
+.ewmt-fxTop i{font-style:normal;font-size:20px;font-weight:700;color:#101010;margin-left:-4px}
+.ewmt-fxComp{margin-left:auto;font-size:14px;letter-spacing:.025em;text-transform:uppercase;color:#9a9aa3;text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ewmt-fxBody{padding:26px 22px 30px;text-align:center}
+.ewmt-fxWhere{margin:0 0 22px!important;font-size:10px;text-transform:uppercase;color:#9a9aa3}
+.ewmt-fxWhere em{font-style:normal;font-weight:700;color:#101010;margin-right:9px}
+.ewmt-fxTie{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:18px}
+.ewmt-fxName{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:40px;line-height:1.02;letter-spacing:.01em;text-transform:uppercase;color:#111;text-align:center}
+.ewmt-fxMid{display:flex;align-items:center;gap:22px}
+.ewmt .ewmt-fxMid img{width:80px;height:80px;object-fit:contain;flex:none}
+.ewmt-fxMid b{font-size:48px;line-height:1;font-weight:700;color:#101010}
+.ewmt-fxBtns{margin:26px 0 0!important;display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.ewmt a.ewmt-fxBtn,.ewmt-cross a,.ewmt .ewmt-go{display:inline-flex;align-items:center;justify-content:center;min-height:50px;padding:12px 18px;border-radius:8px;border:1px solid #CC0000;background:#CC0000;color:#fff;text-decoration:none;text-transform:uppercase;font-family:"Instrument Sans",system-ui,sans-serif;font-size:16px;font-weight:700;letter-spacing:.03em;cursor:pointer;white-space:nowrap}
+.ewmt a.ewmt-fxBtn:hover,.ewmt-cross a:hover,.ewmt .ewmt-go:hover{background:#b00000;border-color:#b00000;color:#fff}
+.ewmt a.ewmt-fxBtn.is-line{background:transparent;color:#CC0000}
+.ewmt a.ewmt-fxBtn.is-line:hover{background:#CC0000;color:#fff}
+.ewmt-fxFoot{display:flex;align-items:center;justify-content:center;min-height:49px;padding:10px 16px;background:#fafafa;border-top:1px solid rgba(200,200,200,.3);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#8a8a8a}
+.ewmt-moreWrap{margin:18px 0 0!important;text-align:center}
+.ewmt-more{display:inline-flex;align-items:center;gap:9px;min-height:50px;padding:12px 26px;background:#fff;border:1px solid #d9d9dd;border-radius:8px;cursor:pointer;font-family:"Instrument Sans",system-ui,sans-serif;font-size:15px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:#101010}
+.ewmt-more:hover{border-color:#CC0000;color:#CC0000}
+.ewmt-more b{font-weight:700;color:#8a8a8a}
+.ewmt-more:hover b{color:#CC0000}
+
 .ewmt-back{margin:0 0 16px}
 .ewmt-back a{font-size:15px;font-weight:700;color:#101010;text-decoration:none}
 .ewmt-back a:hover{text-decoration:underline}
 
 .ewmt-tk{display:grid;grid-template-columns:minmax(0,1fr) 420px;background:#101010;color:#fff;
- border-radius:10px;overflow:hidden}
+ border-radius:8px;overflow:hidden}
 .ewmt-tkMatch{padding:34px 36px;display:flex;flex-direction:column;justify-content:center;gap:18px}
 .ewmt-tie{display:flex;flex-direction:column;gap:4px;font-family:Anton,Impact,sans-serif;
  font-weight:400;font-size:52px;line-height:.98;text-transform:uppercase;letter-spacing:.5px}
-.ewmt-tie em{font-family:Georgia,serif;font-style:italic;font-size:28px;color:#e01b1b;line-height:1}
+.ewmt-tie em{font-family:Anton,Impact,sans-serif;font-style:normal;font-size:30px;color:#CC0000;line-height:1}
 .ewmt-tkWhen{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
 .ewmt-tkWhen b{font-size:16px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
-.ewmt-tkWhen i{font-family:Anton,Impact,sans-serif;font-style:normal;font-size:32px;color:#e01b1b}
-.ewmt-tkAt,.ewmt-tkLeft{font-size:13.5px;color:rgba(255,255,255,.6)}
+.ewmt-tkWhen i{font-family:Anton,Impact,sans-serif;font-style:normal;font-size:32px;color:#fff}
+.ewmt-tkAt,.ewmt-tkLeft{font-size:14px;color:rgba(255,255,255,.6)}
 .ewmt-tkStub{border-left:3px dashed rgba(255,255,255,.85);padding:28px 30px;background:rgba(255,255,255,.04)}
 .ewmt-lab{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
  color:rgba(255,255,255,.55);margin:0 0 10px}
 .ewmt-tkRow{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 0;
  border-top:1px solid rgba(255,255,255,.1)}
 .ewmt-tkRow:first-child{border-top:0}
-.ewmt-tkWho b{display:block;font-size:15px;font-weight:700}
+.ewmt-tkWho b{display:block;font-size:16px;font-weight:700}
 .ewmt-tkWho small{display:block;font-size:12px;color:rgba(255,255,255,.5);margin-top:1px}
 .ewmt-tkPick{display:flex;align-items:center;gap:14px;flex:none}
-.ewmt-tkP{font-size:15px;font-weight:700;min-width:42px;text-align:right}
-.ewmt-tkPm{display:inline-flex;align-items:center;gap:2px;border:1px solid rgba(255,255,255,.3);border-radius:5px}
-.ewmt-tkPm button{appearance:none;background:none;border:0;color:#fff;font:inherit;font-size:17px;
- line-height:1;width:34px;height:34px;cursor:pointer}
+.ewmt-tkP{font-size:16px;font-weight:700;min-width:42px;text-align:right}
+.ewmt-tkPm{display:inline-flex;align-items:center;gap:2px;border:1px solid rgba(255,255,255,.3);border-radius:8px}
+.ewmt-tkPm button{appearance:none;background:none;border:0;color:#fff;font:inherit;font-size:18px;
+ line-height:1;width:38px;height:38px;cursor:pointer}
 .ewmt-tkPm button[disabled]{color:rgba(255,255,255,.28);cursor:default}
-.ewmt-tkPm output{min-width:24px;text-align:center;font-size:15px;font-weight:700}
+.ewmt-tkPm output{min-width:24px;text-align:center;font-size:16px;font-weight:700}
 .ewmt-sum{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:16px 0 0;
  border-top:1px solid rgba(255,255,255,.18);padding-top:12px;font-size:14px}
 .ewmt-sum span:last-child{font-family:Anton,Impact,sans-serif;font-size:28px}
-.ewmt-go{display:block;width:100%;margin:14px 0 0;appearance:none;border:0;border-radius:6px;
- background:#CC0000;color:#fff;font:inherit;font-size:15px;font-weight:700;letter-spacing:.05em;
- text-transform:uppercase;padding:16px;cursor:pointer}
-.ewmt-msg{margin:10px 0 0;font-size:13.5px;color:rgba(255,255,255,.75);min-height:18px}
-.ewmt-pay{margin-top:36px}
-.ewmt-mount{background:#fff;border-radius:6px;min-height:40px}
+.ewmt .ewmt-go{display:flex;width:100%;margin:14px 0 0;appearance:none}
+.ewmt-msg{margin:10px 0 0;font-size:14px;color:rgba(255,255,255,.75);min-height:18px}
+.ewmt-pay{margin-top:60px}
+.ewmt-mount{background:#fff;border-radius:8px;min-height:40px}
 .ewmt-mount:empty{display:none}
-.ewmt-email{background:#101010;color:#fff;border-radius:10px;padding:26px 30px;max-width:640px}
+.ewmt-email{background:#101010;color:#fff;border-radius:8px;padding:26px 30px;max-width:640px}
 .ewmt-elab{display:block;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
  color:rgba(255,255,255,.55);margin:0 0 10px}
 .ewmt-erow{display:flex;gap:10px;flex-wrap:wrap}
-.ewmt-ein{flex:1 1 260px;min-width:0;box-sizing:border-box;background:#fff;color:#101010;border:0;border-radius:6px;
+.ewmt-ein{flex:1 1 260px;min-width:0;box-sizing:border-box;background:#fff;color:#101010;border:0;border-radius:8px;
  padding:15px 14px;font:400 16px "Instrument Sans",system-ui,sans-serif}
 .ewmt-ein:focus{outline:2px solid rgba(255,255,255,.6);outline-offset:1px}
-.ewmt .ewmt-enext{flex:0 0 auto;width:auto;margin:0;padding:15px 24px}
+.ewmt .ewmt-enext{flex:0 0 auto;width:auto;margin:0;padding:12px 24px}
 .ewmt .ewmt-enext[disabled]{opacity:.6;cursor:wait}
-.ewmt-err{margin:10px 0 0;font-size:13.5px;color:rgba(255,255,255,.75);min-height:18px}
+.ewmt-err{margin:10px 0 0;font-size:14px;color:rgba(255,255,255,.75);min-height:18px}
 .ewmt-inapp{max-width:520px;margin:0 0 30px}
 
-.ewmt-thanks{background:#101010;color:#fff;border-radius:10px;padding:30px 34px;margin:0 0 30px}
+.ewmt-thanks{background:#101010;color:#fff;border-radius:8px;padding:30px 34px;margin:0 0 30px}
 .ewmt-thanksT{font-family:Anton,Impact,sans-serif;font-size:34px;line-height:1;text-transform:uppercase;
  letter-spacing:.5px;margin:0 0 12px}
 .ewmt-thanksW{font-size:16px;font-weight:700;margin:0 0 6px}
-.ewmt-thanksR{font-family:Anton,Impact,sans-serif;font-size:20px;color:#e01b1b;margin:0 0 12px}
-.ewmt-thanksG{font-size:14.5px;line-height:1.6;color:rgba(255,255,255,.7)}
+.ewmt-thanksR{font-family:Anton,Impact,sans-serif;font-size:20px;color:#CC0000;margin:0 0 12px}
+.ewmt-thanksG{font-size:15px;line-height:1.6;color:rgba(255,255,255,.7)}
 
-.ewmt-cross{background:#101010;color:#fff;border-radius:10px;padding:26px 30px;margin:34px 0 0;
+.ewmt-cross{background:#101010;color:#fff;border-radius:8px;padding:26px 30px;margin:60px 0 0;
  display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap}
-.ewmt-cross b{display:block;font-family:Anton,Impact,sans-serif;font-weight:400;font-size:27px;
- line-height:1.05;text-transform:uppercase;letter-spacing:.5px;margin:0 0 6px}
-.ewmt-cross span{display:block;font-size:15px;line-height:1.6;color:rgba(255,255,255,.7);max-width:62ch}
-.ewmt-cross a{flex:none;background:#CC0000;color:#fff;border-radius:6px;padding:15px 26px;
- font-size:15px;font-weight:700;text-decoration:none;white-space:nowrap}
+.ewmt-cross b{display:block;font-family:Anton,Impact,sans-serif;font-weight:400;font-size:28px;
+ line-height:1.05;text-transform:uppercase;letter-spacing:0;margin:0 0 6px}
+.ewmt-cross span{display:block;font-size:16px;line-height:1.5;color:rgba(255,255,255,.7);max-width:62ch}
+.ewmt-cross a{flex:none}
 
+@media(max-width:900px){
+.ewmt-fxName{font-size:30px}
+.ewmt-fxComp{display:none}
+}
 @media(max-width:860px){
 .ewmt-email{padding:22px 20px}
 .ewmt .ewmt-enext{flex:1 1 100%}
 .ewmt-tk{grid-template-columns:minmax(0,1fr)}
-.ewmt-tkStub{border-left:0;border-top:3px dashed rgba(255,255,255,.85)}
-.ewmt-tie{font-size:36px}
-.ewmt-row{flex-wrap:wrap;gap:12px}
-.ewmt-when,.ewmt-act{flex:1 1 100%}
+.ewmt-tkMatch{padding:22px 20px;gap:10px}
+.ewmt-tkStub{border-left:0;border-top:3px dashed rgba(255,255,255,.85);padding:22px 20px}
+.ewmt-tie{font-size:30px;flex-direction:row;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
+.ewmt-tie em{font-size:22px}
+.ewmt-tkWhen i{font-size:24px}
+}
+@media(max-width:767px){
+.ewmt .ewmt-h{font-size:30px;margin-bottom:22px}
+.ewmt-fxTop{padding:12px 16px;min-height:64px}
+.ewmt-fxBody{padding:18px 16px 20px}
+.ewmt-fxTie{grid-template-columns:1fr;gap:10px}
+.ewmt-fxName{font-size:24px}
+.ewmt-fxMid{justify-content:center}
+.ewmt .ewmt-fxMid img{width:56px;height:56px}
+.ewmt-fxMid b{font-size:32px}
+.ewmt-cross{padding:22px 20px;margin-top:40px}
+.ewmt-cross b{font-size:24px}
+.ewmt-cross a{flex:1 1 100%}
+.ewmt-pay{margin-top:40px}
 }';
 }
 
 function ew_mt_js() {
 	return <<<'JS'
+(function(){
+ [].forEach.call(document.querySelectorAll('[data-ewmt-more]'), function(btn){
+  btn.addEventListener('click', function(){
+   var box = btn.parentNode.nextElementSibling;
+   if (!box || !box.hasAttribute('data-ewmt-rest')) { return; }
+   var open = !box.hasAttribute('hidden');
+   if (open) { box.setAttribute('hidden', ''); } else { box.removeAttribute('hidden'); }
+   btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+   btn.firstChild.nodeValue = (open ? btn.getAttribute('data-more') : btn.getAttribute('data-less')) + ' ';
+  });
+ });
+})();
 (function(){
  var root = document.querySelector('.ewmt-tk');
  if(!root){ return; }

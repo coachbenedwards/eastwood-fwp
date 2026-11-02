@@ -425,6 +425,25 @@ function ew_inapp_ticket( $t ) {
 	return $h;
 }
 
+/**
+ * A confirmation card instead of a ticket, for a sign-up with no event or
+ * date (academy interest). $c: kicker, title, rows (key => label), next_k, next.
+ * Each row is filled in by the page from what they typed; an empty one hides.
+ */
+function ew_inapp_card( $c ) {
+	$h  = '<div class="ewi-card"><div class="ewi-cardHead"><img src="' . esc_url( ew_inapp_crest( EW_TEAM ) ) . '" alt="">';
+	$h .= '<div><p class="ewi-cardK">' . esc_html( (string) ( $c['kicker'] ?? '' ) ) . '</p><p class="ewi-cardT">' . esc_html( (string) ( $c['title'] ?? '' ) ) . '</p></div></div>';
+	$h .= '<div class="ewi-cardRows">';
+	foreach ( (array) ( $c['rows'] ?? array() ) as $key => $label ) {
+		$h .= '<p class="ewi-cardRow" data-ewi-row="' . esc_attr( $key ) . '"><span>' . esc_html( $label ) . '</span><b data-ewi-f="' . esc_attr( $key ) . '"></b></p>';
+	}
+	$h .= '</div>';
+	if ( '' !== trim( (string) ( $c['next'] ?? '' ) ) ) {
+		$h .= '<div class="ewi-cardNext"><p>' . esc_html( (string) ( $c['next_k'] ?? '' ) ) . '</p><b>' . esc_html( (string) $c['next'] ) . '</b></div>';
+	}
+	return $h . '</div>';
+}
+
 /** The store buttons, the same addresses as eastwoodfc.com/app. */
 function ew_inapp_stores( $claim = '' ) {
 	$d   = function_exists( 'ew_app_defaults' ) ? ew_app_defaults() : array( 'ios_url' => '', 'android_url' => '' );
@@ -445,9 +464,13 @@ function ew_inapp_stores( $claim = '' ) {
  * the sign-up is saved. $after: the block's own markup under the store buttons.
  */
 function ew_inapp_panel( $heading, $ticket, $after = '' ) {
-	$h  = '<div class="ewi" data-ewi hidden>';
-	$h .= '<p class="ewi-h">' . esc_html( $heading ) . '</p>';
-	$h .= '<div class="ewi-art">' . ew_inapp_phone() . ew_inapp_ticket( $ticket ) . '</div>';
+	$card = isset( $ticket['card'] ) && is_array( $ticket['card'] );
+	$h    = '<div class="ewi' . ( $card ? ' is-card' : '' ) . '" data-ewi hidden>';
+	$h   .= '<p class="ewi-h">' . esc_html( $heading ) . '</p>';
+	if ( '' !== trim( (string) ( $ticket['note'] ?? '' ) ) ) {
+		$h .= '<p class="ewi-note">' . esc_html( (string) $ticket['note'] ) . '</p>';
+	}
+	$h .= '<div class="ewi-art">' . ew_inapp_phone() . ( $card ? ew_inapp_card( $ticket['card'] ) : ew_inapp_ticket( $ticket ) ) . '</div>';
 	$h .= ew_inapp_stores();
 	return $h . $after . '</div>';
 }
@@ -496,6 +519,19 @@ function ew_inapp_css() {
 .ewi-tkd{font-weight:700;font-size:11px;letter-spacing:4px;color:#CC0000;margin-top:12px!important;text-transform:uppercase}
 .ewi-tkw{display:flex;justify-content:space-between;align-items:flex-end}.ewi-tkw span{font-size:14px}.ewi-tkw b{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:26px;line-height:28px}
 .ewi-stub{border-top:3px dashed #E4E5E8;padding:10px 16px 12px;text-align:center}.ewi-stub b{display:block;font-family:Anton,Impact,sans-serif;font-weight:400;font-size:30px;line-height:34px}.ewi-stub span{font-family:Anton,Impact,sans-serif;font-size:15px;color:#CC0000}
+.ewi-note{margin-top:10px!important;font-size:15px;line-height:1.45;color:#c9c9cf}
+.ewi.is-card .ewi-art{height:440px}
+.ewi-card{position:absolute;left:80px;top:50px;width:236px;border-radius:12px;background:#1a1a1a;border:1px solid rgba(255,255,255,.14);box-shadow:0 24px 50px rgba(0,0,0,.6);padding:16px;transform:rotate(-3deg);z-index:2;color:#fff}
+.ewi-cardHead{display:flex;align-items:center;gap:10px}.ewi-cardHead img{width:36px;height:36px;flex:none}
+.ewi-cardK{font-family:Anton,Impact,sans-serif;font-size:13px;letter-spacing:1px;color:#ff4a3d;text-transform:uppercase}
+.ewi-cardT{margin-top:2px!important;font-family:Anton,Impact,sans-serif;font-size:20px;line-height:1.05;text-transform:uppercase}
+.ewi-cardRows{margin-top:12px}
+.ewi-cardRow{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid rgba(255,255,255,.12);font-size:14px}
+.ewi-cardRow span{color:rgba(255,255,255,.6)}.ewi-cardRow b{font-weight:600;text-align:right;min-width:0;overflow-wrap:anywhere}
+.ewi-cardRow[hidden]{display:none}
+.ewi-cardNext{margin-top:10px;padding:10px 12px;border-radius:8px;background:#CC0000}
+.ewi-cardNext p{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.ewi-cardNext b{display:block;margin-top:3px;font-size:14px;line-height:1.35;font-weight:600}
 .ewi-stores{display:flex;gap:10px}
 .ewi .ewi-store{flex:1;height:54px;border-radius:10px;background:#000;border:1px solid rgba(255,255,255,.35);display:flex;align-items:center;gap:10px;padding:0 12px;color:#fff;text-decoration:none}
 .ewi-store span{display:flex;flex-direction:column;min-width:0}.ewi-store i{font-style:normal;font-size:10px;color:rgba(255,255,255,.75);white-space:nowrap}.ewi-store b{font-size:15px;line-height:1.1;white-space:nowrap}
@@ -507,8 +543,15 @@ function ew_inapp_css() {
 /** Fills in the ticket and the private link, and shows the panel. */
 function ew_inapp_js() {
 	return <<<'JS'
-window.ewInapp = window.ewInapp || function(root, claim){
+window.ewInapp = window.ewInapp || function(root, claim, fill){
  var p = root.querySelector('[data-ewi]'); if(!p) return;
+ if(fill){
+  p.querySelectorAll('[data-ewi-row]').forEach(function(r){
+   var k = r.getAttribute('data-ewi-row'), v = String(fill[k] || '').trim();
+   var b = r.querySelector('[data-ewi-f]'); if(b) b.textContent = v;
+   r.hidden = !v;
+  });
+ }
  if(claim){
   p.querySelectorAll('[data-ewi-store]').forEach(function(a){
    try{ var u = new URL(a.href); u.searchParams.set('claim', claim); a.href = u.toString(); }catch(e){}

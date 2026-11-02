@@ -25,10 +25,10 @@ function ew_halftime_defaults() {
 	return array(
 		'event'       => 'Eastwood FC v Hucknall Town, Saturday 14 November 2026',
 		// Step one: who is filling it in, and their email.
-		'form_title'  => 'Put your child forward',
+		'form_title'  => 'Register your child',
 		'name_label'  => 'Your full name',
 		'email_label' => 'Your email',
-		'send'        => 'Count us in',
+		'send'        => 'Register',
 		// Step two: the child or children, the parent, the mobile.
 		'next_title'  => 'Nearly there',
 		'who_q'       => 'Is {name} the child taking part, or you?',
