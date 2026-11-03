@@ -59,7 +59,49 @@ function ew_fb_defaults() {
 		'interest_url' => '/academy/register-interest/',
 		'player_word'  => 'your child',
 		'subject'      => 'Trial day feedback: {score}/5 from {who}',
+		// The email that asks a trial family for feedback.
+		'mail_subject' => 'How was the trial day?',
+		'mail_name'    => 'Eastwood FC Academy',
+		'mail_crest'   => '/wp-content/uploads/ew-badges/2059.png',
+		'mail_photo'   => '/wp-content/plugins/eastwood-fwp/assets/email/academy.jpg',
+		'mail_title'   => 'How was the trial day?',
+		'mail_hi'      => 'Hi {parent},',
+		'mail_date'    => 'Wednesday 28 October',
+		'mail_body'    => 'Thank you for bringing {player} to the Eastwood FC Academy trial day on {date}.\n\nWe would love to know how it went for you both. It takes two minutes.',
+		'mail_button'  => 'Give your feedback',
+		'mail_sign'    => 'Thank you,\nLewis McGugan\nHead of Academy, Eastwood FC',
+		'mail_footer'  => 'Eastwood Football Club · Coronation Park, Chewton Street, Eastwood NG16 3HB',
+		'mail_there'   => 'there',
 	);
+}
+
+/** The feedback request email for one family. $who: parent, player, bid. */
+function ew_fb_request_mail( $a, $post, $who ) {
+	$vals = array(
+		'parent' => '' !== trim( (string) ( $who['parent'] ?? '' ) ) ? trim( $who['parent'] ) : $a['mail_there'],
+		'player' => '' !== trim( (string) ( $who['player'] ?? '' ) ) ? trim( $who['player'] ) : $a['player_word'],
+		'date'   => $a['mail_date'],
+	);
+	$link = get_permalink( $post );
+	if ( ! empty( $who['bid'] ) ) {
+		$link = add_query_arg( 'k', ew_fb_key( (int) $who['bid'] ), $link );
+	}
+	$paras = array_merge(
+		array( ew_acad_fill( $a['mail_hi'], $vals ) ),
+		preg_split( '/\n\s*\n/', ew_acad_fill( str_replace( '\n', "\n", (string) $a['mail_body'] ), $vals ) )
+	);
+	$m = array(
+		'crest'  => $a['mail_crest'],
+		'name'   => $a['mail_name'],
+		'photo'  => $a['mail_photo'],
+		'title'  => $a['mail_title'],
+		'paras'  => $paras,
+		'button' => $a['mail_button'],
+		'link'   => $link,
+		'sign'   => $a['mail_sign'],
+		'footer' => $a['mail_footer'],
+	);
+	return array( ew_mail_card( $m ), ew_mail_card_text( $m ) );
 }
 
 /** The link that fills a trial family's names in. */
@@ -86,6 +128,11 @@ function ew_fb_shortcode( $atts ) {
 	$post = get_post();
 	$w    = $a;
 	unset( $w['notify_to'], $w['from'], $w['subject'] );
+	foreach ( array_keys( $w ) as $k ) {
+		if ( 0 === strpos( $k, 'mail_' ) ) {
+			unset( $w[ $k ] );
+		}
+	}
 	foreach ( array( 'felt', 'info', 'place' ) as $k ) {
 		$w[ $k ] = ew_fb_list( $a[ $k ] );
 	}
@@ -105,6 +152,59 @@ add_filter( 'ew_blocks_allowed', function ( $list ) {
 } );
 
 add_action( 'rest_api_init', function () {
+	// Send the feedback request. Admins only. Either a list of trial bookings
+	// (names and the fill-in link come from each), or test addresses.
+	register_rest_route( 'eastwood/v1', '/feedback/send', array(
+		'methods'             => 'POST',
+		'permission_callback' => function () {
+			return current_user_can( 'manage_options' );
+		},
+		'callback'            => function ( $req ) {
+			$post = get_post( (int) $req->get_param( 'page' ) );
+			$blk  = $post ? ew_acad_block_on( $post, 'eastwood_feedback' ) : null;
+			if ( ! $blk ) {
+				return new WP_REST_Response( array( 'message' => 'No feedback block on that page.' ), 400 );
+			}
+			$a    = shortcode_atts( ew_fb_defaults(), $blk['atts'], 'eastwood_feedback' );
+			$test = (bool) $req->get_param( 'test' );
+			$list = array();
+			foreach ( (array) $req->get_param( 'bids' ) as $bid ) {
+				$bid   = (int) $bid;
+				$email = 'ewt_booking' === get_post_type( $bid ) ? sanitize_email( ew_acad_m( $bid, 'email' ) ) : '';
+				if ( is_email( $email ) ) {
+					$list[] = array( 'email' => $email, 'parent' => ew_acad_m( $bid, 'parent' ), 'player' => ew_acad_m( $bid, 'name' ), 'bid' => $bid );
+				}
+			}
+			foreach ( (array) $req->get_param( 'to' ) as $email ) {
+				$email = sanitize_email( (string) $email );
+				if ( is_email( $email ) ) {
+					$list[] = array( 'email' => $email );
+				}
+			}
+			$from = ew_acad_from( array( 'from' => $a['from'] ) );
+			$out  = array();
+			foreach ( $list as $who ) {
+				list( $html, $text ) = ew_fb_request_mail( $a, $post, $who );
+				$alt = function ( $mail ) use ( $text ) {
+					$mail->AltBody = $text;
+				};
+				add_action( 'phpmailer_init', $alt, 99 );
+				$ok = wp_mail(
+					$who['email'],
+					( $test ? '[Test] ' : '' ) . wp_specialchars_decode( $a['mail_subject'], ENT_QUOTES ),
+					$html,
+					array( 'From: ' . $a['mail_name'] . ' <' . $from . '>', 'Content-Type: text/html; charset=UTF-8' )
+				);
+				remove_action( 'phpmailer_init', $alt, 99 );
+				if ( $ok && ! empty( $who['bid'] ) ) {
+					update_post_meta( (int) $who['bid'], '_ewt_fb_asked', time() );
+				}
+				$out[] = array( 'email' => $who['email'], 'sent' => (bool) $ok );
+			}
+			return array( 'ok' => 1, 'from' => $from, 'sent' => $out );
+		},
+	) );
+
 	register_rest_route( 'eastwood/v1', '/feedback', array(
 		array(
 			'methods'             => 'GET',

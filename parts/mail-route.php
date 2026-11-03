@@ -229,3 +229,105 @@ add_action( 'ew_fwp_after_settings', function () {
 	submit_button( 'Send test email', 'secondary' );
 	echo '</form>';
 }, 20 );
+
+/* ------------------------------------------------------------------ *
+ * One email look for the whole site: crest and name, a photo with the
+ * headline on it, the words, one red button, the sign-off and the club
+ * address. Every word comes in from the block that sends it.
+ * ------------------------------------------------------------------ */
+
+function ew_mail_abs( $u ) {
+	$u = trim( (string) $u );
+	if ( '' === $u ) {
+		return '';
+	}
+	return 0 === strpos( $u, 'http' ) ? $u : home_url( '/' . ltrim( $u, '/' ) );
+}
+
+/**
+ * $m: crest, name, photo, title, paras (array of plain text), button, link,
+ * sign (plain text, lines), footer. Returns a full HTML email.
+ */
+function ew_mail_card( $m ) {
+	$m = wp_parse_args( (array) $m, array(
+		'crest'  => '/wp-content/uploads/ew-badges/2059.png',
+		'name'   => 'Eastwood FC',
+		'photo'  => '',
+		'title'  => '',
+		'paras'  => array(),
+		'button' => '',
+		'link'   => '',
+		'sign'   => '',
+		'footer' => 'Eastwood Football Club · Coronation Park, Chewton Street, Eastwood NG16 3HB',
+	) );
+	$disp  = "font-family:Anton,Impact,'Arial Narrow Bold',sans-serif;text-transform:uppercase;font-weight:400";
+	$body  = "font-family:'Instrument Sans',-apple-system,'Segoe UI',Helvetica,Arial,sans-serif";
+	$p     = 'margin:0 0 20px;font-size:17px;line-height:1.6;color:#111;' . $body;
+	$link  = esc_url( $m['link'] );
+	$photo = esc_url( ew_mail_abs( $m['photo'] ) );
+
+	$h  = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
+	$h .= '<meta name="color-scheme" content="light"><title>' . esc_html( $m['title'] ) . '</title>';
+	$h .= '<link href="https://fonts.googleapis.com/css2?family=Anton&family=Instrument+Sans:wght@400;600&display=swap" rel="stylesheet"></head>';
+	$h .= '<body style="margin:0;padding:0;background:#e9e9ec">';
+	$h .= '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#e9e9ec"><tr><td align="center" style="padding:24px 12px">';
+	$h .= '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background:#ffffff;border-radius:10px;overflow:hidden">';
+
+	// Crest and name.
+	$h .= '<tr><td style="padding:28px 32px 20px"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>';
+	$h .= '<td style="padding-right:14px"><img src="' . esc_url( ew_mail_abs( $m['crest'] ) ) . '" width="56" height="56" alt="Eastwood FC crest" style="display:block;border:0"></td>';
+	$h .= '<td style="' . $disp . ';font-size:22px;letter-spacing:.04em;color:#111">' . esc_html( $m['name'] ) . '</td>';
+	$h .= '</tr></table></td></tr>';
+
+	// Photo with the headline on it.
+	if ( '' !== $m['title'] ) {
+		$bg  = $photo ? 'background-image:url(' . $photo . ');background-size:cover;background-position:center;' : '';
+		$h  .= '<tr><td style="padding:0 32px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>';
+		$h  .= '<td height="200" valign="bottom" bgcolor="#111111" style="height:200px;border-radius:8px;' . $bg . 'padding:0 24px 20px">';
+		$h  .= '<div style="' . $disp . ';font-size:40px;line-height:1.05;color:#ffffff">' . esc_html( $m['title'] ) . '</div>';
+		$h  .= '</td></tr></table></td></tr>';
+	}
+
+	// Words, button, sign-off.
+	$h .= '<tr><td style="padding:28px 32px 8px">';
+	foreach ( (array) $m['paras'] as $para ) {
+		if ( '' !== trim( (string) $para ) ) {
+			$h .= '<p style="' . $p . '">' . nl2br( esc_html( trim( (string) $para ) ), false ) . '</p>';
+		}
+	}
+	if ( '' !== $m['button'] && $link ) {
+		$h .= '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 24px"><tr>';
+		$h .= '<td bgcolor="#CC0000" style="border-radius:8px"><a href="' . $link . '" style="display:inline-block;padding:16px 28px;' . $disp . ';font-size:20px;letter-spacing:.02em;color:#ffffff;text-decoration:none;border-radius:8px">' . esc_html( $m['button'] ) . '</a></td>';
+		$h .= '</tr></table>';
+	}
+	if ( '' !== trim( (string) $m['sign'] ) ) {
+		$lines = array_map( 'trim', explode( "\n", str_replace( '\n', "\n", (string) $m['sign'] ) ) );
+		$last  = count( $lines ) > 1 ? array_pop( $lines ) : '';
+		$h    .= '<p style="' . $p . '">' . implode( '<br>', array_map( 'esc_html', $lines ) )
+			. ( '' !== $last ? '<br><span style="color:#555">' . esc_html( $last ) . '</span>' : '' ) . '</p>';
+	}
+	$h .= '</td></tr>';
+
+	// Club address.
+	$h .= '<tr><td style="padding:16px 32px;background:#f6f6f7;font-size:12px;line-height:1.5;color:#666;' . $body . '">' . esc_html( $m['footer'] ) . '</td></tr>';
+	$h .= '</table></td></tr></table></body></html>';
+	return $h;
+}
+
+/** The same email as plain text, for mail apps that will not show HTML. */
+function ew_mail_card_text( $m ) {
+	$out = array();
+	foreach ( (array) ( $m['paras'] ?? array() ) as $para ) {
+		$out[] = trim( (string) $para );
+	}
+	if ( ! empty( $m['button'] ) && ! empty( $m['link'] ) ) {
+		$out[] = $m['button'] . ': ' . $m['link'];
+	}
+	if ( ! empty( $m['sign'] ) ) {
+		$out[] = str_replace( '\n', "\n", (string) $m['sign'] );
+	}
+	if ( ! empty( $m['footer'] ) ) {
+		$out[] = $m['footer'];
+	}
+	return implode( "\n\n", array_filter( $out, 'strlen' ) );
+}
