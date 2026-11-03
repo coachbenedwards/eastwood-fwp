@@ -162,8 +162,12 @@ add_action( 'phpmailer_init', function ( $mail ) {
 	if ( '' === $from || ! in_array( $from, $ok_from, true ) ) {
 		$mail->setFrom( ew_smtp_from(), 'Eastwood FC', false );
 	}
+	// Replies go to the team's inbox (orders@ by default), never to the
+	// sending mailbox, which is private: its Sent folder holds every booking
+	// reference and sign-in link the website sends, so only the owner reads it.
 	$mail->clearReplyTos();
-	$mail->addReplyTo( $mail->From, 'Eastwood FC' );
+	$reply = trim( (string) get_option( 'ew_smtp_reply', 'orders@eastwoodfc.com' ) );
+	$mail->addReplyTo( is_email( $reply ) ? $reply : $mail->From, 'Eastwood FC' );
 	// No separate sender is named, so nothing anywhere reads "calendar@ on behalf of".
 	$mail->Sender = '';
 } );
@@ -197,6 +201,7 @@ add_action( 'ew_fwp_after_settings', function () {
 		update_option( 'ew_smtp_user', sanitize_email( wp_unslash( $_POST['ew_smtp_user'] ) ) );
 		update_option( 'ew_smtp_from', sanitize_email( wp_unslash( $_POST['ew_smtp_from'] ?? '' ) ) );
 		update_option( 'ew_smtp_aliases', sanitize_text_field( wp_unslash( $_POST['ew_smtp_aliases'] ?? '' ) ) );
+		update_option( 'ew_smtp_reply', sanitize_email( wp_unslash( $_POST['ew_smtp_reply'] ?? '' ) ) );
 		$pass = preg_replace( '/\s+/', '', (string) wp_unslash( $_POST['ew_smtp_pass'] ?? '' ) );
 		if ( '' !== $pass ) {
 			update_option( 'ew_smtp_pass', $pass, false );
@@ -218,6 +223,7 @@ add_action( 'ew_fwp_after_settings', function () {
 	wp_nonce_field( 'ew_smtp_save' );
 	echo '<p><label>Mailbox<br><input type="email" name="ew_smtp_user" size="40" value="' . esc_attr( ew_smtp_user() ) . '"></label></p>';
 	echo '<p><label>Send as<br><input type="email" name="ew_smtp_from" size="40" value="' . esc_attr( ew_smtp_from() ) . '"></label></p>';
+	echo '<p><label>Replies go to (the team inbox)<br><input type="email" name="ew_smtp_reply" size="40" value="' . esc_attr( (string) get_option( 'ew_smtp_reply', 'orders@eastwoodfc.com' ) ) . '"></label></p>';
 	echo '<p><label>Also send as (only addresses confirmed as "Send mail as" on the mailbox, comma separated)<br><input type="text" name="ew_smtp_aliases" size="60" value="' . esc_attr( (string) get_option( 'ew_smtp_aliases', '' ) ) . '"></label></p>';
 	echo '<p><label>App password' . ( '' !== (string) get_option( 'ew_smtp_pass', '' ) ? ' (saved; leave blank to keep it)' : '' ) . '<br><input type="password" name="ew_smtp_pass" size="40" autocomplete="new-password" value=""></label></p>';
 	echo '<p><label><input type="checkbox" name="ew_smtp_clear" value="1"> Remove the saved app password</label></p>';
