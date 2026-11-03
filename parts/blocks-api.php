@@ -524,6 +524,96 @@ add_action( 'rest_api_init', function () {
 		},
 	) );
 
+	/*
+	 * Rows. GET lists every row with its class and the widgets in it.
+	 * POST with id + class changes one row's class (ew-blockrow is kept).
+	 * POST with after|before + widgets adds a new row next to an existing row.
+	 */
+	register_rest_route( 'eastwood/v1', '/row', array(
+		array(
+			'methods'             => 'GET',
+			'permission_callback' => function () { return current_user_can( 'edit_pages' ); },
+			'callback'            => function ( $req ) {
+				$post = ew_blocks_page( $req->get_param( 'page' ) );
+				if ( ! $post ) {
+					return new WP_Error( 'ew_no_page', 'No page by that name.', array( 'status' => 404 ) );
+				}
+				$out = array();
+				foreach ( ew_blocks_read( $post ) as $node ) {
+					if ( ! is_array( $node ) || 'widget' === ( $node['elType'] ?? '' ) ) {
+						continue;
+					}
+					$ids = array();
+					$one = array( $node );
+					ew_blocks_walk( $one, function ( $w ) use ( &$ids ) { $ids[] = $w['id'] ?? ''; } );
+					$out[] = array( 'id' => $node['id'] ?? '', 'class' => $node['settings']['css_classes'] ?? '', 'widgets' => $ids );
+				}
+				return array( 'page' => $post->post_name, 'rows' => $out );
+			},
+		),
+		array(
+			'methods'             => 'POST',
+			'permission_callback' => function () { return current_user_can( 'edit_pages' ); },
+			'callback'            => function ( $req ) {
+				$post = ew_blocks_page( $req->get_param( 'page' ) );
+				if ( ! $post ) {
+					return new WP_Error( 'ew_no_page', 'No page by that name.', array( 'status' => 404 ) );
+				}
+				$doc   = ew_blocks_read( $post );
+				$class = trim( preg_replace( '/[^A-Za-z0-9_ -]/', '', (string) $req->get_param( 'class' ) ) );
+				$id    = (string) $req->get_param( 'id' );
+				if ( '' !== $id ) {
+					$hit = false;
+					foreach ( $doc as &$node ) {
+						if ( is_array( $node ) && ( $node['id'] ?? '' ) === $id && 'widget' !== ( $node['elType'] ?? '' ) ) {
+							$node['settings']['css_classes'] = trim( preg_replace( '/\s+/', ' ', 'ew-blockrow ' . preg_replace( '/\bew-blockrow\b/', '', $class ) ) );
+							$hit = true;
+						}
+					}
+					unset( $node );
+					if ( ! $hit ) {
+						return new WP_Error( 'ew_no_block', 'No row with that id on that page.', array( 'status' => 404 ) );
+					}
+					ew_blocks_write( $post, $doc );
+					return array( 'ok' => true, 'id' => $id, 'class' => $class );
+				}
+				$after  = (string) $req->get_param( 'after' );
+				$before = (string) $req->get_param( 'before' );
+				if ( '' === $after && '' === $before ) {
+					return new WP_Error( 'ew_args', 'Give it a row id, or after/before.', array( 'status' => 400 ) );
+				}
+				$built = array();
+				foreach ( (array) $req->get_param( 'widgets' ) as $spec ) {
+					if ( ! empty( $spec['block'] ) && ! in_array( (string) $spec['block'], ew_blocks_allowed(), true ) ) {
+						return new WP_Error( 'ew_block', 'Not a block this channel writes: ' . $spec['block'], array( 'status' => 400 ) );
+					}
+					$w = ew_blocks_widget( (array) $spec );
+					if ( null === $w ) {
+						return new WP_Error( 'ew_widget', 'Not a widget this channel writes.', array( 'status' => 400 ) );
+					}
+					$built[] = $w;
+				}
+				if ( ! $built ) {
+					return new WP_Error( 'ew_args', 'Give it some widgets.', array( 'status' => 400 ) );
+				}
+				$row = ew_blocks_row( $built, '' !== $class ? $class : 'ew-blockrow' );
+				$ok  = false;
+				foreach ( $doc as $i => $node ) {
+					if ( is_array( $node ) && ( $node['id'] ?? '' ) === ( '' !== $after ? $after : $before ) ) {
+						array_splice( $doc, '' !== $after ? $i + 1 : $i, 0, array( $row ) );
+						$ok = true;
+						break;
+					}
+				}
+				if ( ! $ok ) {
+					return new WP_Error( 'ew_no_block', 'No row with that id on that page.', array( 'status' => 404 ) );
+				}
+				ew_blocks_write( $post, $doc );
+				return array( 'ok' => true, 'id' => $row['id'], 'widgets' => array_column( $built, 'id' ) );
+			},
+		),
+	) );
+
 	register_rest_route( 'eastwood/v1', '/page-blocks', array(
 		'methods'             => 'POST',
 		// Laying a page out again throws away whatever was there, so this one

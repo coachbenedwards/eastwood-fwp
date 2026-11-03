@@ -176,6 +176,9 @@ function ew_tix_money( $pence ) {
 function ew_tix_shortcode( $atts, $content = null ) {
 	$a = shortcode_atts( array(
 		'event'    => '',
+		// The day of the event, YYYY-MM-DD. The morning after, anything tied
+		// to this page by an ewx-before-/ewx-after- class flips (event-dates.php).
+		'date'     => '',
 		'kicker'   => 'Tickets',
 		'title'    => 'Get your tickets',
 		'sub'      => '',

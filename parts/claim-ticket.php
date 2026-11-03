@@ -304,9 +304,14 @@ function ew_claim_extras_html( $a ) {
 	}
 	$h = '<div class="ewc-extras"><h2>' . esc_html( $a['extras_title'] ) . '</h2><div class="ewc-cards">';
 	foreach ( $rows as $r ) {
-		$b   = array_map( 'trim', explode( '|', $r ) );
-		$img = ew_claim_img( $b[3] ?? '' );
-		$h  .= '<div class="ewc-card">';
+		$b    = array_map( 'trim', explode( '|', $r ) );
+		$img  = ew_claim_img( $b[3] ?? '' );
+		$slug = function_exists( 'ew_event_slug_of_url' ) ? ew_event_slug_of_url( $b[2] ?? '' ) : '';
+		// An event that has happened is not something to make a day of.
+		if ( '' !== $slug && ew_event_is_past( $slug ) ) {
+			continue;
+		}
+		$h .= '<div class="ewc-card' . ( '' !== $slug ? ' ewx-before-' . sanitize_html_class( $slug ) : '' ) . '">';
 		if ( '' !== $img ) {
 			$h .= '<img src="' . esc_url( $img ) . '" alt="">';
 		}
