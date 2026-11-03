@@ -234,6 +234,14 @@ function ew_tix_shortcode( $atts, $content = null ) {
 		'ev'            => '',
 	), $atts, 'eastwood_tickets' );
 
+	// Once the event is over there is nothing to book.
+	if ( function_exists( 'ew_event_is_past' ) && function_exists( 'ew_event_this_page' ) ) {
+		$me = ew_event_this_page();
+		if ( '' !== $me && ew_event_is_past( $me ) ) {
+			return '';
+		}
+	}
+
 	$tix = ew_tix_lines( $content );
 	if ( ! $tix ) {
 		return '';

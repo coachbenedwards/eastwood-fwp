@@ -63,11 +63,25 @@ function ew_event_slug_of_url( $url ) {
 	return preg_match( '~^/events/([a-z0-9-]+)/?~', $path, $m ) ? $m[1] : '';
 }
 
+/** The event slug of the page being shown, if it is an event page with a date. */
+function ew_event_this_page() {
+	$post = get_post();
+	if ( ! $post || 'page' !== $post->post_type ) {
+		return '';
+	}
+	$ends = ew_event_ends();
+	return isset( $ends[ $post->post_name ] ) && (int) $post->post_parent === (int) ( get_page_by_path( 'events' )->ID ?? 0 ) ? $post->post_name : '';
+}
+
 add_filter( 'body_class', function ( $c ) {
 	foreach ( ew_event_ends() as $slug => $t ) {
 		if ( time() > $t ) {
 			$c[] = 'ew-past-' . $slug;
 		}
+	}
+	$me = ew_event_this_page();
+	if ( '' !== $me ) {
+		$c[] = 'ew-event-page-' . $me;
 	}
 	return $c;
 } );
@@ -81,6 +95,8 @@ add_action( 'wp_head', function () {
 	foreach ( array_keys( $ends ) as $s ) {
 		$s    = sanitize_html_class( $s );
 		$css .= 'body:not(.ew-past-' . $s . ') .ewx-after-' . $s . ',body.ew-past-' . $s . ' .ewx-before-' . $s . '{display:none!important}';
+		// The checkout bar the tickets block pins to the bottom of its own page.
+		$css .= 'body.ew-past-' . $s . '.ew-event-page-' . $s . ' .ewt-bar{display:none!important}';
 	}
 	echo '<style id="ew-event-dates">' . $css . '.ewx-sec.ew-empty{display:none!important}</style>' . "\n";
 	$js = 'window.EW_EVENT_ENDS=' . wp_json_encode( $ends ) . ';'
