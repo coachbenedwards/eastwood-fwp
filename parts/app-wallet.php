@@ -13,6 +13,9 @@
  *
  *   GET /eastwood/v1/app/wallet?w=<wallet>       their bookings, newest first
  *
+ * Signed in, the account is the key instead: see app-account.php
+ * (POST /app/mine). A claim made while signed in is kept on the account.
+ *
  * The code on each ticket is the booking's private key, which the gate
  * scanner already accepts.
  *
@@ -131,6 +134,13 @@ add_action( 'rest_api_init', function () {
 				return new WP_REST_Response( array( 'message' => "We couldn't find that booking. Check the email and the reference in your confirmation email." ), 404 );
 			}
 			$email = (string) get_post_meta( $bid, '_ewt_email', true );
+			// Signed in while claiming: the booking's email joins their account, on every phone.
+			if ( function_exists( 'ew_fan_from_token' ) ) {
+				$fan = ew_fan_from_token( ew_fan_token( $req ) );
+				if ( $fan ) {
+					ew_fan_link( $fan['sub'], $email );
+				}
+			}
 			return array(
 				'email'  => $email,
 				'name'   => (string) get_post_meta( $bid, '_ewt_name', true ),
