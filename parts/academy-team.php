@@ -524,6 +524,8 @@ function ew_act_css() {
 .ewact .ewact-add{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:52px;border:1px solid rgba(255,255,255,.35);border-radius:8px;background:transparent;color:#fff;font:inherit;font-size:17px;font-weight:700;cursor:pointer}
 .ewact .ewact-ok{margin:12px 0 0;font-size:15px;color:#fff}
 .ewact .ewact-solo{grid-column:2}
+.ewact .ewact-google{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;height:52px;margin-top:18px;border:1px solid #747775;border-radius:26px;background:#fff;color:#1f1f1f;font-family:Roboto,"Instrument Sans",system-ui,sans-serif;font-size:16px;font-weight:500;text-decoration:none}
+.ewact .ewact-google:hover{background:#f2f2f2}
 @media (max-width:900px){.ewact{grid-template-columns:minmax(0,1fr);gap:28px}.ewact .ewact-side{order:-1}.ewact .ewact-solo{grid-column:1}.ewact .ewact-tr{grid-template-columns:1fr 1fr;row-gap:2px;padding:8px 0}.ewact .ewact-tr.h{display:none}}
 ';
 }
@@ -547,7 +549,7 @@ function ew_act_js() {
    var bad = /[?&]ewat_bad=1/.test(location.search), gbad = /[?&]ewat_gbad=1/.test(location.search);
    box.innerHTML = '<div class="ewact-side ewact-solo"><form class="ewtr-form">'
      + '<p class="ewtr-head">' + esc(W.signin_title) + '</p>'
-     + (W.google ? '<a class="ewact-add" style="margin-top:18px;text-decoration:none" href="' + esc(W.google) + '">' + esc(W.google_btn) + '</a>' + (gbad ? '<p class="ewtr-err">' + esc(W.google_bad) + '</p>' : '') + '<div class="ewact-or"></div><p class="ewtr-note" style="margin:0">' + esc(W.or_email) + '</p>' : '')
+     + (W.google ? '<a class="ewact-google" href="' + esc(W.google) + '"><svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>' + esc(W.google_btn) + '</span></a>' + (gbad ? '<p class="ewtr-err">' + esc(W.google_bad) + '</p>' : '') + '<div class="ewact-or"></div><p class="ewtr-note" style="margin:0">' + esc(W.or_email) + '</p>' : '')
      + '<p class="ewtr-note">' + esc(bad ? W.bad_link : W.signin_note) + '</p>'
      + '<label class="ewtr-lab" for="ewactE">' + esc(W.email_label) + '</label><input class="ewtr-in" id="ewactE" type="email" autocomplete="email" required>'
      + '<button class="ewtr-btn" type="submit">' + esc(W.signin_btn) + '</button><p class="ewtr-err" role="alert"></p></form></div>';
