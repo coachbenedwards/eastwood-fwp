@@ -4,11 +4,12 @@
  *
  * Who gets in: only the email addresses typed into the block's "allow" field.
  * They type their email, the site emails them a one-time link (30 minutes),
- * and that link signs this one device in for a set number of days.
+ * and that link signs this one browser in for a set number of days (kept in
+ * the browser and sent with each call, never in the page or its address).
  *
  * What they get: this page and nothing else. Signing in here makes no
- * WordPress account and gives no wp-admin access; the sign-in is a separate,
- * signed cookie that only this page's own calls accept, and it is checked
+ * WordPress account and gives no wp-admin access; the sign-in is a separate
+ * signed pass that only this page's own calls accept, and it is checked
  * against the allow list on every call, so taking an address off the list
  * shuts that person out at once. They can see families waiting for an invite
  * and families already invited, send an invite, and add a family. They cannot
@@ -91,7 +92,11 @@ function ew_act_sig( $email, $exp ) {
 
 /** The signed-in email for this request, or '' (checked against the list every time). */
 function ew_act_me( $a ) {
-	$raw = isset( $_COOKIE['ew_acteam'] ) ? (string) wp_unslash( $_COOKIE['ew_acteam'] ) : '';
+	// The browser keeps it and sends it as a header: the site's cache in front strips cookies it does not know.
+	$raw = isset( $_SERVER['HTTP_X_EW_TEAM'] ) ? (string) wp_unslash( $_SERVER['HTTP_X_EW_TEAM'] ) : '';
+	if ( '' === $raw && isset( $_COOKIE['ew_acteam'] ) ) {
+		$raw = (string) wp_unslash( $_COOKIE['ew_acteam'] );
+	}
 	$p   = explode( '|', base64_decode( $raw, true ) ?: '' );
 	if ( 3 !== count( $p ) ) {
 		return '';
@@ -103,10 +108,9 @@ function ew_act_me( $a ) {
 	return in_array( strtolower( $email ), ew_act_allowed( $a ), true ) ? strtolower( $email ) : '';
 }
 
-function ew_act_set_cookie( $email, $days ) {
+function ew_act_pass( $email, $days ) {
 	$exp = time() + max( 1, (int) $days ) * DAY_IN_SECONDS;
-	$val = base64_encode( $email . '|' . $exp . '|' . ew_act_sig( $email, $exp ) );
-	setcookie( 'ew_acteam', $val, array( 'expires' => $exp, 'path' => '/', 'secure' => is_ssl(), 'httponly' => true, 'samesite' => 'Lax' ) );
+	return base64_encode( $email . '|' . $exp . '|' . ew_act_sig( $email, $exp ) );
 }
 
 /** The block and its words, read from the page itself. */
@@ -146,7 +150,8 @@ add_action( 'template_redirect', function () {
 	delete_transient( $key );
 	$url = get_permalink( $post );
 	if ( '' !== $email && in_array( $email, ew_act_allowed( $b[1] ), true ) ) {
-		ew_act_set_cookie( $email, $b[1]['days'] );
+		// After the #, so it never reaches the server, the cache or its logs.
+		$url .= '#ewts=' . rawurlencode( ew_act_pass( $email, $b[1]['days'] ) );
 	} else {
 		$url = add_query_arg( 'ewat_bad', 1, $url );
 	}
@@ -355,7 +360,6 @@ add_action( 'rest_api_init', function () {
 		'methods'             => 'POST',
 		'permission_callback' => '__return_true',
 		'callback'            => function () {
-			setcookie( 'ew_acteam', '', array( 'expires' => time() - 3600, 'path' => '/', 'secure' => is_ssl(), 'httponly' => true, 'samesite' => 'Lax' ) );
 			return array( 'ok' => 1 );
 		},
 	) );
@@ -430,9 +434,12 @@ function ew_act_js() {
  var root = document.querySelector('.ewact'); if(!root) return;
  var W = JSON.parse(root.querySelector('.ewact-words').textContent), page = root.getAttribute('data-page');
  var box = root.querySelector('.ewact-root');
+ function pass(){ try { return localStorage.getItem('ew_acteam') || ''; } catch(e){ return ''; } }
+ var mh = location.hash.match(/ewts=([^&]+)/);
+ if(mh){ try { localStorage.setItem('ew_acteam', decodeURIComponent(mh[1])); } catch(e){} history.replaceState(null, '', location.pathname); }
  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
  function call(path, body){
-   var o = {credentials:'same-origin', headers:{'Content-Type':'application/json'}};
+   var o = {credentials:'same-origin', headers:{'Content-Type':'application/json', 'X-EW-Team': pass()}};
    if(body){ o.method = 'POST'; o.body = JSON.stringify(Object.assign({page: page}, body)); }
    return fetch(W.rest + path + (body ? '' : '?page=' + page + '&t=' + Date.now()), o).then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); });
  }
@@ -496,7 +503,7 @@ function ew_act_js() {
    Array.prototype.forEach.call(box.querySelectorAll('.ewact-again'), function(b){
      b.addEventListener('click', function(){ b.disabled = true; call('invite', {id: +b.getAttribute('data-id')}).then(function(x){ done(x, b); }); });
    });
-   box.querySelector('.ewact-out').addEventListener('click', function(){ call('signout', {}).then(signin); });
+   box.querySelector('.ewact-out').addEventListener('click', function(){ try { localStorage.removeItem('ew_acteam'); } catch(e){} call('signout', {}).then(signin); });
  }
  function load(msg){
    call('data').then(function(x){
