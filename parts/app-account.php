@@ -20,6 +20,12 @@
  * /app/claim (app-wallet.php) links the claimed email to the account too,
  * when it is called while signed in.
  *
+ * No booking reference to hand? A signed-in supporter can ask for a link:
+ *   POST /eastwood/v1/app/link-email  { email }
+ * If anything is booked under that email, the club emails it a one-tap link.
+ * Opening it proves the inbox is theirs and joins the email to the account,
+ * then lands on eastwoodfc.com/app/ with the block's "linked" line.
+ *
  * @package eastwood-fwp
  */
 
@@ -161,4 +167,69 @@ add_action( 'rest_api_init', function () {
 			);
 		},
 	) );
+} );
+
+
+/** A signed, one-day link that joins $email to the account $sub. */
+function ew_fan_link_token( $sub, $email ) {
+	$p = rtrim( strtr( base64_encode( wp_json_encode( array( 's' => $sub, 'e' => strtolower( $email ), 'x' => time() + DAY_IN_SECONDS ) ) ), '+/', '-_' ), '=' );
+	return $p . '.' . substr( hash_hmac( 'sha256', $p, wp_salt( 'auth' ) . 'ew-fan-link' ), 0, 32 );
+}
+
+/** The account and email a link names, or null when forged or out of date. */
+function ew_fan_link_read( $t ) {
+	$bits = explode( '.', (string) $t );
+	if ( 2 !== count( $bits ) || ! hash_equals( substr( hash_hmac( 'sha256', $bits[0], wp_salt( 'auth' ) . 'ew-fan-link' ), 0, 32 ), $bits[1] ) ) {
+		return null;
+	}
+	$d = json_decode( (string) base64_decode( strtr( $bits[0], '-_', '+/' ) ), true );
+	if ( ! is_array( $d ) || empty( $d['s'] ) || empty( $d['e'] ) || (int) ( $d['x'] ?? 0 ) < time() ) {
+		return null;
+	}
+	return $d;
+}
+
+add_action( 'rest_api_init', function () {
+	register_rest_route( 'eastwood/v1', '/app/link-email', array(
+		'methods'             => 'POST',
+		'permission_callback' => '__return_true',
+		'callback'            => function ( $req ) {
+			$fan = ew_fan_from_token( ew_fan_token( $req ) );
+			if ( ! $fan ) {
+				return new WP_REST_Response( array( 'message' => 'Please sign in again.' ), 401 );
+			}
+			$email = strtolower( sanitize_email( (string) $req->get_param( 'email' ) ) );
+			if ( ! is_email( $email ) ) {
+				return new WP_REST_Response( array( 'message' => 'That email does not look right.' ), 400 );
+			}
+			// Five links an hour per account is plenty for a person.
+			$tk = 'ew_fan_linkmail_' . md5( $fan['sub'] );
+			$n  = (int) get_transient( $tk );
+			if ( $n >= 5 ) {
+				return new WP_REST_Response( array( 'message' => 'Too many tries. Please wait an hour and try again.' ), 429 );
+			}
+			set_transient( $tk, $n + 1, HOUR_IN_SECONDS );
+			if ( ew_wallet_ids_for( array( $email ) ) ) {
+				$url  = add_query_arg( 'ewlink', ew_fan_link_token( $fan['sub'], $email ), home_url( '/app/' ) );
+				$body = "Hi,\n\nTap this link to add the tickets booked with this email to your Eastwood FC account:\n\n" . $url
+					. "\n\nIt works for 24 hours. Didn't ask for this? Ignore this email and nothing changes.\n\nEastwood FC";
+				wp_mail( $email, 'Add your tickets to your Eastwood FC account', $body );
+			}
+			// The same answer either way, so nobody learns who has booked.
+			return array( 'sent' => true );
+		},
+	) );
+} );
+
+/** The emailed link: join the email to the account, then show the app page's "done" line. */
+add_action( 'template_redirect', function () {
+	if ( empty( $_GET['ewlink'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+		return;
+	}
+	$d = ew_fan_link_read( sanitize_text_field( wp_unslash( $_GET['ewlink'] ) ) ); // phpcs:ignore WordPress.Security.NonceVerification
+	if ( $d ) {
+		ew_fan_link( sanitize_key( $d['s'] ), $d['e'] );
+	}
+	wp_safe_redirect( add_query_arg( array( 'stay' => '1', ( $d ? 'linked' : 'linkbad' ) => '1' ), home_url( '/app/' ) ) );
+	exit;
 } );

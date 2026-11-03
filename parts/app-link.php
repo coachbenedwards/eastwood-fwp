@@ -31,6 +31,8 @@ function ew_app_defaults() {
 		'android_url'   => 'https://play.google.com/store/apps/details?id=com.eastwoodfc.team',
 		'redirect'      => 'yes',
 		'note'          => '',
+		'linked'        => 'Done. Those tickets are now on your Eastwood FC account. Open the app and look in Tickets.',
+		'link_bad'      => 'That link has run out. Ask for a new one in the app, under Tickets.',
 	);
 }
 
@@ -41,6 +43,11 @@ function ew_app_shortcode( $atts ) {
 	$play  = '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" d="M4.5 3.2v17.6c0 .5.5.8.9.5l15-8.8c.4-.3.4-.8 0-1.1l-15-8.8c-.4-.2-.9.1-.9.6z"/></svg>';
 
 	$out  = '<div class="ewa" data-ios="' . esc_url( $a['ios_url'] ) . '" data-android="' . esc_url( $a['android_url'] ) . '" data-redirect="' . esc_attr( $a['redirect'] ) . '">';
+	if ( isset( $_GET['linked'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+		$out .= '<p class="ewa-done">' . esc_html( $a['linked'] ) . '</p>';
+	} elseif ( isset( $_GET['linkbad'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+		$out .= '<p class="ewa-done">' . esc_html( $a['link_bad'] ) . '</p>';
+	}
 	$out .= '<div class="ewa-btns">';
 	$out .= '<a class="ewa-btn" href="' . esc_url( $a['ios_url'] ) . '">' . $apple . '<span>' . esc_html( $a['ios_label'] ) . '</span></a>';
 	$out .= '<a class="ewa-btn" href="' . esc_url( $a['android_url'] ) . '">' . $play . '<span>' . esc_html( $a['android_label'] ) . '</span></a>';
@@ -61,6 +68,7 @@ function ew_app_css() {
 .ewa-btn:hover{background:#CC0000}
 .ewa-btn svg{flex:none}
 .ewa-note{margin:16px 0 0;color:#5d5d66;font-size:15px}
+.ewa-done{margin:0 0 20px;padding:16px 18px;border-radius:12px;background:#fff;border:1px solid #e4e5e8;color:#121417;font-size:17px;font-weight:600}
 @media (max-width:600px){.ewa-btns{flex-direction:column}.ewa-btn{justify-content:center}}
 ';
 }
