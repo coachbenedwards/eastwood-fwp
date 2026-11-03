@@ -70,6 +70,9 @@ function ew_act_defaults() {
 		'list_none'       => 'Nobody invited yet.',
 		'free'            => 'Times still free: {n} of {total}',
 		'loading'         => 'Loading',
+		'google_btn'      => 'Sign in with Google',
+		'or_email'        => 'Or get a sign-in link by email',
+		'google_bad'      => 'That Google account is not on the academy team list.',
 	);
 }
 
@@ -365,14 +368,111 @@ add_action( 'rest_api_init', function () {
 	) );
 } );
 
+/* ---------- Sign in with Google (only when its two settings are filled in) ---------- */
+
+function ew_act_google_on() {
+	return '' !== trim( (string) get_option( 'ew_act_google_id', '' ) ) && '' !== trim( (string) get_option( 'ew_act_google_secret', '' ) );
+}
+
+function ew_act_google_back() {
+	return rest_url( 'eastwood/v1/academy/team/google' );
+}
+
+add_action( 'rest_api_init', function () {
+	register_rest_route( 'eastwood/v1', '/academy/team/google', array(
+		'methods'             => 'GET',
+		'permission_callback' => '__return_true',
+		'callback'            => function ( $req ) {
+			nocache_headers();
+			if ( ! ew_act_google_on() ) {
+				return new WP_REST_Response( array( 'message' => 'off' ), 404 );
+			}
+			$code  = (string) $req->get_param( 'code' );
+			$state = preg_replace( '/[^A-Za-z0-9]/', '', (string) $req->get_param( 'state' ) );
+			if ( '' === $code ) {
+				// Out to Google, remembering which page asked.
+				$b = ew_act_block( $req->get_param( 'page' ) );
+				if ( ! $b ) {
+					return new WP_REST_Response( array( 'message' => 'no' ), 400 );
+				}
+				$st = wp_generate_password( 24, false, false );
+				set_transient( 'ew_actg_' . $st, (int) $b[0]->ID, 10 * MINUTE_IN_SECONDS );
+				$url = add_query_arg( array(
+					'client_id'     => rawurlencode( trim( (string) get_option( 'ew_act_google_id' ) ) ),
+					'redirect_uri'  => rawurlencode( ew_act_google_back() ),
+					'response_type' => 'code',
+					'scope'         => rawurlencode( 'openid email' ),
+					'state'         => $st,
+					'prompt'        => 'select_account',
+				), 'https://accounts.google.com/o/oauth2/v2/auth' );
+				wp_redirect( $url ); // phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect
+				exit;
+			}
+			$pid = (int) get_transient( 'ew_actg_' . $state );
+			delete_transient( 'ew_actg_' . $state );
+			$b = $pid ? ew_act_block( $pid ) : null;
+			if ( ! $b ) {
+				return new WP_REST_Response( array( 'message' => 'expired' ), 400 );
+			}
+			$page = get_permalink( $b[0] );
+			$r    = wp_remote_post( 'https://oauth2.googleapis.com/token', array(
+				'timeout' => 15,
+				'body'    => array(
+					'code'          => $code,
+					'client_id'     => trim( (string) get_option( 'ew_act_google_id' ) ),
+					'client_secret' => trim( (string) get_option( 'ew_act_google_secret' ) ),
+					'redirect_uri'  => ew_act_google_back(),
+					'grant_type'    => 'authorization_code',
+				),
+			) );
+			$tok = is_wp_error( $r ) ? array() : (array) json_decode( (string) wp_remote_retrieve_body( $r ), true );
+			$email = '';
+			if ( ! empty( $tok['id_token'] ) ) {
+				// Google checks its own token and tells us whose it is.
+				$i  = wp_remote_get( 'https://oauth2.googleapis.com/tokeninfo?id_token=' . rawurlencode( (string) $tok['id_token'] ), array( 'timeout' => 15 ) );
+				$in = is_wp_error( $i ) ? array() : (array) json_decode( (string) wp_remote_retrieve_body( $i ), true );
+				if ( ( $in['aud'] ?? '' ) === trim( (string) get_option( 'ew_act_google_id' ) ) && in_array( (string) ( $in['email_verified'] ?? '' ), array( 'true', '1' ), true ) ) {
+					$email = strtolower( (string) ( $in['email'] ?? '' ) );
+				}
+			}
+			if ( '' !== $email && in_array( $email, ew_act_allowed( $b[1] ), true ) ) {
+				wp_redirect( $page . '#ewts=' . rawurlencode( ew_act_pass( $email, $b[1]['days'] ) ) ); // phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect
+			} else {
+				wp_redirect( add_query_arg( 'ewat_gbad', 1, $page ) ); // phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect
+			}
+			exit;
+		},
+	) );
+} );
+
+add_action( 'ew_fwp_after_settings', function () {
+	if ( isset( $_POST['ew_act_google_id'] ) && check_admin_referer( 'ew_act_google_save' ) ) {
+		update_option( 'ew_act_google_id', sanitize_text_field( wp_unslash( $_POST['ew_act_google_id'] ) ), false );
+		$sec = trim( (string) wp_unslash( $_POST['ew_act_google_secret'] ?? '' ) );
+		if ( '' !== $sec ) {
+			update_option( 'ew_act_google_secret', sanitize_text_field( $sec ), false );
+		}
+		echo '<div class="notice notice-success"><p>Academy team Google sign-in saved.</p></div>';
+	}
+	echo '<h2 id="academy-google">Academy team: Sign in with Google</h2>';
+	echo '<p>For the academy team page. Redirect address to give Google: <code>' . esc_html( ew_act_google_back() ) . '</code></p>';
+	echo '<form method="post">';
+	wp_nonce_field( 'ew_act_google_save' );
+	echo '<p><label>Client ID<br><input type="text" name="ew_act_google_id" size="90" value="' . esc_attr( (string) get_option( 'ew_act_google_id', '' ) ) . '"></label></p>';
+	echo '<p><label>Client secret' . ( '' !== (string) get_option( 'ew_act_google_secret', '' ) ? ' (saved; leave blank to keep it)' : '' ) . '<br><input type="password" name="ew_act_google_secret" size="60" autocomplete="new-password" value=""></label></p>';
+	submit_button( 'Save Google sign-in' );
+	echo '</form>';
+} );
+
 /* ---------- the block ---------- */
 
 function ew_act_shortcode( $atts ) {
 	$a    = shortcode_atts( ew_act_defaults(), (array) $atts, 'eastwood_academy_team' );
 	$post = get_post();
-	$keys = array( 'signin_title', 'signin_note', 'email_label', 'signin_btn', 'sent_note', 'bad_link', 'signout', 'form_title', 'form_note', 'pick_label', 'pick_first', 'pick_none', 'send', 'not_listed', 'add_btn', 'parent_label', 'player_label', 'pemail_label', 'pphone_label', 'add_send', 'failed', 'list_title', 'col_player', 'col_parent', 'col_invited', 'col_meeting', 'not_yet', 'again', 'list_none', 'loading' );
+	$keys = array( 'signin_title', 'signin_note', 'email_label', 'signin_btn', 'sent_note', 'bad_link', 'signout', 'form_title', 'form_note', 'pick_label', 'pick_first', 'pick_none', 'send', 'not_listed', 'add_btn', 'parent_label', 'player_label', 'pemail_label', 'pphone_label', 'add_send', 'failed', 'list_title', 'col_player', 'col_parent', 'col_invited', 'col_meeting', 'not_yet', 'again', 'list_none', 'loading', 'google_btn', 'or_email', 'google_bad' );
 	$w    = array_intersect_key( $a, array_flip( $keys ) );
 	$w['rest'] = esc_url_raw( rest_url( 'eastwood/v1/academy/team/' ) );
+	$w['google'] = ew_act_google_on() ? esc_url_raw( add_query_arg( 'page', (int) ( $post ? $post->ID : 0 ), ew_act_google_back() ) ) : '';
 	// Nothing personal is in the HTML: it is the same for everyone, and the list is fetched after sign-in.
 	return '<section class="ewtr ewact" data-page="' . (int) ( $post ? $post->ID : 0 ) . '"><div class="ewact-root"><p class="ewact-msg">' . esc_html( $a['loading'] ) . '</p></div>'
 		. '<script type="application/json" class="ewact-words">' . wp_json_encode( $w ) . '</script></section>';
@@ -444,9 +544,11 @@ function ew_act_js() {
    return fetch(W.rest + path + (body ? '' : '?page=' + page + '&t=' + Date.now()), o).then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); });
  }
  function signin(){
-   var bad = /[?&]ewat_bad=1/.test(location.search);
+   var bad = /[?&]ewat_bad=1/.test(location.search), gbad = /[?&]ewat_gbad=1/.test(location.search);
    box.innerHTML = '<div class="ewact-side ewact-solo"><form class="ewtr-form">'
-     + '<p class="ewtr-head">' + esc(W.signin_title) + '</p><p class="ewtr-note">' + esc(bad ? W.bad_link : W.signin_note) + '</p>'
+     + '<p class="ewtr-head">' + esc(W.signin_title) + '</p>'
+     + (W.google ? '<a class="ewact-add" style="margin-top:18px;text-decoration:none" href="' + esc(W.google) + '">' + esc(W.google_btn) + '</a>' + (gbad ? '<p class="ewtr-err">' + esc(W.google_bad) + '</p>' : '') + '<div class="ewact-or"></div><p class="ewtr-note" style="margin:0">' + esc(W.or_email) + '</p>' : '')
+     + '<p class="ewtr-note">' + esc(bad ? W.bad_link : W.signin_note) + '</p>'
      + '<label class="ewtr-lab" for="ewactE">' + esc(W.email_label) + '</label><input class="ewtr-in" id="ewactE" type="email" autocomplete="email" required>'
      + '<button class="ewtr-btn" type="submit">' + esc(W.signin_btn) + '</button><p class="ewtr-err" role="alert"></p></form></div>';
    var f = box.querySelector('form');
