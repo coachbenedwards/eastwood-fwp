@@ -325,6 +325,24 @@ function ew_inv_bottle() {
 	return '<svg class="ewv-d ewv-b" width="22" height="60" viewBox="0 0 22 60" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M8 2h6v14c4 3 6 7 6 12v28H2V28c0-5 2-9 6-12z"/><path d="M2 36h18" stroke-opacity=".6"/></svg>';
 }
 
+/**
+ * The big heading. The company name always starts its own line and is
+ * never split across two; if it is too wide for the screen, the page
+ * script shrinks it to fit.
+ */
+function ew_inv_head( $raw, $vals ) {
+	$tok  = "\x01CO\x01";
+	$text = ew_inv_fill( str_replace( '{company}', $tok, (string) $raw ), array_diff_key( $vals, array( 'company' => 1 ) ) );
+	$text = esc_html( $text );
+	$co   = '<span class="ewv-co">' . esc_html( (string) $vals['company'] ) . '</span>';
+	if ( false === strpos( $text, $tok ) ) {
+		return $text;
+	}
+	$parts  = explode( $tok, $text, 2 );
+	$before = rtrim( $parts[0] );
+	return ( '' !== $before ? $before . '<br>' : '' ) . $co . $parts[1];
+}
+
 function ew_inv_shortcode( $atts ) {
 	$a   = shortcode_atts( ew_inv_defaults(), $atts, 'eastwood_invite' );
 	$inv = ew_inv_find( ew_inv_code_here() );
@@ -425,10 +443,10 @@ function ew_inv_shortcode( $atts ) {
 
 	$h  = '<div class="ewv ewv-' . $layout . '"' . $bg_style . $attrs . '><div class="ewv-in">';
 	/* Step 1: details. */
-	$h .= '<section class="ewv-s ewv-s1"><div class="ewv-l"><p class="ewv-kicker">' . $e( $a['kicker'] ) . '</p><h1 class="ewv-h1">' . $f( 'head' ) . '</h1>';
+	$h .= '<section class="ewv-s ewv-s1"><div class="ewv-l"><p class="ewv-kicker">' . $e( $a['kicker'] ) . '</p><h1 class="ewv-h1">' . ew_inv_head( $a['head'], $vals ) . '</h1>';
 	foreach ( array( 'lede1', 'lede2' ) as $k ) {
 		if ( '' !== trim( $a[ $k ] ) ) {
-			$h .= '<p class="ewv-lede">' . $f( $k ) . '</p>';
+			$h .= '<p class="ewv-lede ewv-' . $k . '">' . $f( $k ) . '</p>';
 		}
 	}
 	if ( '' !== trim( $a['lede3'] ) ) {
@@ -670,6 +688,7 @@ function ew_inv_css() {
 .ewv p{margin:0}
 .ewv-kicker{font-family:Anton,sans-serif;font-size:16px;letter-spacing:.18em;text-transform:uppercase;color:var(--c)!important}
 .ewv .ewv-h1{margin:0;font-family:Anton,sans-serif;font-weight:400;font-size:104px;line-height:.9;text-transform:uppercase;color:var(--c);background:none;padding:0;width:auto}
+.ewv-co{display:inline-block;white-space:nowrap}
 .ewv .ewv-h2{margin:0;font-family:Anton,sans-serif;font-weight:400;font-size:54px;line-height:.98;text-transform:uppercase;color:var(--c)}
 .ewv .ewv-h2b{margin-top:18px}
 .ewv .ewv-h3{margin:0;font-family:Anton,sans-serif;font-weight:400;font-size:30px;text-transform:uppercase;color:var(--c)}
@@ -735,12 +754,11 @@ function ew_inv_css() {
 .ewv-s1 .ewv-l{display:contents}
 .ewv-s1 .ewv-kicker{order:1}
 .ewv-s1 .ewv-h1{order:2}
-.ewv-s1 .ewv-lede:first-of-type{order:3}
+.ewv-s1 .ewv-lede.ewv-lede1{order:3}
 .ewv-s1 .ewv-r{order:4;flex:none;width:100%;margin-top:6px}
 .ewv-s1 .ewv-lede{order:5}
 .ewv-s1 .ewv-big{order:6}
-.ewv .ewv-s1 .ewv-h1{font-size:46px}
-.ewv-s1 .ewv-r .ewv-h3{display:none}
+.ewv .ewv-s1 .ewv-h1{font-size:46px;align-self:stretch;width:100%}
 .ewv-inv-title{text-align:left}
 .ewv-gap{display:none}
 .ewv-s{gap:28px}
@@ -824,6 +842,16 @@ function ew_inv_js() {
   });
   render();
  });
+ /* The company name in the heading stays on one line: shrink it until it fits. */
+ function fitCo(){
+  document.querySelectorAll('.ewv-co').forEach(function(co){
+   co.style.fontSize='';
+   var box=co.parentNode.getBoundingClientRect().width, size=parseFloat(getComputedStyle(co).fontSize);
+   while(co.getBoundingClientRect().width>box && size>24){size-=2; co.style.fontSize=size+'px';}
+  });
+ }
+ fitCo(); window.addEventListener('resize',fitCo);
+ if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fitCo);
 })();
 JS;
 }
