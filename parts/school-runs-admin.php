@@ -220,7 +220,7 @@ function ew_runs_css() {
 .ewr .btn{height:40px;padding:0 16px;border-radius:8px;border:1px solid rgba(0,0,0,.14);background:#fff;font:600 13px 'Instrument Sans',sans-serif;cursor:pointer;color:#121417}
 .ewr .btn.red{background:#CC0000;border-color:#CC0000;color:#fff}
 .ewr .btn.sm{height:30px;padding:0 10px;font-size:12px}
-.ewr .card{background:#fff;border:1px solid #E4E5E8;border-radius:14px;padding:16px}
+.ewr .card{background:#fff;border:1px solid #E4E5E8;border-radius:14px;padding:16px;max-width:none;min-width:0;margin-top:0;box-shadow:none;box-sizing:border-box}
 .ewr .row{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
 .ewr .rail{flex:1 1 260px;max-width:300px;display:flex;flex-direction:column;gap:10px}
 .ewr .mapwrap{flex:999 1 480px;min-width:0}
@@ -245,7 +245,7 @@ function ew_runs_css() {
 .ewr .pin.done{background:#121417;color:#fff;border-color:#fff}
 .ewr .pin.next{border:3px solid #CC0000}
 .ewr .car{width:30px;height:30px;border-radius:15px;background:#CC0000;border:3px solid #fff;box-sizing:border-box;box-shadow:0 2px 6px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center}
-.ewr .tl{overflow-x:auto}
+.ewr .tl{overflow-x:auto;width:100%}
 .ewr .tl .in{min-width:900px}
 .ewr .tl .axis,.ewr .tl .lane{display:flex}
 .ewr .tl .lab{flex:0 0 200px;padding:12px 14px}
