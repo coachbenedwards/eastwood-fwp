@@ -382,7 +382,7 @@ function ew_mt_done( $sid, $a ) {
 	$h .= '<p class="ewmt-thanksT">' . esc_html( $a['thanks'] ) . '</p>';
 	$h .= '<p class="ewmt-thanksW">' . esc_html( (string) ( $s['metadata']['what'] ?? '' ) ) . '</p>';
 	if ( $bid ) {
-		$h .= '<p class="ewmt-thanksR">' . esc_html( str_replace( '{code}', 'EFC-' . $bid, $a['ref'] ) ) . '</p>';
+		$h .= '<p class="ewmt-thanksR">' . esc_html( str_replace( '{code}', function_exists( 'ew_booking_code' ) ? ew_booking_code( $bid ) : 'EFC-' . $bid, $a['ref'] ) ) . '</p>';
 	}
 	$h .= '<p class="ewmt-thanksG">' . esc_html( $a['gate'] ) . '</p>';
 	return $h . '</div>';

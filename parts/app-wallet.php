@@ -127,6 +127,16 @@ add_action( 'rest_api_init', function () {
 						),
 					) );
 					$bid = $hit ? (int) $hit[0] : 0;
+					// Until 3.94 the match-ticket thank-you page showed "EFC-" plus the
+					// booking's own number instead of its reference. Accept that too,
+					// still only with the booking's own email.
+					if ( ! $bid && preg_match( '/^EFC-(\d{1,5})$/', $ref, $mm ) ) {
+						$old = (int) $mm[1];
+						if ( 'ewt_booking' === get_post_type( $old )
+							&& strtolower( (string) get_post_meta( $old, '_ewt_email', true ) ) === strtolower( $email ) ) {
+							$bid = $old;
+						}
+					}
 				}
 			}
 			if ( ! $bid ) {
