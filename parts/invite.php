@@ -354,7 +354,7 @@ function ew_inv_shortcode( $atts ) {
 	$bg     = ew_inv_img( $a['background'] );
 	$crest  = ew_inv_img( $a['crest'] );
 	if ( '' === $crest ) {
-		$crest = plugins_url( 'assets/favicon/favicon-180.png', dirname( __FILE__ ) . '/eastwood-fwp.php' );
+		$crest = plugins_url( 'assets/favicon/favicon-180.png', dirname( __DIR__ ) . '/eastwood-fwp.php' );
 	}
 	$base   = ew_inv_price( $a, $d );
 	$adds   = ew_inv_adds( $a['adds'] );
@@ -729,7 +729,20 @@ function ew_inv_css() {
 .ewv-mount:empty{display:none}
 .ewv-done{min-height:520px;display:flex;flex-direction:column;gap:18px;justify-content:center}
 @media(max-width:900px){
-.ewv-in{padding:28px 16px 48px}
+.ewv-in{padding:24px 16px 48px}
+.ewv-s1{flex-direction:column;flex-wrap:nowrap;gap:12px}
+.ewv-s1[hidden]{display:none}
+.ewv-s1 .ewv-l{display:contents}
+.ewv-s1 .ewv-kicker{order:1}
+.ewv-s1 .ewv-h1{order:2}
+.ewv-s1 .ewv-lede:first-of-type{order:3}
+.ewv-s1 .ewv-r{order:4;flex:none;width:100%;margin-top:6px}
+.ewv-s1 .ewv-lede{order:5}
+.ewv-s1 .ewv-big{order:6}
+.ewv .ewv-s1 .ewv-h1{font-size:46px}
+.ewv-s1 .ewv-r .ewv-h3{display:none}
+.ewv-inv-title{text-align:left}
+.ewv-gap{display:none}
 .ewv-s{gap:28px}
 .ewv .ewv-h1{font-size:56px}
 .ewv .ewv-h2{font-size:36px}
@@ -743,9 +756,9 @@ function ew_inv_css() {
 .ewv-opts{grid-template-columns:repeat(2,minmax(0,1fr))}
 .ewv-o-p{font-size:28px}
 .ewv-no{font-size:16px}
-.ewv-d{width:22px;height:32px}
+.ewv-d{width:20px;height:30px}
 .ewv-d.ewv-b{width:16px;height:44px}
-.ewv-drinks{gap:6px}
+.ewv-drinks{gap:5px}
 .ewv-inv{padding:20px 18px}
 .ewv-inv-top{flex-wrap:wrap}
 .ewv-inv-vat .ewv-inv-row{grid-template-columns:minmax(0,1fr) 70px}
