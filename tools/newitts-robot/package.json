@@ -1,0 +1,8 @@
+{
+  "name": "newitts-robot",
+  "private": true,
+  "type": "module",
+  "description": "Puts eastwoodfc.com shirt orders into the club's Newitts basket each weekday at 14:40.",
+  "scripts": { "login": "node robot.mjs --login", "try": "node robot.mjs --try", "run": "node robot.mjs" },
+  "dependencies": { "playwright": "1.48.2" }
+}
