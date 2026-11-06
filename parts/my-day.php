@@ -1,6 +1,6 @@
 <?php
 /**
- * eastwoodfc.com/my-day: "Your day at Eastwood", for someone with a ticket.
+ * eastwoodfc.com/myday: "Your day at Eastwood", for someone with a ticket.
  *
  * [eastwood_day]
  * time|title|line|marker
