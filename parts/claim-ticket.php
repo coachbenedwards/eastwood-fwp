@@ -945,6 +945,8 @@ function ew_claim_js() {
      fetch(W.api + 'app/claim', {method:'POST', headers:{'Content-Type':'application/json', 'X-Eastwood-Fan': t || ''}, body: JSON.stringify({claim: claim})})
        .catch(function(){}).then(function(){ location.href = A.go || '/my-tickets/'; });
    }
+   /* Tell the club a sign-in failed (email and reason only, never the password). */
+   function logFail(em, err, where){ try { fetch(W.api + 'auth/failed', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({email: String(em||'').toLowerCase(), reason: (err && (err.message || err.code)) || '', where: where, method: 'password'}), keepalive: true}); } catch(x){} }
    function run(n, fn){
      var b = acc.querySelector('[data-acc-do="' + n + '"]'); b.disabled = true; msg(n, '');
      Promise.resolve().then(fn).then(function(s){ if(s) finish(s); else b.disabled = false; })
@@ -961,12 +963,12 @@ function ew_claim_js() {
      }); },
      'has': function(){ return run('has', function(){
        if(!client()) throw new Error(W.failed);
-       return sb.auth.signInWithPassword({email: email.toLowerCase(), password: acc.querySelector('#ewcPwHas').value}).then(function(r){ if(r.error) throw new Error(A.wrong_pw); return r.data.session; });
+       return sb.auth.signInWithPassword({email: email.toLowerCase(), password: acc.querySelector('#ewcPwHas').value}).then(function(r){ if(r.error){ logFail(email, r.error, 'claim'); throw new Error(A.wrong_pw); } return r.data.session; });
      }); },
      'other': function(){ return run('other', function(){
        if(!client()) throw new Error(W.failed);
        var em = acc.querySelector('#ewcAccEmail').value.trim().toLowerCase();
-       return sb.auth.signInWithPassword({email: em, password: acc.querySelector('#ewcPwOther').value}).then(function(r){ if(r.error) throw new Error(A.wrong_pw); return r.data.session; });
+       return sb.auth.signInWithPassword({email: em, password: acc.querySelector('#ewcPwOther').value}).then(function(r){ if(r.error){ logFail(em, r.error, 'claim_other'); throw new Error(A.wrong_pw); } return r.data.session; });
      }); }
    };
    acc.addEventListener('click', function(e){

@@ -215,6 +215,8 @@ function ew_acc_js() {
   function err() { return st.err ? '<p class="ewac-err">' + e(st.err) + '</p>' : ''; }
   function okEmail(x) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x); }
   async function token() { var s = (await sb.auth.getSession()).data.session; return s ? s.access_token : null; }
+  /* Tell the club a sign-in failed (email and reason only, never the password). */
+  function logFail(email, err, where) { try { fetch(cfg.api + 'auth/failed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: String(email || '').toLowerCase(), reason: (err && (err.message || err.code)) || '', where: where, method: 'password' }), keepalive: true }); } catch (x) {} }
   async function api(path, body) {
     var h = { 'Content-Type': 'application/json', Accept: 'application/json' }, t = await token();
     if (t) h['X-Eastwood-Fan'] = t;
@@ -318,7 +320,7 @@ function ew_acc_js() {
     signin: function () { return act(async function () {
       st.email = v('email');
       var r = await sb.auth.signInWithPassword({ email: st.email.toLowerCase(), password: v('pw') });
-      if (r.error) throw r.error; await loadTickets();
+      if (r.error) { logFail(st.email, r.error, 'my_tickets'); throw r.error; } await loadTickets();
     }); },
     create: function () { return act(async function () {
       st.email = v('email'); var pw = v('pw');
@@ -329,7 +331,7 @@ function ew_acc_js() {
     }); },
     sendcode: function () { return act(async function () {
       st.email = v('email'); if (!okEmail(st.email)) throw new Error(W.bad_email);
-      var r = await sb.auth.resetPasswordForEmail(st.email.toLowerCase(), { redirectTo: cfg.page }); if (r.error) throw r.error; show('code');
+      var r = await sb.auth.resetPasswordForEmail(st.email.toLowerCase(), { redirectTo: cfg.page }); if (r.error) throw r.error; try { fetch(cfg.api + 'auth/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: st.email.toLowerCase(), where: 'my_tickets' }), keepalive: true }); } catch (x) {} show('code');
     }); },
     setpw: function () { return act(async function () {
       var pw = v('pw'); if (pw.length < 8) throw new Error(W.short_pw);
@@ -345,7 +347,7 @@ function ew_acc_js() {
     foundpw: function () { return act(async function () {
       var pw = v('pw'); if (pw.length < 8) throw new Error(W.short_pw);
       var r = await sb.auth.signUp({ email: st.email.toLowerCase(), password: pw });
-      if (r.error && /registered|exists/i.test(r.error.message)) r = await sb.auth.signInWithPassword({ email: st.email.toLowerCase(), password: pw });
+      if (r.error && /registered|exists/i.test(r.error.message)) { r = await sb.auth.signInWithPassword({ email: st.email.toLowerCase(), password: pw }); if (r.error) logFail(st.email, r.error, 'my_tickets_found'); }
       if (r.error) throw r.error; await loadTickets();
     }); },
     emaillink: function () { return act(async function () {

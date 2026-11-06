@@ -200,7 +200,7 @@ function ew_log_route_names() {
 
 /** Routes too frequent or too passive to log (page hits are counted elsewhere). */
 function ew_log_route_skip( $route, $method ) {
-	if ( in_array( $route, array( '/hit', '/doc-reached', '/fwp', '/update-status', '/r' ), true ) ) {
+	if ( in_array( $route, array( '/hit', '/doc-reached', '/fwp', '/update-status', '/r', '/auth/failed', '/auth/reset', '/stripe/webhook' ), true ) || 0 === strpos( $route, '/square/webhook' ) ) {
 		return true;
 	}
 	// Reads are not actions, except a gate checking a ticket.
