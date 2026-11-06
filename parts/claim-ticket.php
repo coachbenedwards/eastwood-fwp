@@ -120,6 +120,27 @@ function ew_claim_defaults() {
 		'phone_note'    => 'For a text about the game if anything changes.',
 		'need_phone'    => 'We need a mobile number for the day.',
 		'app_title'     => 'Your tickets are in the app',
+		/* The last page. "account": make a MyEastwood password and go to the
+		   account; "app": the old "your tickets are in the app" panel. */
+		'ending'        => 'account',
+		'done_when'     => '',
+		'see_title'     => 'See my ticket',
+		'create_pw'     => 'Create password',
+		'pw_hint'       => 'At least 8 characters',
+		'info'          => 'The same login will work in the Eastwood FC app.',
+		'info_label'    => 'About your login',
+		'show_pw'       => 'Show password',
+		'go_account'    => 'Go to my account',
+		'got_account'   => 'Got an account?',
+		'sign_in'       => 'Sign in',
+		'has_line'      => 'Enter your MyEastwood password.',
+		'pw_label'      => 'Password',
+		'signin_email'  => 'Email',
+		'forgot'        => 'Forgotten your password?',
+		'forgot_url'    => '/my-tickets/?reset',
+		'account_url'   => '/my-tickets/',
+		'short_pw'      => 'At least 8 characters, please.',
+		'wrong_pw'      => 'That password did not work. Try again, or reset it.',
 		'ticket_title'  => '{home} v {away}',
 		'ticket_sub'    => 'Coronation Park',
 		'track'         => 'School tickets',
@@ -365,6 +386,16 @@ function ew_claim_shortcode( $atts, $content = null ) {
 		'many'        => array( $a['adult_many'], $a['child_many'] ),
 		'schools'     => ew_claim_schools( $content ),
 		'rest'        => esc_url_raw( rest_url( 'eastwood/v1/claim' ) ),
+		'api'         => esc_url_raw( rest_url( 'eastwood/v1/' ) ),
+		'ending'      => $a['ending'],
+		'when'        => ew_claim_when( $a ),
+		'acc'         => array(
+			'supabase' => defined( 'EW_FAN_SUPABASE' ) ? EW_FAN_SUPABASE : '',
+			'anon'     => defined( 'EW_FAN_ANON' ) ? EW_FAN_ANON : '',
+			'go'       => $a['account_url'],
+			'short_pw' => $a['short_pw'],
+			'wrong_pw' => $a['wrong_pw'],
+		),
 	) + ( function_exists( 'ew_optin_words' ) ? ew_optin_words( 'school', $a ) : array() );
 	$next_at = ew_claim_next_at( $a );
 	if ( $next_at && time() < $next_at ) {
@@ -402,8 +433,13 @@ function ew_claim_shortcode( $atts, $content = null ) {
 	$h .= '<p class="ewc-err" role="alert"></p><button type="submit" class="ewc-btn">' . esc_html( $a['claim'] ) . '</button></div>';
 	$h .= '</form>';
 
-	/* The last page: their tickets, in the app. Offers (the shirt) are in the app too, so none here. */
-	$h .= ew_inapp_panel( $a['app_title'], ew_claim_ticket( $a ) );
+	if ( 'app' === $a['ending'] ) {
+		/* The last page: their tickets, in the app. */
+		$h .= ew_inapp_panel( $a['app_title'], ew_claim_ticket( $a ) );
+	} else {
+		/* The last page: make (or enter) the MyEastwood password, then their account. */
+		$h .= ew_claim_account_html( $a );
+	}
 
 	$h .= '</div></div>';
 	$h .= '<div class="ewc-after" hidden>' . ew_claim_extras_html( $a ) . '</div>';
@@ -411,6 +447,72 @@ function ew_claim_shortcode( $atts, $content = null ) {
 	return $h . '</section>';
 }
 add_shortcode( 'eastwood_claim', 'ew_claim_shortcode' );
+
+/** "Sat 14 Nov": the day and date of the game, short. A field can say it instead. */
+function ew_claim_when( $a ) {
+	if ( '' !== trim( (string) $a['done_when'] ) ) {
+		return (string) $a['done_when'];
+	}
+	$date = preg_replace( '/\s+\d{4}$/', '', trim( (string) $a['date'] ) );
+	if ( preg_match( '/^(\d{1,2})\s+([A-Za-z]{3})/', $date, $m ) ) {
+		$date = $m[1] . ' ' . $m[2];
+	}
+	return trim( substr( trim( (string) $a['day'] ), 0, 3 ) . ' ' . $date );
+}
+
+/** The last page: You're in, then See my ticket (make or enter the MyEastwood password). */
+function ew_claim_account_html( $a ) {
+	$eye  = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6b6b73" stroke-width="1.6" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+	$pw   = function ( $id, $ph, $ac ) use ( $a, $eye ) {
+		return '<span class="ewc-pw"><input class="ewc-acin" id="' . esc_attr( $id ) . '" type="password" placeholder="' . esc_attr( $ph ) . '" autocomplete="' . esc_attr( $ac ) . '"><button type="button" class="ewc-eye" aria-label="' . esc_attr( $a['show_pw'] ) . '">' . $eye . '</button></span>';
+	};
+	$info = '<button type="button" class="ewc-i" aria-label="' . esc_attr( $a['info_label'] ) . '" aria-expanded="false">i</button>';
+	$h  = '<div class="ewc-acc" data-acc hidden>';
+	$h .= '<p class="ewc-done">' . esc_html( $a['done_title'] ) . '</p>';
+	$h .= '<p class="ewc-who" data-acc-party></p>';
+	$h .= '<div class="ewc-card2">';
+	$h .= '<p class="ewc-see">' . esc_html( $a['see_title'] ) . '</p>';
+	/* New to MyEastwood: make a password. */
+	$h .= '<div data-view="new"><p class="ewc-alab">' . esc_html( $a['create_pw'] ) . $info . '</p>';
+	$h .= '<p class="ewc-info" hidden>' . esc_html( $a['info'] ) . '</p>';
+	$h .= $pw( 'ewcPwNew', $a['pw_hint'], 'new-password' );
+	$h .= '<p class="ewc-err" role="alert"></p><button type="button" class="ewc-btn" data-acc-do="new">' . esc_html( $a['go_account'] ) . '</button>';
+	$h .= '<p class="ewc-fine">' . esc_html( $a['got_account'] ) . ' <button type="button" class="ewc-alink" data-acc-go="other">' . esc_html( $a['sign_in'] ) . '</button></p></div>';
+	/* Already has an account under this email: just the password. */
+	$h .= '<div data-view="has" hidden><p class="ewc-aline">' . esc_html( $a['has_line'] ) . '</p>';
+	$h .= '<p class="ewc-alab">' . esc_html( $a['pw_label'] ) . '</p>' . $pw( 'ewcPwHas', '', 'current-password' );
+	$h .= '<p class="ewc-err" role="alert"></p><button type="button" class="ewc-btn" data-acc-do="has">' . esc_html( $a['go_account'] ) . '</button>';
+	$h .= '<p class="ewc-fine"><a class="ewc-alink" href="' . esc_url( $a['forgot_url'] ) . '">' . esc_html( $a['forgot'] ) . '</a></p></div>';
+	/* An account under a different email. */
+	$h .= '<div data-view="other" hidden><p class="ewc-alab">' . esc_html( $a['signin_email'] ) . '</p><input class="ewc-acin" id="ewcAccEmail" type="email" autocomplete="email">';
+	$h .= '<p class="ewc-alab">' . esc_html( $a['pw_label'] ) . '</p>' . $pw( 'ewcPwOther', '', 'current-password' );
+	$h .= '<p class="ewc-err" role="alert"></p><button type="button" class="ewc-btn" data-acc-do="other">' . esc_html( $a['go_account'] ) . '</button>';
+	$h .= '<p class="ewc-fine"><a class="ewc-alink" href="' . esc_url( $a['forgot_url'] ) . '">' . esc_html( $a['forgot'] ) . '</a></p></div>';
+	$h .= '</div></div>';
+	return $h;
+}
+
+/** Does this email already have a MyEastwood (supporter) account? Null when the site cannot ask. */
+function ew_claim_has_account( $email ) {
+	$key = function_exists( 'ew_runs_key' ) ? (string) ew_runs_key() : (string) get_option( 'ew_runs_sb_key', '' );
+	if ( '' === $key || ! defined( 'EW_FAN_SUPABASE' ) || ! is_email( $email ) ) {
+		return null;
+	}
+	$r = wp_remote_post( EW_FAN_SUPABASE . '/rest/v1/rpc/fan_email_exists', array(
+		'timeout' => 8,
+		'headers' => array(
+			'apikey'        => $key,
+			'Authorization' => 'Bearer ' . $key,
+			'Content-Type'  => 'application/json',
+		),
+		'body'    => wp_json_encode( array( 'p_email' => strtolower( $email ) ) ),
+	) );
+	if ( is_wp_error( $r ) || 200 !== (int) wp_remote_retrieve_response_code( $r ) ) {
+		return null;
+	}
+	$v = json_decode( (string) wp_remote_retrieve_body( $r ), true );
+	return is_bool( $v ) ? $v : null;
+}
 
 /** The ticket that slides out of the app on the last page: the game on the block. */
 function ew_claim_ticket( $a ) {
@@ -574,6 +676,33 @@ add_action( 'rest_api_init', function () {
 		},
 	) );
 
+	/* The last page asks: does the claim's email have a MyEastwood account yet?
+	   Only with the claim's own private key, and the answer is yes, no or unknown. */
+	register_rest_route( 'eastwood/v1', '/claim/account', array(
+		'methods'             => 'POST',
+		'permission_callback' => '__return_true',
+		'callback'            => function ( $req ) {
+			$claim = (string) $req->get_param( 'claim' );
+			$id    = 0;
+			if ( false !== strpos( $claim, '.' ) ) {
+				list( $i, $k ) = explode( '.', $claim, 2 );
+				$i = (int) $i;
+				if ( $i && 'ewt_booking' === get_post_type( $i ) && hash_equals( (string) get_post_meta( $i, '_ewt_key', true ), (string) $k ) ) {
+					$id = $i;
+				}
+			}
+			if ( ! $id ) {
+				return new WP_REST_Response( array( 'message' => 'not found' ), 404 );
+			}
+			$email = strtolower( (string) get_post_meta( $id, '_ewt_email', true ) );
+			nocache_headers();
+			return array(
+				'email'  => $email,
+				'exists' => ew_claim_has_account( $email ),
+			);
+		},
+	) );
+
 	/* At the turnstile: someone logged in marks the claim as in. */
 	register_rest_route( 'eastwood/v1', '/claim/in', array(
 		'methods'             => 'POST',
@@ -675,6 +804,19 @@ function ew_claim_css() {
 .ewc-card-t b{display:block;font-family:Anton,Impact,sans-serif;font-weight:400;font-size:20px;text-transform:uppercase}
 .ewc-card-t span{font-size:14px;color:#555}
 .ewc-card a{border:1.5px solid #101010;border-radius:6px;padding:9px 14px;font-weight:700;font-size:14px;text-decoration:none;color:#101010;white-space:nowrap}
+.ewc-card2{background:#fff;color:#121417;border-radius:12px;padding:18px;margin-top:20px}
+.ewc .ewc-see{margin:0 0 6px;font-family:Anton,Impact,sans-serif;font-size:24px;text-transform:uppercase;color:#121417}
+.ewc .ewc-aline{margin:0 0 4px;font-size:14px;color:#565c64}
+.ewc .ewc-alab{display:flex;align-items:center;gap:6px;margin:12px 0 8px;font-size:13px;font-weight:700;color:#121417}
+.ewc-i{width:18px;height:18px;border-radius:9px;border:1.5px solid #8b9099;color:#8b9099;background:#fff;font:700 11px/1 "Instrument Sans",sans-serif;padding:0;cursor:pointer}
+.ewc .ewc-info{margin:0 0 8px;font-size:13px;line-height:1.45;color:#565c64;background:#f3f3f3;border-radius:6px;padding:8px 10px}
+.ewc-pw{position:relative;display:block}
+.ewc-acin{width:100%;height:48px;border:1px solid #d9d9dd;border-radius:6px;padding:0 46px 0 14px;font:inherit;font-size:15px;color:#121417;background:#fff}
+.ewc-eye{position:absolute;right:8px;top:9px;width:30px;height:30px;border:0;background:none;padding:4px;cursor:pointer}
+.ewc-card2 .ewc-btn{margin-top:16px}
+.ewc-card2 .ewc-err{margin:10px 0 0;color:#CC0000}
+.ewc .ewc-fine{margin:12px 0 0;font-size:13px;line-height:1.8;color:#565c64;text-align:center}
+.ewc-alink{background:none;border:0;padding:0;font:inherit;color:#121417;text-decoration:underline;cursor:pointer}
 @media(max-width:1100px){.ewc .ewc-team{font-size:68px}.ewc-crests img{width:96px;height:96px}}
 @media(max-width:900px){
  .ewc-tk{grid-template-columns:minmax(0,1fr);min-height:0}
@@ -784,6 +926,61 @@ function ew_claim_js() {
  });
 
  function err(step, t){ step.querySelector('.ewc-err').textContent = t || ''; }
+
+ /* The last page: make or enter the MyEastwood password, then the account. */
+ function account(claim){
+   var acc = root.querySelector('[data-acc]'); if(!acc) return;
+   var A = W.acc || {}, sb = null, email = O.email || '';
+   acc.querySelector('[data-acc-party]').textContent = party() + (W.when ? ' \u00b7 ' + W.when : '');
+   acc.hidden = false;
+   function view(n){ acc.querySelectorAll('[data-view]').forEach(function(v){ v.hidden = v.getAttribute('data-view') !== n; }); var f = acc.querySelector('[data-view="' + n + '"] input'); if(f) f.focus(); }
+   function msg(n, t){ var e = acc.querySelector('[data-view="' + n + '"] .ewc-err'); if(e) e.textContent = t || ''; }
+   function client(){ if(!sb && window.supabase && A.supabase) sb = window.supabase.createClient(A.supabase, A.anon, {auth: {persistSession: true, autoRefreshToken: true}}); return sb; }
+   fetch(W.api + 'claim/account', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({claim: claim})})
+     .then(function(r){ return r.json(); }).then(function(j){ if(j && j.email) email = j.email; view(j && j.exists === true ? 'has' : 'new'); })
+     .catch(function(){ view('new'); });
+   /* Signed in: the booking joins the account, then off to it. */
+   function finish(session){
+     var t = session && session.access_token;
+     fetch(W.api + 'app/claim', {method:'POST', headers:{'Content-Type':'application/json', 'X-Eastwood-Fan': t || ''}, body: JSON.stringify({claim: claim})})
+       .catch(function(){}).then(function(){ location.href = A.go || '/my-tickets/'; });
+   }
+   function run(n, fn){
+     var b = acc.querySelector('[data-acc-do="' + n + '"]'); b.disabled = true; msg(n, '');
+     Promise.resolve().then(fn).then(function(s){ if(s) finish(s); else b.disabled = false; })
+       .catch(function(x){ msg(n, (x && x.message) || W.failed); b.disabled = false; });
+   }
+   var does = {
+     'new': function(){ return run('new', function(){
+       var pw = acc.querySelector('#ewcPwNew').value; if(pw.length < 8) throw new Error(A.short_pw);
+       if(!client()) throw new Error(W.failed);
+       return sb.auth.signUp({email: email.toLowerCase(), password: pw}).then(function(r){
+         if(r.error && /registered|exists/i.test(r.error.message)){ view('has'); return null; }
+         if(r.error) throw r.error; return r.data.session;
+       });
+     }); },
+     'has': function(){ return run('has', function(){
+       if(!client()) throw new Error(W.failed);
+       return sb.auth.signInWithPassword({email: email.toLowerCase(), password: acc.querySelector('#ewcPwHas').value}).then(function(r){ if(r.error) throw new Error(A.wrong_pw); return r.data.session; });
+     }); },
+     'other': function(){ return run('other', function(){
+       if(!client()) throw new Error(W.failed);
+       var em = acc.querySelector('#ewcAccEmail').value.trim().toLowerCase();
+       return sb.auth.signInWithPassword({email: em, password: acc.querySelector('#ewcPwOther').value}).then(function(r){ if(r.error) throw new Error(A.wrong_pw); return r.data.session; });
+     }); }
+   };
+   acc.addEventListener('click', function(e){
+     var b = e.target.closest('button,a'); if(!b) return;
+     if(b.classList.contains('ewc-eye')){ var i = b.parentNode.querySelector('input'); i.type = i.type === 'password' ? 'text' : 'password'; return; }
+     if(b.classList.contains('ewc-i')){ var p = acc.querySelector('.ewc-info'); p.hidden = !p.hidden; b.setAttribute('aria-expanded', String(!p.hidden)); return; }
+     if(b.getAttribute('data-acc-go')){ var em = acc.querySelector('#ewcAccEmail'); if(em && !em.value) em.value = email; view(b.getAttribute('data-acc-go')); return; }
+     var d = b.getAttribute('data-acc-do'); if(d && does[d]) does[d]();
+   });
+   acc.addEventListener('keydown', function(e){
+     if(e.key !== 'Enter' || e.target.tagName !== 'INPUT') return;
+     var v = e.target.closest('[data-view]'); var b = v && v.querySelector('[data-acc-do]'); if(b){ e.preventDefault(); b.click(); }
+   });
+ }
  form.addEventListener('submit', function(e){
    e.preventDefault();
    if(s2.hidden) return;
@@ -805,7 +1002,8 @@ function ew_claim_js() {
      root.querySelector('.ewc-big').hidden = true; root.querySelector('.ewc-month').hidden = true;
      form.hidden = true;
      if(O.done) O.done();
-     if(window.ewInapp) ewInapp(root, res.j.claim || '');
+     if(W.ending === 'app'){ if(window.ewInapp) ewInapp(root, res.j.claim || ''); }
+     else account(res.j.claim || '');
    })
    .catch(function(){ err(s2, W.failed); go.disabled = false; });
  });
@@ -829,7 +1027,8 @@ add_action( 'wp_enqueue_scripts', function () {
 	if ( current_user_can( 'edit_posts' ) ) {
 		wp_enqueue_script( 'wp-api' );
 	}
-	wp_register_script( 'ew-claim', '', array( 'ew-qrcode' ), EW_FWP_VERSION, true );
+	wp_enqueue_script( 'ew-supabase', 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js', array(), null, true ); // phpcs:ignore WordPress.WP.EnqueuedResourceParameters.MissingVersion
+	wp_register_script( 'ew-claim', '', array( 'ew-qrcode', 'ew-supabase' ), EW_FWP_VERSION, true );
 	wp_enqueue_script( 'ew-claim' );
 	wp_add_inline_script( 'ew-claim', ( function_exists( 'ew_optin_js' ) ? ew_optin_js() . ew_inapp_js() : '' ) . ew_claim_js() );
 }, 22 );

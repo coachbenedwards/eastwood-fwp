@@ -10,8 +10,10 @@
  * a shared inbox or the CRM is useless),
  * and the booking reference. Signed in, it shows exactly what the app's
  * Tickets tab shows, read from the same place (POST /app/mine), so the two can
- * never disagree. The scannable ticket stays in the app: each ticket here
- * says "Show in the app".
+ * never disagree. Signed in, each ticket shows the same QR the app shows (the
+ * rows /app/mine sends), so the turnstile scans either. The block's qr field
+ * set to "off" goes back to "Show in the app"; app_panel "on" brings back the
+ * app box and the Get the app strip (for when the apps are in the stores).
  *
  * Apple and Google buttons follow the block's social field: "google", "apple",
  * "on" for both, "off" for neither. Each needs its web set-up first (Google:
@@ -63,6 +65,9 @@ function ew_acc_defaults() {
 		'sign_out'      => 'Sign out',
 		'none'          => 'Nothing booked under your account yet.',
 		'show_app'      => 'Show in the app',
+		'qr'            => 'on',
+		'show_gate'     => 'Show this at the turnstile',
+		'app_panel'     => 'off',
 		'used'          => 'Used',
 		'other_email'   => 'Booked with a different email?',
 		'add_ref'       => 'Add it with its booking reference',
@@ -111,6 +116,7 @@ function ew_acc_shortcode( $atts ) {
 	);
 	$out  = '<div class="ewac">';
 	$out .= '<section class="ewac-main" aria-live="polite"><p class="ewac-wait">&nbsp;</p></section>';
+	if ( 'on' === strtolower( (string) $a['app_panel'] ) ) {
 	$out .= '<aside class="ewac-app">';
 	$out .= '<p class="ewac-kick">' . esc_html( $a['app_kicker'] ) . '</p>';
 	$out .= '<h2>' . esc_html( $a['app_title'] ) . '</h2>';
@@ -118,6 +124,7 @@ function ew_acc_shortcode( $atts ) {
 	$out .= '<a class="ewac-store" href="' . esc_url( $a['ios_url'] ) . '">' . esc_html( $a['ios_label'] ) . '</a>';
 	$out .= '<a class="ewac-store ewac-store2" href="' . esc_url( $a['android_url'] ) . '">' . esc_html( $a['android_label'] ) . '</a>';
 	$out .= '</aside>';
+	}
 	$out .= '<script type="application/json" class="ewac-cfg">' . wp_json_encode( $cfg ) . '</script>';
 	$out .= '</div>';
 	return $out;
@@ -151,6 +158,12 @@ function ew_acc_css() {
 .ewac-tk .r{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px}
 .ewac-tk .c{font-size:15px;font-weight:600;letter-spacing:1px}
 .ewac-tk a{height:40px;padding:0 14px;border-radius:6px;background:#CC0000;color:#fff !important;display:flex;align-items:center;font-family:Anton,sans-serif;font-size:15px;text-transform:uppercase;text-decoration:none !important;white-space:nowrap}
+.ewac-tk .q{display:flex;align-items:center;gap:14px;margin-top:12px}
+.ewac-tk .qr{background:#fff;border-radius:8px;padding:6px;flex:none;display:block;line-height:0}
+.ewac-tk .q .c{display:block;font-family:Anton,sans-serif;font-size:22px;letter-spacing:2px}
+.ewac-tk .g{display:block;font-size:13px;color:rgba(255,255,255,.7);margin-top:4px}
+.ewac-fine{line-height:1.8}
+.ewac-box{line-height:1.8}
 .ewac-head{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px}
 .ewac-head>div{flex-grow:1}
 .ewac-buy{height:46px;padding:0 18px;border-radius:10px;border:2px solid #111;display:flex;align-items:center;color:#111 !important;font-weight:700;text-decoration:none !important}
@@ -183,6 +196,14 @@ function ew_acc_js() {
   var soc = String(W.social || 'off').toLowerCase();
   var socialApple = soc === 'on' || soc.indexOf('apple') > -1;
   var socialGoogle = soc === 'on' || soc.indexOf('google') > -1;
+  var qrOn = String(W.qr || 'on').toLowerCase() !== 'off';
+  var appOn = String(W.app_panel || 'off').toLowerCase() === 'on';
+  /* The gate code, drawn from the rows the site sends: the same QR as the app. */
+  function qrSvg(rows) {
+    var n = rows.length, q = 2, t = n + q * 2, p = '';
+    rows.forEach(function (r, y) { for (var x = 0; x < r.length; x++) { if (r.charAt(x) === '1') p += 'M' + (x + q) + ' ' + (y + q) + 'h1v1h-1z'; } });
+    return '<svg viewBox="0 0 ' + t + ' ' + t + '" width="116" height="116" shape-rendering="crispEdges" aria-hidden="true"><rect width="' + t + '" height="' + t + '" fill="#fff"/><path d="' + p + '" fill="#000"/></svg>';
+  }
   var APPLE = '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.8 1.3 10.3.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8s2 .8 3.4.8c1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9-.1 0-2.7-1-2.7-4.2ZM13.9 4.9c.7-.9 1.2-2.1 1-3.3-1 0-2.3.7-3 1.6-.7.8-1.2 2-1.1 3.2 1.2.1 2.4-.6 3.1-1.5Z"/></svg>';
   var GOOGLE = '<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.6 13.3l7.9 6.2C12.4 13.7 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.6c0-1.6-.1-3.1-.4-4.6H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.7c4.3-4 6.9-9.9 6.9-17z"/><path fill="#FBBC05" d="M10.5 28.5c-.5-1.4-.8-2.9-.8-4.5s.3-3.1.8-4.5l-7.9-6.2C1 16.6 0 20.2 0 24s1 7.4 2.6 10.7l7.9-6.2z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.5 2.3-6.3 0-11.6-4.2-13.5-10l-7.9 6.2C6.6 42.6 14.6 48 24 48z"/></svg>';
 
@@ -208,11 +229,11 @@ function ew_acc_js() {
       return '<h1>' + e(W.signin_title) + '</h1><p class="ewac-line">' + e(W.signin_line) + '</p>'
         + field('email', W.email_label, 'email', st.email, 'email') + field('pw', W.password_label, 'password', '', 'current-password') + err()
         + '<button class="ewac-btn" data-do="signin">' + e(W.signin_button) + '</button>'
-        + '<p class="ewac-fine">' + e(W.new_here) + ' <button class="ewac-link" data-go="create">' + e(W.create_link) + '</button> · <button class="ewac-link" data-go="reset">' + e(W.forgot_link) + '</button></p>'
+        + '<p class="ewac-fine">' + e(W.new_here) + ' <button class="ewac-link" data-go="create">' + e(W.create_link) + '</button><br><button class="ewac-link" data-go="reset">' + e(W.forgot_link) + '</button></p>'
         + (socialApple || socialGoogle ? '<p class="ewac-or">' + e(W.or) + '</p>' : '')
         + (socialApple ? '<button class="ewac-btn ewac-dark" data-do="apple">' + APPLE + e(W.apple) + '</button>' : '')
         + (socialGoogle ? '<button class="ewac-btn ewac-light" data-do="google">' + GOOGLE + e(W.google) + '</button>' : '')
-        + '<p class="ewac-box">' + e(W.booked) + ' <button class="ewac-link" data-go="ref">' + e(W.ref_link) + '</button></p>';
+        + '<p class="ewac-box">' + e(W.booked) + '<br><button class="ewac-link" data-go="ref">' + e(W.ref_link) + '</button></p>';
     },
     create: function () {
       return '<h1>' + e(W.create_title) + '</h1><p class="ewac-line">' + e(W.create_line) + '</p>'
@@ -255,15 +276,17 @@ function ew_acc_js() {
       var items = st.items || [];
       var cards = items.map(function (i) {
         var k = W['kind_' + i.kind] || W.kind_event;
+        var foot = (qrOn && i.qr_rows && i.qr_rows.length)
+          ? '<div class="q"><span class="qr">' + qrSvg(i.qr_rows) + '</span><span><span class="c">' + e(i.code) + '</span><span class="g">' + e(i.used ? W.used : W.show_gate) + '</span></span></div>'
+          : '<div class="r"><span class="c">' + e(i.code) + '</span><a href="' + e(W.app_url) + '">' + e(W.show_app) + '</a></div>';
         return '<div class="ewac-tk"><p class="k">' + e(k) + (i.used ? ' · ' + e(W.used) : '') + '</p><p class="t">' + e(i.title) + '</p>'
-          + (i.lines ? '<p class="s">' + e(i.lines) + '</p>' : '')
-          + '<div class="r"><span class="c">' + e(i.code) + '</span><a href="' + e(W.app_url) + '">' + e(W.show_app) + '</a></div></div>';
+          + (i.lines ? '<p class="s">' + e(i.lines) + '</p>' : '') + foot + '</div>';
       }).join('');
       return '<div class="ewac-head"><div><h1>' + e(W.tickets_title) + '</h1><p class="ewac-fine">' + e(W.signed_as) + ' ' + e(st.who) + ' · <button class="ewac-link" data-do="signout">' + e(W.sign_out) + '</button></p></div>'
         + (W.buy_url ? '<a class="ewac-buy" href="' + e(W.buy_url) + '">' + e(W.buy) + '</a>' : '') + '</div>' + err()
         + (items.length ? '<div class="ewac-grid">' + cards + '</div>' : '<p class="ewac-line">' + e(W.none) + '</p>')
-        + '<p class="ewac-fine">' + e(W.other_email) + ' <button class="ewac-link" data-go="ref">' + e(W.add_ref) + '</button></p>'
-        + '<div class="ewac-banner"><p>' + e(W.app_banner) + '</p><a href="' + e(W.app_url) + '">' + e(W.app_button) + '</a></div>';
+        + '<p class="ewac-fine">' + e(W.other_email) + '<br><button class="ewac-link" data-go="ref">' + e(W.add_ref) + '</button></p>'
+        + (appOn ? '<div class="ewac-banner"><p>' + e(W.app_banner) + '</p><a href="' + e(W.app_url) + '">' + e(W.app_button) + '</a></div>' : '');
     }
   };
 
@@ -340,8 +363,9 @@ function ew_acc_js() {
   });
 
   if (/[?&]ref\b/.test(location.search)) { st.view = 'ref'; }
+  if (/[?&]reset\b/.test(location.search)) { st.view = 'reset'; }
   if (linkFailed) { st.err = W.link_failed; history.replaceState(null, '', cfg.page); show('reset'); }
-  else if (!recovering) act(async function () { await loadTickets(); if (!st.signedIn && st.view === 'ref') show('ref'); });
+  else if (!recovering) act(async function () { await loadTickets(); if (!st.signedIn && (st.view === 'ref' || st.view === 'reset')) show(st.view); });
   else setTimeout(function () { if (st.view !== 'newpw') act(loadTickets); }, 4000);
 })();
 JS;
