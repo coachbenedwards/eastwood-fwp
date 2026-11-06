@@ -69,6 +69,21 @@ function ew_sup_can( $what ) {
 	return '' !== $l && in_array( $l, $rules[ $what ] ?? array(), true );
 }
 
+/** "iPhone, 5 Nov" style: which app they have used, and when last. */
+function ew_sup_app( $r ) {
+	$on = array();
+	if ( ! empty( $r['app_ios'] ) ) {
+		$on[] = 'iPhone';
+	}
+	if ( ! empty( $r['app_and'] ) ) {
+		$on[] = 'Android';
+	}
+	if ( ! $on ) {
+		return 'No';
+	}
+	return implode( ' and ', $on ) . ', ' . wp_date( 'j M', max( (int) ( $r['app_ios'] ?? 0 ), (int) ( $r['app_and'] ?? 0 ) ) );
+}
+
 function ew_sup_fmt( $n ) {
 	return $n ? 'EFC-' . (int) $n : '';
 }
@@ -117,6 +132,13 @@ function ew_sup_all( $fresh = false ) {
 			}
 		}
 	}
+	$apps = array();
+	list( $c, $b ) = ew_runs_sb( 'GET', '/rest/v1/supporter_app_use?select=user_id,last_ios,last_android,last_web&limit=100000' );
+	if ( 200 === $c ) {
+		foreach ( (array) $b as $r ) {
+			$apps[ (string) $r['user_id'] ] = $r;
+		}
+	}
 	$links = function_exists( 'ew_fan_links_all' ) ? ew_fan_links_all() : array();
 	$per   = ew_sup_booking_stats();
 	$rows  = array();
@@ -144,6 +166,8 @@ function ew_sup_all( $fresh = false ) {
 			'source'   => implode( ', ', $prov ),
 			'bookings' => $bk,
 			'last_in'  => $last,
+			'app_ios'  => strtotime( (string) ( $apps[ $id ]['last_ios'] ?? '' ) ) ?: 0,
+			'app_and'  => strtotime( (string) ( $apps[ $id ]['last_android'] ?? '' ) ) ?: 0,
 		);
 	}
 	usort( $rows, function ( $a, $b ) {
@@ -230,7 +254,8 @@ function ew_sup_page() {
 	if ( ew_sup_can( 'view' ) ) {
 		$tabs['list'] = 'Supporters';
 	}
-	$tabs['totals'] = 'Totals';
+	$tabs['totals']   = 'Totals';
+	$tabs['activity'] = 'Activity';
 	if ( ew_sup_can( 'edit' ) ) {
 		$tabs['log'] = 'Number changes';
 	}
@@ -256,6 +281,8 @@ function ew_sup_page() {
 		'' !== $one ? ew_sup_detail( $one ) : ew_sup_list();
 	} elseif ( 'totals' === $tab ) {
 		ew_sup_totals();
+	} elseif ( 'activity' === $tab ) {
+		ew_sup_activity();
 	} elseif ( 'log' === $tab ) {
 		ew_sup_log();
 	} else {
@@ -273,6 +300,9 @@ function ew_sup_list() {
 	$src  = sanitize_key( $_GET['src'] ?? '' );                       // phpcs:ignore WordPress.Security.NonceVerification
 	$has  = sanitize_key( $_GET['has'] ?? '' );                       // phpcs:ignore WordPress.Security.NonceVerification
 	$rows = ew_sup_filter( $data['rows'], $q, $src, $has );
+	if ( function_exists( 'ew_log' ) && ( '' !== $q || '' !== $src || '' !== $has ) ) {
+		ew_log( 'supporter.searched', array( 'detail' => array_filter( array( 'q' => $q, 'signin' => $src, 'filter' => $has, 'found' => count( $rows ) ) ) ) );
+	}
 	echo '<form class="f" method="get"><input type="hidden" name="page" value="ew-supporters"><input type="hidden" name="tab" value="list">';
 	echo '<input type="search" name="q" value="' . esc_attr( $q ) . '" placeholder="Name, email or EFC- number" size="32">';
 	echo '<select name="src"><option value="">Any sign-in</option>';
@@ -288,14 +318,15 @@ function ew_sup_list() {
 		echo ' <a class="button" href="' . esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=ew_sup_export' ), 'ew_sup_export' ) ) . '">Export CSV</a>';
 	}
 	echo '</form><p>' . count( $rows ) . ' of ' . count( $data['rows'] ) . ' supporters</p>';
-	echo '<table><thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Joined</th><th>Signs in with</th><th>Bookings</th><th>Last scanned in</th></tr></thead><tbody>';
+	echo '<table><thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Joined</th><th>Signs in with</th><th>Bookings</th><th>Last scanned in</th><th>Uses the app</th></tr></thead><tbody>';
 	foreach ( array_slice( $rows, 0, 500 ) as $r ) {
 		$url = ew_sup_url( array( 'tab' => 'list', 'sup' => $r['id'] ) );
 		echo '<tr><td class="num"><a href="' . esc_url( $url ) . '">' . esc_html( ew_sup_fmt( $r['number'] ) ?: 'Open' ) . '</a></td>'
 			. '<td>' . esc_html( $r['name'] ) . '</td><td>' . esc_html( $r['email'] ) . '</td>'
 			. '<td>' . esc_html( $r['joined'] ? wp_date( 'j M Y', $r['joined'] ) : '' ) . '</td>'
 			. '<td>' . esc_html( $r['source'] ) . '</td><td>' . (int) $r['bookings'] . '</td>'
-			. '<td>' . esc_html( $r['last_in'] ? wp_date( 'j M Y, g:ia', $r['last_in'] ) : '' ) . '</td></tr>';
+			. '<td>' . esc_html( $r['last_in'] ? wp_date( 'j M Y, g:ia', $r['last_in'] ) : '' ) . '</td>'
+			. '<td>' . esc_html( ew_sup_app( $r ) ) . '</td></tr>';
 	}
 	echo '</tbody></table>';
 }
@@ -306,6 +337,9 @@ function ew_sup_detail( $id ) {
 		echo '<p>That supporter was not found. <a href="' . esc_url( ew_sup_url( array( 'tab' => 'list' ) ) ) . '">Back to supporters</a></p>';
 		return;
 	}
+	if ( function_exists( 'ew_log' ) ) {
+		ew_log( 'supporter.viewed', array( 'object_type' => 'supporter', 'object_id' => $r['id'], 'detail' => array( 'number' => ew_sup_fmt( $r['number'] ) ) ) );
+	}
 	echo '<p><a href="' . esc_url( ew_sup_url( array( 'tab' => 'list' ) ) ) . '">Back to supporters</a></p>';
 	echo '<h2>' . esc_html( ew_sup_fmt( $r['number'] ) . ( $r['name'] ? ' · ' . $r['name'] : '' ) ) . '</h2>';
 	echo '<table style="max-width:720px"><tbody>'
@@ -313,6 +347,7 @@ function ew_sup_detail( $id ) {
 		. '<tr><th>Joined</th><td>' . esc_html( $r['joined'] ? wp_date( 'j M Y, g:ia', $r['joined'] ) : '' ) . '</td></tr>'
 		. '<tr><th>Last signed in</th><td>' . esc_html( $r['seen'] ? wp_date( 'j M Y, g:ia', $r['seen'] ) : '' ) . '</td></tr>'
 		. '<tr><th>Signs in with</th><td>' . esc_html( $r['source'] ) . '</td></tr>'
+		. '<tr><th>Uses the app</th><td>' . esc_html( ew_sup_app( $r ) ) . '</td></tr>'
 		. '</tbody></table>';
 	if ( ew_sup_can( 'edit' ) ) {
 		echo '<h3>Edit</h3><form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
@@ -327,8 +362,18 @@ function ew_sup_detail( $id ) {
 	echo '<h3>Bookings and tickets (' . count( $ids ) . ')</h3>';
 	if ( ! $ids ) {
 		echo '<p>Nothing booked under these emails.</p>';
-		return;
+	} else {
+		ew_sup_bookings_table( $ids );
 	}
+	$quoted = implode( ',', array_map( function ( $e ) {
+		return '"' . str_replace( '"', '', $e ) . '"';
+	}, $r['emails'] ) );
+	$or     = 'actor_id.eq.' . $r['id'] . ( $quoted ? ',actor_email.in.(' . $quoted . ')' : '' );
+	echo '<h3>Activity</h3>';
+	ew_sup_activity_table( array( 'or' => '(' . $or . ')' ), false );
+}
+
+function ew_sup_bookings_table( $ids ) {
 	echo '<table><thead><tr><th>Booking</th><th>Booked</th><th>Status</th><th>Scanned in</th></tr></thead><tbody>';
 	foreach ( $ids as $bid ) {
 		$in = (int) get_post_meta( $bid, '_ewt_in', true );
@@ -336,6 +381,155 @@ function ew_sup_detail( $id ) {
 			. '<td>' . esc_html( get_the_date( 'j M Y', $bid ) ) . '</td>'
 			. '<td>' . esc_html( (string) get_post_meta( $bid, '_ewt_status', true ) ) . '</td>'
 			. '<td>' . esc_html( $in ? wp_date( 'j M Y, g:ia', $in ) : '' ) . '</td></tr>';
+	}
+	echo '</tbody></table>';
+}
+
+/* --------------------------------------------------------------- activity */
+
+/** Groups of actions for the filter, by their first word. */
+function ew_sup_activity_groups() {
+	return array(
+		'ticket'    => 'Ticket scans and checks',
+		'food'      => 'Food tokens',
+		'sale'      => 'Sales and refunds',
+		'booking'   => 'Bookings',
+		'claim'     => 'Free ticket claims',
+		'auth'      => 'Supporter sign-ins',
+		'account'   => 'Supporter account',
+		'supporter' => 'Supporters screen',
+		'staff'     => 'Staff sign-ins and access',
+		'admin'     => 'wp-admin changes',
+		'form'      => 'Forms',
+		'job'       => 'Job applications',
+		'runs'      => 'School runs',
+	);
+}
+
+/** What this level may see, as extra PostgREST filters. Reports never gets rows. */
+function ew_sup_activity_scope() {
+	$l = ew_sup_level();
+	if ( 'ew_sup_member' === $l ) {
+		return array( 'actor_type' => 'in.(supporter,guest)' );
+	}
+	if ( 'ew_sup_box' === $l ) {
+		return array( 'or' => '(action.like.ticket.*,action.like.food.*,action.eq.booking.checked_in)' );
+	}
+	return array();
+}
+
+function ew_sup_activity() {
+	if ( 'ew_sup_reports' === ew_sup_level() ) {
+		ew_sup_activity_counts();
+		return;
+	}
+	$g     = function ( $k ) {
+		return sanitize_text_field( wp_unslash( $_GET[ $k ] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification
+	};
+	$who   = $g( 'who' );
+	$grp   = sanitize_key( $g( 'grp' ) );
+	$src   = sanitize_key( $g( 'src' ) );
+	$res   = sanitize_key( $g( 'res' ) );
+	$from  = preg_match( '/^\d{4}-\d{2}-\d{2}$/', $g( 'from' ) ) ? $g( 'from' ) : '';
+	$to    = preg_match( '/^\d{4}-\d{2}-\d{2}$/', $g( 'to' ) ) ? $g( 'to' ) : '';
+	echo '<form class="f" method="get"><input type="hidden" name="page" value="ew-supporters"><input type="hidden" name="tab" value="activity">';
+	echo '<input type="search" name="who" value="' . esc_attr( $who ) . '" placeholder="Who: name, email or EFC- number" size="30">';
+	echo '<select name="grp"><option value="">Every action</option>';
+	foreach ( ew_sup_activity_groups() as $k => $l ) {
+		echo '<option value="' . esc_attr( $k ) . '"' . selected( $grp, $k, false ) . '>' . esc_html( $l ) . '</option>';
+	}
+	echo '</select><select name="src"><option value="">Anywhere</option>';
+	foreach ( array( 'website' => 'Website', 'app_ios' => 'iPhone app', 'app_android' => 'Android app', 'wp_admin' => 'wp-admin', 'till' => 'Till', 'system' => 'System' ) as $k => $l ) {
+		echo '<option value="' . esc_attr( $k ) . '"' . selected( $src, $k, false ) . '>' . esc_html( $l ) . '</option>';
+	}
+	echo '</select><select name="res"><option value="">Any result</option>';
+	foreach ( array( 'ok' => 'Worked', 'rejected' => 'Turned away', 'failed' => 'Failed' ) as $k => $l ) {
+		echo '<option value="' . esc_attr( $k ) . '"' . selected( $res, $k, false ) . '>' . esc_html( $l ) . '</option>';
+	}
+	echo '</select><label>From <input type="date" name="from" value="' . esc_attr( $from ) . '"></label><label>To <input type="date" name="to" value="' . esc_attr( $to ) . '"></label><button class="button">Show</button></form>';
+	$f = array();
+	if ( $grp ) {
+		$f['action'] = 'like.' . $grp . '.*';
+	}
+	if ( $src ) {
+		$f['source'] = 'eq.' . $src;
+	}
+	if ( $res ) {
+		$f['result'] = 'eq.' . $res;
+	}
+	$range = array();
+	if ( $from ) {
+		$range[] = 'at.gte.' . $from . 'T00:00:00';
+	}
+	if ( $to ) {
+		$range[] = 'at.lte.' . $to . 'T23:59:59';
+	}
+	if ( $range ) {
+		$f['and'] = '(' . implode( ',', $range ) . ')';
+	}
+	if ( '' !== $who ) {
+		$num = ew_sup_parse_number( $who );
+		$w   = str_replace( array( ',', '(', ')', '*' ), ' ', $who );
+		$f['or'] = $num >= 100001 ? '(efc_number.eq.' . $num . ')' : '(actor_label.ilike.*' . $w . '*,actor_email.ilike.*' . $w . '*)';
+	}
+	if ( function_exists( 'ew_log' ) && ( $who || $grp || $src || $res || $from || $to ) ) {
+		ew_log( 'supporter.activity_searched', array( 'detail' => array_filter( compact( 'who', 'grp', 'src', 'res', 'from', 'to' ) ) ) );
+	}
+	ew_sup_activity_table( $f, true );
+}
+
+/** The newest 300 matching rows from the activity feed, within this level's scope. */
+function ew_sup_activity_table( $filters, $show_who ) {
+	$scope = ew_sup_activity_scope();
+	if ( isset( $scope['or'] ) && isset( $filters['or'] ) ) {
+		$filters['and'] = '(' . trim( $filters['and'] ?? '', '()' ) . ( isset( $filters['and'] ) ? ',' : '' ) . 'or' . $scope['or'] . ')';
+		unset( $scope['or'] );
+	}
+	$q = array_merge( array( 'select' => '*', 'order' => 'at.desc', 'limit' => '300' ), $filters, $scope );
+	list( $c, $b ) = ew_runs_sb( 'GET', '/rest/v1/activity_feed?' . http_build_query( $q, '', '&', PHP_QUERY_RFC3986 ) );
+	if ( 200 !== $c ) {
+		echo '<p>The activity log is not set up in the database yet.</p>';
+		return;
+	}
+	if ( ! $b ) {
+		echo '<p>Nothing yet.</p>';
+		return;
+	}
+	$where = array( 'website' => 'Website', 'app_ios' => 'iPhone app', 'app_android' => 'Android app', 'wp_admin' => 'wp-admin', 'till' => 'Till', 'system' => 'System' );
+	echo '<p>' . count( $b ) . ' most recent</p><table><thead><tr><th>When</th>' . ( $show_who ? '<th>Who</th>' : '' ) . '<th>What</th><th>Where</th><th>Result</th><th>Details</th></tr></thead><tbody>';
+	foreach ( (array) $b as $r ) {
+		$who = trim( (string) ( $r['actor_label'] ?? '' ) );
+		if ( ! empty( $r['efc_number'] ) ) {
+			$who = ew_sup_fmt( $r['efc_number'] ) . ( $who ? ' · ' . $who : '' );
+		}
+		$who .= ( $r['actor_email'] && false === strpos( $who, (string) $r['actor_email'] ) ) ? ' (' . $r['actor_email'] . ')' : '';
+		$who  = $who ?: ucfirst( (string) $r['actor_type'] );
+		$det  = array();
+		foreach ( (array) ( $r['detail'] ?? array() ) as $k => $v ) {
+			$det[] = $k . ': ' . ( is_scalar( $v ) ? $v : wp_json_encode( $v ) );
+		}
+		if ( ! empty( $r['object_id'] ) ) {
+			array_unshift( $det, ( $r['object_type'] ? $r['object_type'] . ' ' : '' ) . $r['object_id'] );
+		}
+		$res = array( 'ok' => 'Worked', 'rejected' => 'Turned away', 'failed' => 'Failed' )[ $r['result'] ] ?? $r['result'];
+		echo '<tr><td style="white-space:nowrap">' . esc_html( wp_date( 'j M Y, g:i:sa', strtotime( (string) $r['at'] ) ) ) . '</td>'
+			. ( $show_who ? '<td>' . esc_html( $who ) . '</td>' : '' )
+			. '<td>' . esc_html( (string) $r['action'] ) . '</td><td>' . esc_html( $where[ $r['source'] ] ?? (string) $r['source'] ) . '</td>'
+			. '<td>' . esc_html( (string) $res ) . '</td><td>' . esc_html( implode( ' · ', $det ) ) . '</td></tr>';
+	}
+	echo '</tbody></table>';
+}
+
+/** Reports level: counts per day and action, no people. */
+function ew_sup_activity_counts() {
+	list( $c, $b ) = ew_runs_sb( 'GET', '/rest/v1/activity_daily?select=*&order=day.desc,n.desc&limit=500' );
+	if ( 200 !== $c ) {
+		echo '<p>The activity log is not set up in the database yet.</p>';
+		return;
+	}
+	echo '<p>How many times each thing happened, by day. No names or emails.</p><table><thead><tr><th>Day</th><th>What</th><th>Where</th><th>Result</th><th>Times</th></tr></thead><tbody>';
+	foreach ( (array) $b as $r ) {
+		echo '<tr><td>' . esc_html( wp_date( 'D j M Y', strtotime( (string) $r['day'] . ' 12:00' ) ) ) . '</td><td>' . esc_html( (string) $r['action'] ) . '</td><td>' . esc_html( (string) $r['source'] ) . '</td><td>' . esc_html( (string) $r['result'] ) . '</td><td>' . (int) $r['n'] . '</td></tr>';
 	}
 	echo '</tbody></table>';
 }
@@ -434,11 +628,20 @@ add_action( 'admin_post_ew_sup_access', function () {
 		if ( ! $u || user_can( $u, 'manage_options' ) ) {
 			continue;
 		}
+		$was = '';
 		foreach ( $levels as $cap ) {
+			if ( ! empty( $u->caps[ $cap ] ) ) {
+				$was = $cap;
+			}
 			$u->remove_cap( $cap );
 		}
 		if ( in_array( $want, $levels, true ) ) {
 			$u->add_cap( $want );
+		}
+		$now = in_array( $want, $levels, true ) ? $want : '';
+		if ( $was !== $now && function_exists( 'ew_log' ) ) {
+			$names = ew_sup_levels();
+			ew_log( 'staff.access_changed', array( 'object_type' => 'user', 'object_id' => $u->ID, 'detail' => array( 'staff' => $u->display_name, 'from' => $names[ $was ] ?? 'No access', 'to' => $names[ $now ] ?? 'No access' ) ) );
 		}
 	}
 	wp_safe_redirect( ew_sup_url( array( 'tab' => 'access', 'msg' => 'Access saved.' ) ) );
@@ -477,6 +680,14 @@ add_action( 'admin_post_ew_sup_save', function () {
 		wp_safe_redirect( add_query_arg( 'msg', 'Could not save (' . (int) $c . ').', $back ) );
 		exit;
 	}
+	if ( function_exists( 'ew_log' ) ) {
+		if ( $name !== $r['name'] ) {
+			ew_log( 'supporter.name_changed', array( 'object_type' => 'supporter', 'object_id' => $id, 'detail' => array( 'from' => $r['name'], 'to' => $name ) ) );
+		}
+		if ( isset( $patch['efc_number'] ) ) {
+			ew_log( 'supporter.number_changed', array( 'object_type' => 'supporter', 'object_id' => $id, 'detail' => array( 'from' => ew_sup_fmt( $r['number'] ), 'to' => ew_sup_fmt( $want ) ) ) );
+		}
+	}
 	if ( isset( $patch['efc_number'] ) ) {
 		$me = wp_get_current_user();
 		ew_runs_sb( 'POST', '/rest/v1/supporter_number_changes', array(
@@ -496,13 +707,17 @@ add_action( 'admin_post_ew_sup_export', function () {
 	if ( ! ew_sup_can( 'export' ) ) {
 		wp_die( 'You cannot export supporters.' );
 	}
+	$all = ew_sup_all( true )['rows'];
+	if ( function_exists( 'ew_log' ) ) {
+		ew_log( 'supporter.exported', array( 'detail' => array( 'rows' => count( $all ) ) ) );
+	}
 	nocache_headers();
 	header( 'Content-Type: text/csv; charset=utf-8' );
 	header( 'Content-Disposition: attachment; filename="supporters-' . gmdate( 'Y-m-d' ) . '.csv"' );
 	$f = fopen( 'php://output', 'w' );
-	fputcsv( $f, array( 'ID', 'Name', 'Email', 'Joined', 'Signs in with', 'Bookings', 'Last scanned in' ) );
-	foreach ( ew_sup_all( true )['rows'] as $r ) {
-		fputcsv( $f, array( ew_sup_fmt( $r['number'] ), $r['name'], $r['email'], $r['joined'] ? wp_date( 'Y-m-d H:i', $r['joined'] ) : '', $r['source'], $r['bookings'], $r['last_in'] ? wp_date( 'Y-m-d H:i', $r['last_in'] ) : '' ) );
+	fputcsv( $f, array( 'ID', 'Name', 'Email', 'Joined', 'Signs in with', 'Bookings', 'Last scanned in', 'Uses the app' ) );
+	foreach ( $all as $r ) {
+		fputcsv( $f, array( ew_sup_fmt( $r['number'] ), $r['name'], $r['email'], $r['joined'] ? wp_date( 'Y-m-d H:i', $r['joined'] ) : '', $r['source'], $r['bookings'], $r['last_in'] ? wp_date( 'Y-m-d H:i', $r['last_in'] ) : '', ew_sup_app( $r ) ) );
 	}
 	fclose( $f ); // phpcs:ignore WordPress.WP.AlternativeFunctions
 	exit;
