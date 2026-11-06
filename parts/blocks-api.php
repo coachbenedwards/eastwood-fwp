@@ -49,7 +49,7 @@ function ew_blocks_allowed() {
 		'eastwood_tickets', 'eastwood_claim', 'eastwood_halftime', 'eastwood_community_games', 'eastwood_community_request',
 		'eastwood_trial', 'eastwood_match_tickets', 'eastwood_fixture_rows', 'eastwood_food_tokens',
 		'eastwood_hts_next', 'eastwood_hts_steps', 'eastwood_hts_past', 'eastwood_hts_coming',
-		'eastwood_hts_vote', 'eastwood_hts_play',
+		'eastwood_hts_vote', 'eastwood_hts_play', 'eastwood_jobs',
 	) );
 }
 

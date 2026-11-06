@@ -59,6 +59,7 @@ function ew_notify_routes() {
 		'question'   => 'Academy question',
 		'interest'   => 'Academy interest registered',
 		'meeting'    => 'Academy 1:1 booked',
+		'application' => 'Job application',
 	);
 }
 
@@ -112,6 +113,7 @@ function ew_notify_kinds() {
 		'question'  => 'Academy question',
 		'interest'  => 'Academy interest registered',
 		'meeting'   => 'Academy 1:1 booked',
+		'application' => 'Job application',
 	);
 }
 
@@ -126,12 +128,19 @@ function ew_notify_body( $id, $kind ) {
 		$lines[] = 'Accept and invite them to a 1:1: ' . ew_acad_accept_url( $id );
 		$lines[] = '';
 	}
+	// A job application: the video, behind a link that signs a fresh one each time.
+	if ( '' !== $m( 'video' ) && function_exists( 'ew_jobs_video_link' ) ) {
+		$lines[] = 'Watch the video: ' . ew_jobs_video_link( $id );
+		$lines[] = '';
+	}
 	$pairs = array(
 		'What'     => $m( 'event' ),
 		'Name'     => $m( 'name' ),
 		'Email'    => $m( 'email' ),
 		'Mobile'   => $m( 'phone' ),
-		'Details'  => $m( 'lines' ),
+		'Role'     => $m( 'role' ),
+		'Volunteer or paid' => $m( 'pay' ),
+		'Details'  => '' !== $m( 'role' ) ? '' : $m( 'lines' ),
 		'Where they live' => $m( 'loc' ),
 		'School'   => $m( 'school' ),
 		'Parent or guardian' => $m( 'guardian' ),
