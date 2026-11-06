@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.102.0
+ * Version: 3.103.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -613,6 +613,13 @@ function ew_fwp_settings_page() {
 		if ( isset( $_POST['ew_stripe_env'] ) ) {
 			update_option( 'ew_stripe_env', 'live' === $_POST['ew_stripe_env'] ? 'live' : 'test', false );
 		}
+		foreach ( array( 'test', 'live' ) as $post_env ) {
+			// Webhook signing secret: blank keeps the saved one, like the secret key.
+			$wh = 'ew_stripe_whsec_' . $post_env;
+			if ( isset( $_POST[ $wh ] ) && '' !== trim( (string) wp_unslash( $_POST[ $wh ] ) ) ) {
+				update_option( $wh, sanitize_text_field( wp_unslash( $_POST[ $wh ] ) ), false );
+			}
+		}
 		echo '<div class="notice notice-success"><p>Saved.</p></div>';
 	}
 
@@ -651,6 +658,18 @@ function ew_fwp_settings_page() {
 			esc_attr( $row_env ),
 			esc_attr( '' !== $creds['secret'] ? 'paste a new one to replace it' : ( 'live' === $row_env ? 'begins sk_live_' : 'begins sk_test_' ) ),
 			esc_html( 'Left blank, the key already saved is kept.' )
+		);
+		$whsec = (string) get_option( 'ew_stripe_whsec_' . $row_env, '' );
+		printf(
+			'<tr><th scope="row">Webhook signing secret</th><td><p>%s</p>'
+				. '<input type="password" name="ew_stripe_whsec_%s" size="50" autocomplete="off" placeholder="%s">'
+				. '<p class="description">%s</p></td></tr>',
+			wp_kses_post( '' !== $whsec
+				? 'Signing secret: <strong>set (' . (int) strlen( $whsec ) . ' characters)</strong>'
+				: '<strong>No signing secret saved.</strong>' ),
+			esc_attr( $row_env ),
+			esc_attr( '' !== $whsec ? 'paste a new one to replace it' : 'begins whsec_' ),
+			esc_html( 'From the Stripe webhook pointing at ' . rest_url( 'eastwood/v1/stripe/webhook' ) . '. Left blank, the one saved is kept.' )
 		);
 		echo '</tbody></table>';
 	}
@@ -4056,7 +4075,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.102.0';
+const EW_FWP_VERSION = '3.103.0';
 
 /*
  * Parts loader.

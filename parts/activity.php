@@ -309,6 +309,10 @@ function ew_log_booking_meta( $meta_id, $id, $key, $value ) {
 		}
 		return;
 	}
+	// Stripe and Square log their own sale.* entry with the amount; do not log the bare status twice.
+	if ( ! empty( $GLOBALS['ew_log_quiet_status'] ) ) {
+		return;
+	}
 	$st  = sanitize_key( (string) $value );
 	$map = array(
 		'paid'      => 'sale.paid',
