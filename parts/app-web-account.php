@@ -62,6 +62,8 @@ function ew_acc_defaults() {
 		'link_failed'   => 'That link did not work. It only works in the browser you asked from, for one hour. Ask for a new one.',
 		'id_label'      => 'MyEastwood · ID',
 		'tickets_title' => 'Your tickets',
+		'day_link'      => 'My day',
+		'day_url'       => '/my-day/',
 		'signed_as'     => 'Signed in as',
 		'sign_out'      => 'Sign out',
 		'none'          => 'Nothing booked under your account yet.',
@@ -286,7 +288,7 @@ function ew_acc_js() {
         return '<div class="ewac-tk"><p class="k">' + e(k) + (i.used ? ' · ' + e(W.used) : '') + '</p><p class="t">' + e(i.title) + '</p>'
           + (i.lines ? '<p class="s">' + e(i.lines) + '</p>' : '') + foot + '</div>';
       }).join('');
-      return '<div class="ewac-head"><div>' + (st.efc ? '<p class="ewac-id">' + e(W.id_label) + ' ' + e(st.efc) + '</p>' : '') + '<h1>' + e(W.tickets_title) + '</h1><p class="ewac-fine">' + e(W.signed_as) + ' ' + e(st.who) + ' · <button class="ewac-link" data-do="signout">' + e(W.sign_out) + '</button></p></div>'
+      return '<div class="ewac-head"><div>' + (st.efc ? '<p class="ewac-id">' + e(W.id_label) + ' ' + e(st.efc) + '</p>' : '') + '<h1>' + e(W.tickets_title) + '</h1>' + (W.day_link && W.day_url ? '<p class="ewac-fine"><a href="' + e(W.day_url) + '">' + e(W.day_link) + '</a></p>' : '') + '<p class="ewac-fine">' + e(W.signed_as) + ' ' + e(st.who) + ' · <button class="ewac-link" data-do="signout">' + e(W.sign_out) + '</button></p></div>'
         + (W.buy_url ? '<a class="ewac-buy" href="' + e(W.buy_url) + '">' + e(W.buy) + '</a>' : '') + '</div>' + err()
         + (items.length ? '<div class="ewac-grid">' + cards + '</div>' : '<p class="ewac-line">' + e(W.none) + '</p>')
         + '<p class="ewac-fine">' + e(W.other_email) + '<br><button class="ewac-link" data-go="ref">' + e(W.add_ref) + '</button></p>'
@@ -373,8 +375,9 @@ function ew_acc_js() {
 
   if (/[?&]ref\b/.test(location.search)) { st.view = 'ref'; }
   if (/[?&]reset\b/.test(location.search)) { st.view = 'reset'; }
+  if (/[?&]create\b/.test(location.search)) { st.view = 'create'; }
   if (linkFailed) { st.err = W.link_failed; history.replaceState(null, '', cfg.page); show('reset'); }
-  else if (!recovering) act(async function () { await loadTickets(); if (!st.signedIn && (st.view === 'ref' || st.view === 'reset')) show(st.view); });
+  else if (!recovering) act(async function () { await loadTickets(); if (!st.signedIn && (st.view === 'ref' || st.view === 'reset' || st.view === 'create')) show(st.view); });
   else setTimeout(function () { if (st.view !== 'newpw') act(loadTickets); }, 4000);
 })();
 JS;

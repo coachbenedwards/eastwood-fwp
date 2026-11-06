@@ -83,6 +83,7 @@ function ew_wallet_item( $id ) {
 		'form'   => $m( 'form' ),
 		'status' => $status,
 		'title'  => $m( 'event' ),
+		'fixture' => (int) $m( 'fixture' ),
 		'lines'  => $m( 'lines' ),
 		'name'   => $m( 'name' ),
 		'child'  => $m( 'child' ),
