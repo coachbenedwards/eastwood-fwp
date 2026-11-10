@@ -253,6 +253,80 @@ function ew_tix_is_paid( $s ) {
 }
 
 /**
+ * Keep what Stripe collected that the Booking needs afterwards: the postal
+ * address for a posted order, the printing chosen and whether it is posted
+ * or collected, and the phone number. Without the address saved here, a
+ * posted shirt arrives at the club as an order nobody can send.
+ */
+function ew_tix_save_delivery( $bid, $s ) {
+	if ( ! $bid ) {
+		return;
+	}
+	$ship = $s['collected_information']['shipping_details'] ?? ( $s['shipping_details'] ?? null );
+	if ( is_array( $ship ) && ! empty( $ship['address'] ) ) {
+		$a     = $ship['address'];
+		$parts = array_filter( array_map( 'trim', array(
+			(string) ( $ship['name'] ?? '' ),
+			(string) ( $a['line1'] ?? '' ),
+			(string) ( $a['line2'] ?? '' ),
+			(string) ( $a['city'] ?? '' ),
+			(string) ( $a['state'] ?? '' ),
+			strtoupper( (string) ( $a['postal_code'] ?? '' ) ),
+			'GB' === ( $a['country'] ?? 'GB' ) ? '' : (string) ( $a['country'] ?? '' ),
+		) ) );
+		if ( $parts ) {
+			update_post_meta( $bid, '_ewt_address', implode( "\n", $parts ) );
+		}
+	}
+	$meta = (array) ( $s['metadata'] ?? array() );
+	if ( ! empty( $meta['delivery'] ) ) {
+		update_post_meta( $bid, '_ewt_delivery', sanitize_key( (string) $meta['delivery'] ) );
+	}
+	if ( ! empty( $meta['printing'] ) ) {
+		update_post_meta( $bid, '_ewt_printing', sanitize_text_field( (string) $meta['printing'] ) );
+	}
+	$phone = trim( (string) ( $s['customer_details']['phone'] ?? '' ) );
+	if ( '' !== $phone && '' === trim( (string) get_post_meta( $bid, '_ewt_phone', true ) ) ) {
+		update_post_meta( $bid, '_ewt_phone', sanitize_text_field( $phone ) );
+	}
+}
+
+/**
+ * Once: shirt orders already paid for posting, made before the address was
+ * kept, get it back from Stripe so they can be sent.
+ */
+add_action( 'admin_init', function () {
+	if ( get_option( 'ew_addr_backfill_v1' ) || '' === ew_tix_sk() ) {
+		return;
+	}
+	update_option( 'ew_addr_backfill_v1', time(), false );
+	$ids = get_posts( array(
+		'post_type'   => 'ewt_booking',
+		'post_status' => 'any',
+		'numberposts' => 300,
+		'fields'      => 'ids',
+		'meta_key'    => '_ewt_status',
+		'meta_value'  => 'paid',
+	) );
+	foreach ( $ids as $bid ) {
+		if ( '' !== (string) get_post_meta( $bid, '_ewt_address', true ) ) {
+			continue;
+		}
+		if ( false === stripos( (string) get_post_meta( $bid, '_ewt_lines', true ), 'posted' ) ) {
+			continue;
+		}
+		$sid = (string) get_post_meta( $bid, '_ewt_session', true );
+		if ( ! preg_match( '/^cs_[A-Za-z0-9_]+$/', $sid ) ) {
+			continue;
+		}
+		$s = ew_tix_stripe( 'GET', 'checkout/sessions/' . rawurlencode( $sid ) );
+		if ( ! empty( $s['id'] ) ) {
+			ew_tix_save_delivery( (int) $bid, $s );
+		}
+	}
+} );
+
+/**
  * A Booking whose Stripe session is paid becomes paid -- once.
  *
  * Shared by every flow that comes back from Stripe (event tickets, food
@@ -268,6 +342,7 @@ function ew_tix_mark_paid( $bid, $s, $hook ) {
 	if ( ! ew_tix_is_paid( $s ) ) {
 		return false;
 	}
+	ew_tix_save_delivery( $bid, $s ); // before the status, so the club's email has the address
 	update_post_meta( $bid, '_ewt_status', 'paid' );
 	update_post_meta( $bid, '_ewt_paid', (int) ( $s['amount_total'] ?? 0 ) );
 	update_post_meta( $bid, '_ewt_session', $s['id'] );

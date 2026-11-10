@@ -1402,6 +1402,9 @@ function ew_shirt_mark_paid( $session_id, $hook ) {
 	if ( 'paid' === get_post_meta( $bid, '_ewt_status', true ) ) {
 		return $bid;
 	}
+	if ( function_exists( 'ew_tix_save_delivery' ) ) {
+		ew_tix_save_delivery( $bid, $s ); // before the status, so the club's email has the address
+	}
 	update_post_meta( $bid, '_ewt_status', 'paid' );
 	update_post_meta( $bid, '_ewt_paid', (int) ( $s['amount_total'] ?? 0 ) );
 	update_post_meta( $bid, '_ewt_session', $s['id'] );

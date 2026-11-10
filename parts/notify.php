@@ -173,6 +173,8 @@ function ew_notify_body( $id, $kind ) {
 		'Role'     => $m( 'role' ),
 		'Volunteer or paid' => $m( 'pay' ),
 		'Details'  => '' !== $m( 'role' ) ? '' : $m( 'lines' ),
+		'Printing' => $m( 'printing' ),
+		'Post to'  => '' !== $m( 'address' ) ? "\n" . $m( 'address' ) : ( 'post' === $m( 'delivery' ) ? 'NOT GIVEN -- check the order in Stripe' : '' ),
 		'Where they live' => $m( 'loc' ),
 		'School'   => $m( 'school' ),
 		'Parent or guardian' => $m( 'guardian' ),
