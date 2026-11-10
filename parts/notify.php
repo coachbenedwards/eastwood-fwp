@@ -117,6 +117,38 @@ function ew_notify_kinds() {
 	);
 }
 
+/**
+ * The tag at the front of the subject, so each kind of email stands out in a
+ * busy inbox: [SHIRT PURCHASE] Home shirt, M -- Jane Smith.
+ */
+function ew_notify_tag( $id, $status ) {
+	$tags = array(
+		'claimed'     => 'FREE TICKET CLAIMED',
+		'halftime'    => 'HALF-TIME SHOW SIGN-UP',
+		'trial'       => 'ACADEMY TRIAL SIGN-UP',
+		'community'   => 'COMMUNITY TICKET REQUEST',
+		'question'    => 'ACADEMY QUESTION',
+		'interest'    => 'ACADEMY INTEREST',
+		'meeting'     => 'ACADEMY 1:1 BOOKED',
+		'application' => 'JOB APPLICATION',
+	);
+	if ( isset( $tags[ $status ] ) ) {
+		return $tags[ $status ];
+	}
+	$kind = (string) get_post_meta( $id, '_ewt_kind', true );
+	$what = (string) get_post_meta( $id, '_ewt_event', true );
+	if ( 'shop' === $kind || false !== stripos( $what, 'shirt' ) ) {
+		return false !== stripos( $what, 'shirt' ) || '' === $what ? 'SHIRT PURCHASE' : 'SHOP PURCHASE';
+	}
+	if ( 'food' === $kind ) {
+		return 'FOOD TOKENS PURCHASE';
+	}
+	if ( get_post_meta( $id, '_ewt_fixture', true ) ) {
+		return 'MATCH TICKET PURCHASE';
+	}
+	return 'EVENT TICKET PURCHASE';
+}
+
 /** One booking, written out as plain lines. */
 function ew_notify_body( $id, $kind ) {
 	$m = function ( $k ) use ( $id ) {
@@ -197,7 +229,7 @@ function ew_notify_booking( $id ) {
 
 	$event   = trim( (string) get_post_meta( $id, '_ewt_event', true ) );
 	$name    = trim( (string) get_post_meta( $id, '_ewt_name', true ) );
-	$subject = $kinds[ $status ] . ( '' !== $name ? ': ' . $name : '' ) . ( '' !== $event ? ' -- ' . $event : '' );
+	$subject = '[' . ew_notify_tag( $id, $status ) . '] ' . ( '' !== $event ? $event . ( '' !== $name ? ' -- ' . $name : '' ) : $name );
 
 	wp_mail(
 		$to,

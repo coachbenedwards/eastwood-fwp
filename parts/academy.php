@@ -127,7 +127,7 @@ function ew_acad_meeting_defaults() {
 		'invite_to'       => '',
 		'minutes'         => '30',
 		'invite_title'    => 'Academy 1:1: {player}',
-		'staff_subject'   => 'Academy 1:1 booked: {player}, {time}',
+		'staff_subject'   => '[ACADEMY 1:1 BOOKED] {player}, {time}',
 		'staff_body'      => "{parent} has booked a 1:1 about {player}.\n\nWhen: {time}\n{where}\nEmail: {email}\nPhone: {phone}\n\nThe calendar invite is attached.",
 	);
 }

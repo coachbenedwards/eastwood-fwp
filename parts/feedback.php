@@ -58,7 +58,7 @@ function ew_fb_defaults() {
 		'done_btn'     => 'Register your interest',
 		'interest_url' => '/academy/register-interest/',
 		'player_word'  => 'your child',
-		'subject'      => 'Trial day feedback: {score}/5 from {who}',
+		'subject'      => '[TRIAL DAY FEEDBACK] {score}/5 from {who}',
 		// The email that asks a trial family for feedback.
 		'mail_subject' => 'How was the trial day?',
 		'mail_name'    => 'Eastwood FC Academy',

@@ -118,7 +118,7 @@ function ew_digest_build( $end = 0 ) {
 	$out[] = '';
 	$out[] = 'All bookings: ' . admin_url( 'edit.php?post_type=ewt_booking' );
 
-	$subject = 'Website week: ' . $count . ' in, ' . $pound . number_format( $total / 100, 2 ) . ' taken (' . $from . ' to ' . $to . ')';
+	$subject = '[WEEKLY WEBSITE REPORT] ' . $count . ' in, ' . $pound . number_format( $total / 100, 2 ) . ' taken (' . $from . ' to ' . $to . ')';
 	return array( $subject, implode( "\n", $out ), $count );
 }
 
