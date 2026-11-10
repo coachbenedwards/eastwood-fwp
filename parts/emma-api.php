@@ -31,6 +31,7 @@ function ew_emma_row( $id ) {
 		'id'       => (int) $id,
 		'code'     => (string) $m( 'code' ),
 		'status'   => (string) $m( 'status' ),
+		'merged_into' => ( $mi = (int) $m( 'merged_into' ) ) ? (string) get_post_meta( $mi, '_ewt_code', true ) : '',
 		'name'     => (string) $m( 'name' ),
 		'email'    => (string) $m( 'email' ),
 		'phone'    => (string) $m( 'phone' ),
@@ -273,6 +274,14 @@ add_action( 'rest_api_init', function () {
 					return new WP_REST_Response( array( 'message' => 'status not allowed' ), 400 );
 				}
 				update_post_meta( $id, '_ewt_status', $status );
+			}
+			$merge = $req->get_param( 'merged_into' );
+			if ( null !== $merge && '' !== (string) $merge ) {
+				$res = ew_booking_merge( $id, ew_booking_by_code( (string) $merge ) );
+				if ( is_wp_error( $res ) ) {
+					return new WP_REST_Response( array( 'message' => $res->get_error_message() ), 400 );
+				}
+				return ew_emma_row( $id );
 			}
 			$in = $req->get_param( 'checked_in' );
 			if ( null !== $in ) {

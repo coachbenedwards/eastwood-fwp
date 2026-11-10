@@ -110,7 +110,7 @@ add_action( 'rest_api_init', function () {
 				list( $id, $k ) = explode( '.', $claim, 2 );
 				$id = (int) $id;
 				if ( $id && 'ewt_booking' === get_post_type( $id ) && hash_equals( (string) get_post_meta( $id, '_ewt_key', true ), (string) $k ) ) {
-					$bid = $id;
+					$bid = ew_booking_resolve( $id );
 				}
 			} else {
 				$email = sanitize_email( (string) $req->get_param( 'email' ) );

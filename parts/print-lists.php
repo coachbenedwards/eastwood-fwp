@@ -208,6 +208,9 @@ function ew_pl_rows( $event, $status ) {
 	}
 	$out = array();
 	foreach ( get_posts( $args ) as $b ) {
+		if ( 'merged' === (string) get_post_meta( $b->ID, '_ewt_status', true ) && 'merged' !== $status ) {
+			continue;
+		}
 		// Either key answering is enough, the same test the screen above
 		// makes, so the sheet carries exactly what the screen showed.
 		if ( '' !== $event

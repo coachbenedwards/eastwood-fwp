@@ -68,7 +68,7 @@ function ew_ticket_find_any($ref) {
 			'meta_value'     => $ref,
 			'fields'         => 'ids',
 		]);
-		if (!empty($q->posts)) return (int) $q->posts[0];
+		if (!empty($q->posts)) return ew_booking_resolve((int) $q->posts[0]);
 	}
 	return null;
 }

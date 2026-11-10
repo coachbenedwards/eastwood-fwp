@@ -268,7 +268,7 @@ function ew_claim_find( $code, $key ) {
 	if ( ! $ids ) {
 		return 0;
 	}
-	return hash_equals( (string) get_post_meta( $ids[0], '_ewt_key', true ), $key ) ? (int) $ids[0] : 0;
+	return hash_equals( (string) get_post_meta( $ids[0], '_ewt_key', true ), $key ) ? ew_booking_resolve( (int) $ids[0] ) : 0;
 }
 
 /** The ticket's left half: the match, as it is printed. */

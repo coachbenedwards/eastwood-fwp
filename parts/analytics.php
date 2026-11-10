@@ -121,6 +121,9 @@ function ew_an_page() {
 			return (string) get_post_meta( $id, '_ewt_' . $k, true );
 		};
 		$status = $m( 'status' );
+		if ( 'merged' === $status ) {
+			continue;
+		}
 		$event  = '' !== $m( 'event' ) ? $m( 'event' ) : '(no name)';
 		$event  = preg_replace( '/^Community tickets:\s*/', '', $event );
 		$lines  = $m( 'lines' );
