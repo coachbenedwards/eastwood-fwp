@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.109.0
+ * Version: 3.109.1
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1097,7 +1097,11 @@ function ew_fixture_adds_sanitise( $in ) {
 		// has not dated yet. Kept apart from the dated list -- see
 		// ew_fixture_tbc() -- so nothing that looks for the next game ever
 		// picks it.
-		$tbc = 'TBC' === strtoupper( $date );
+		// WordPress can run this twice on one save (the first save of an
+		// option goes through add_option, which sanitises again), so a row
+		// already turned into tbc with an empty date must survive a second
+		// pass.
+		$tbc = 'TBC' === strtoupper( $date ) || ( ! empty( $r['tbc'] ) && '' === $date );
 		if ( $tbc ) {
 			$date = '';
 		}
@@ -4194,7 +4198,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.109.0';
+const EW_FWP_VERSION = '3.109.1';
 
 /*
  * Parts loader.
