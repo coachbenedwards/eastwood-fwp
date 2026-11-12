@@ -37,7 +37,12 @@ function ew_app_paragraphs( $html ) {
 	if ( function_exists( 'wptexturize' ) ) {
 		$html = wptexturize( $html );
 	}
-	$html  = preg_replace( '#<br\s*/?>#i', "\n", $html );
+	// Whitespace in the source is layout, not words: fold it to single
+	// spaces, then mark the real breaks. (wp_strip_all_tags trims each
+	// piece, which ate the space before every link, so it isn't used here.)
+	$html  = preg_replace( '#<(script|style)[^>]*>.*?</\1>#is', '', $html );
+	$html  = preg_replace( '/\s+/u', ' ', $html );
+	$html  = preg_replace( '#<br\s*/?>#i', "\x01", $html );
 	$html  = preg_replace( '#</(p|li|h[1-6]|div)>#i', "\n\n", $html );
 	$html  = preg_replace( '#<li[^>]*>#i', '• ', $html );
 	$paras = array();
@@ -46,17 +51,17 @@ function ew_app_paragraphs( $html ) {
 		$rest = $chunk;
 		while ( preg_match( '#<a\s[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>#is', $rest, $m, PREG_OFFSET_CAPTURE ) ) {
 			$before = substr( $rest, 0, $m[0][1] );
-			$t      = html_entity_decode( wp_strip_all_tags( $before ), ENT_QUOTES, 'UTF-8' );
+			$t      = str_replace( "\x01", "\n", html_entity_decode( strip_tags( $before ), ENT_QUOTES, 'UTF-8' ) );
 			if ( '' !== $t ) {
 				$runs[] = array( 'text' => $t );
 			}
 			$runs[] = array(
-				'text' => html_entity_decode( wp_strip_all_tags( $m[2][0] ), ENT_QUOTES, 'UTF-8' ),
+				'text' => trim( html_entity_decode( strip_tags( $m[2][0] ), ENT_QUOTES, 'UTF-8' ) ),
 				'href' => esc_url_raw( html_entity_decode( $m[1][0], ENT_QUOTES, 'UTF-8' ) ),
 			);
 			$rest = substr( $rest, $m[0][1] + strlen( $m[0][0] ) );
 		}
-		$t = html_entity_decode( wp_strip_all_tags( $rest ), ENT_QUOTES, 'UTF-8' );
+		$t = str_replace( "\x01", "\n", html_entity_decode( strip_tags( $rest ), ENT_QUOTES, 'UTF-8' ) );
 		if ( '' !== $t ) {
 			$runs[] = array( 'text' => $t );
 		}
