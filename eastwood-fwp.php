@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.108.0
+ * Version: 3.109.0
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -1048,7 +1048,8 @@ function ew_fixture_adds() {
 	$out  = array();
 	foreach ( $rows as $r ) {
 		$r = (array) $r;
-		if ( empty( $r['id'] ) || empty( $r['date'] ) || '' === trim( (string) ( $r['opp'] ?? '' ) ) ) {
+		if ( empty( $r['id'] ) || empty( $r['date'] ) || ! empty( $r['tbc'] )
+			|| '' === trim( (string) ( $r['opp'] ?? '' ) ) ) {
 			continue;
 		}
 		$home = ! empty( $r['home'] );
@@ -1092,7 +1093,15 @@ function ew_fixture_adds_sanitise( $in ) {
 		}
 		$date = trim( (string) ( $r['date'] ?? '' ) );
 		$opp  = trim( (string) ( $r['opp'] ?? '' ) );
-		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) || '' === $opp ) {
+		// TBC in the date box: a game we know we have to play but the league
+		// has not dated yet. Kept apart from the dated list -- see
+		// ew_fixture_tbc() -- so nothing that looks for the next game ever
+		// picks it.
+		$tbc = 'TBC' === strtoupper( $date );
+		if ( $tbc ) {
+			$date = '';
+		}
+		if ( ( ! $tbc && ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) ) || '' === $opp ) {
 			continue;
 		}
 		$time = trim( (string) ( $r['time'] ?? '' ) );
@@ -1109,6 +1118,7 @@ function ew_fixture_adds_sanitise( $in ) {
 		}
 		$out[] = array(
 			'id'      => $id,
+			'tbc'     => $tbc ? 1 : 0,
 			'date'    => $date,
 			'time'    => $time,
 			'home'    => empty( $r['home'] ) ? 0 : 1,
@@ -1117,6 +1127,90 @@ function ew_fixture_adds_sanitise( $in ) {
 			'comp_id' => (int) ( $r['comp_id'] ?? 0 ),
 			'comp'    => trim( (string) ( $r['comp'] ?? '' ) ),
 			'venue'   => trim( (string) ( $r['venue'] ?? '' ) ),
+		);
+	}
+	return $out;
+}
+
+/**
+ * Games we know we have to play but the league has not dated yet.
+ *
+ * A league season is everyone home and away, so a pairing missing from the
+ * feed is a game still to be given a date -- usually one moved for a cup
+ * tie. Leaving it off made the list look a game short. Putting it in the
+ * dated list with no date would hand it to everything that picks "the next
+ * game" (ticket buttons, the countdown, the claim pages), and an empty date
+ * sorts first. So these travel beside the matches, never inside them:
+ * fixtures-results carries them under ew-tbc, and only a block that chooses
+ * to draw them ever sees them.
+ *
+ * They are typed into the Fixtures screen with TBC as the date, and they
+ * look after themselves: the moment the corrected list holds the same
+ * pairing -- same opponent, same side of home and away, same competition --
+ * the TBC row stops showing, because the league has dated it.
+ *
+ * @param array $matches Eastwood's corrected, dated list.
+ * @return array
+ */
+function ew_fixture_tbc( $matches ) {
+	$norm = function ( $name ) {
+		return preg_replace( '/[^a-z0-9]/', '', strtolower( (string) $name ) );
+	};
+	$same = function ( $a, $b ) use ( $norm ) {
+		$ai = (int) ( $a['id'] ?? 0 );
+		$bi = (int) ( $b['id'] ?? 0 );
+		if ( $ai && $bi && $ai < 990101 && $bi < 990101 ) {
+			return $ai === $bi;
+		}
+		$an = $norm( $a['name'] ?? '' );
+		$bn = $norm( $b['name'] ?? '' );
+		return '' !== $an && '' !== $bn && ( false !== strpos( $an, $bn ) || false !== strpos( $bn, $an ) );
+	};
+
+	$out = array();
+	foreach ( (array) get_option( 'ew_fixture_adds', array() ) as $r ) {
+		$r = (array) $r;
+		if ( empty( $r['tbc'] ) || empty( $r['id'] ) || '' === trim( (string) ( $r['opp'] ?? '' ) ) ) {
+			continue;
+		}
+		$home = ! empty( $r['home'] );
+		$us   = array( 'id' => (int) EW_TEAM, 'name' => 'Eastwood FC' );
+		$them = array( 'id' => (int) ( $r['opp_id'] ?? 0 ), 'name' => (string) $r['opp'] );
+		$comp = (int) ( $r['comp_id'] ?? 0 );
+
+		$dated = false;
+		foreach ( (array) $matches as $m ) {
+			$m_home = (int) ( $m['home-team']['id'] ?? 0 ) === (int) EW_TEAM;
+			if ( $m_home !== $home || '' === (string) ( $m['date'] ?? '' ) ) {
+				continue;
+			}
+			if ( $comp && (int) ( $m['competition']['id'] ?? 0 ) !== $comp ) {
+				continue;
+			}
+			if ( $same( $them, (array) ( $home ? ( $m['away-team'] ?? array() ) : ( $m['home-team'] ?? array() ) ) ) ) {
+				$dated = true;
+				break;
+			}
+		}
+		if ( $dated ) {
+			continue;
+		}
+
+		$comp_name = (string) ( $r['comp'] ?? '' );
+		if ( '' === $comp_name && 143 === $comp ) {
+			$comp_name = 'United Counties League Premier Division North';
+		}
+		$out[] = array(
+			'id'          => (int) $r['id'],
+			'date'        => '',
+			'time'        => '',
+			'status'      => array( 'short' => '' ),
+			'venue'       => (string) ( $r['venue'] ?? '' ),
+			'competition' => array( 'id' => $comp, 'name' => $comp_name ),
+			'home-team'   => $home ? $us : $them,
+			'away-team'   => $home ? $them : $us,
+			'ew-added'    => true,
+			'ew-tbc'      => true,
 		);
 	}
 	return $out;
@@ -1729,6 +1823,10 @@ function ew_fixtures_admin_page() {
 				&ldquo;remove&rdquo; the moment the feed carries the real one</strong>, or the site shows it twice.
 				A club the feed doesn&rsquo;t know gets its own crest id; drop its badge in
 				<code>assets/ew-badges/&lt;id&gt;.png</code>.</p>
+			<p class="description" style="max-width:48em">A league game we know we have to play but the league hasn&rsquo;t
+				dated yet: type <code>TBC</code> as the date and the club&rsquo;s feed crest id. It shows at the
+				end of the fixtures list as Date TBC, is never treated as the next game, and stops showing by
+				itself the moment the feed carries the same game with a date.</p>
 			<?php
 			$adds = (array) get_option( 'ew_fixture_adds', array() );
 			$adds[] = array(); // one blank row to add a game
@@ -1749,7 +1847,8 @@ function ew_fixtures_admin_page() {
 				<?php foreach ( $adds as $i => $r ) : $r = (array) $r; $new = empty( $r['id'] ); ?>
 				<tr>
 					<td><input type="hidden" name="ew_fixture_adds[<?php echo (int) $i; ?>][id]" value="<?php echo (int) ( $r['id'] ?? 0 ); ?>">
-						<input type="text" style="width:100%" placeholder="2026-11-28" name="ew_fixture_adds[<?php echo (int) $i; ?>][date]" value="<?php echo esc_attr( $r['date'] ?? '' ); ?>"></td>
+						<?php if ( ! empty( $r['tbc'] ) ) { $r['date'] = 'TBC'; } ?>
+						<input type="text" style="width:100%" placeholder="2026-11-28 or TBC" name="ew_fixture_adds[<?php echo (int) $i; ?>][date]" value="<?php echo esc_attr( $r['date'] ?? '' ); ?>"></td>
 					<td><input type="text" style="width:100%" placeholder="15:00" name="ew_fixture_adds[<?php echo (int) $i; ?>][time]" value="<?php echo esc_attr( $r['time'] ?? '' ); ?>"></td>
 					<td style="text-align:center"><input type="checkbox" name="ew_fixture_adds[<?php echo (int) $i; ?>][home]" value="1" <?php checked( ! empty( $r['home'] ) ); ?>></td>
 					<td><input type="text" style="width:100%" placeholder="Club name" name="ew_fixture_adds[<?php echo (int) $i; ?>][opp]" value="<?php echo esc_attr( $r['opp'] ?? '' ); ?>"></td>
@@ -1796,6 +1895,23 @@ function ew_fixtures_admin_page() {
 function ew_fwp_corrections( $data ) {
 	$data = ew_fwp_fix_names( $data );
 	$data = ew_fixture_apply_all( $data );
+
+	// Eastwood's own list -- every game ours -- also carries the games still
+	// to be dated, beside the matches and never among them.
+	if ( is_array( $data ) && isset( $data['fixtures-results']['matches'] ) && is_array( $data['fixtures-results']['matches'] ) ) {
+		$list = $data['fixtures-results']['matches'];
+		$ours = (bool) $list;
+		foreach ( $list as $m ) {
+			if ( (int) ( $m['home-team']['id'] ?? 0 ) !== (int) EW_TEAM
+				&& (int) ( $m['away-team']['id'] ?? 0 ) !== (int) EW_TEAM ) {
+				$ours = false;
+				break;
+			}
+		}
+		if ( $ours ) {
+			$data['fixtures-results']['ew-tbc'] = ew_fixture_tbc( $list );
+		}
+	}
 	return $data;
 }
 
@@ -4078,7 +4194,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.108.0';
+const EW_FWP_VERSION = '3.109.0';
 
 /*
  * Parts loader.

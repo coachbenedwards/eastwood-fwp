@@ -239,7 +239,7 @@ function ew_hb_teams( $content ) {
 /** Every match the feed holds for one team, split into done and to come. */
 function ew_hb_team_matches( $id ) {
 	if ( ! $id ) {
-		return array( 'played' => array(), 'todo' => array() );
+		return array( 'played' => array(), 'todo' => array(), 'tbc' => array() );
 	}
 	$fx  = ew_fwp_fetch( 'fixtures-results', array( 'team' => $id ) );
 	$all = (array) ( $fx['fixtures-results']['matches'] ?? array() );
@@ -249,7 +249,11 @@ function ew_hb_team_matches( $id ) {
 	usort( $played, function ( $a, $b ) { return strcmp( (string) $b['date'], (string) $a['date'] ); } );
 	usort( $todo, function ( $a, $b ) { return strcmp( (string) $a['date'], (string) $b['date'] ); } );
 
-	return array( 'played' => $played, 'todo' => $todo );
+	// Games the league has still to date ride beside the list, never in
+	// it, so nothing that takes todo[0] as the next game can land on one.
+	$tbc = (array) ( $fx['fixtures-results']['ew-tbc'] ?? array() );
+
+	return array( 'played' => $played, 'todo' => $todo, 'tbc' => $tbc );
 }
 
 /** The post used by the hero, so the news grid below does not repeat it. */
@@ -263,9 +267,10 @@ function ew_hb_hero_id( $set = null ) {
 
 /** One fixture card, in the captured design, from live data. */
 function ew_hb_card( $m, $done = false, $cta = array(), $label = '' ) {
+	$tbc   = ! empty( $m['ew-tbc'] );
 	$home  = (int) ( $m['home-team']['id'] ?? 0 ) === (int) EW_TEAM;
 	$opp   = $home ? ( $m['away-team'] ?? array() ) : ( $m['home-team'] ?? array() );
-	$ts    = strtotime( $m['date'] ?? '' );
+	$ts    = $tbc ? false : strtotime( $m['date'] ?? '' );
 	$venue = $home ? 'Coronation Park' : ( $m['venue'] ?? 'Away' );
 
 	// Scores come back home-first. A card that names only the opponent and
@@ -278,7 +283,11 @@ function ew_hb_card( $m, $done = false, $cta = array(), $label = '' ) {
 	ob_start();
 	?>
 <li class="ewp-slide">
+	<?php if ( $tbc ) : // no match page until the league dates it ?>
+	<span class="ewp-card">
+	<?php else : ?>
 	<a class="ewp-card" href="<?php echo esc_url( home_url( '/match/' . (int) ( $m['id'] ?? 0 ) . '/' ) ); ?>">
+	<?php endif; ?>
 		<span class="ewp-cardTop">
 			<?php
 			/*
@@ -298,11 +307,11 @@ function ew_hb_card( $m, $done = false, $cta = array(), $label = '' ) {
 				<?php if ( '' !== $label ) : ?>
 				<em class="ewp-cardLabel"><?php echo esc_html( $label ); ?></em>
 				<?php endif; ?>
-				<b><?php echo esc_html( $ts ? date_i18n( 'D j M', $ts ) : '' ); ?></b>
+				<b><?php echo esc_html( $tbc ? 'Date TBC' : ( $ts ? date_i18n( 'D j M', $ts ) : '' ) ); ?></b>
 				<?php if ( $done ) : ?>
 				<i>FT</i>
 				<?php else : ?>
-				<i><?php echo esc_html( ! empty( $m['time'] ) ? substr( $m['time'], 0, 5 ) : '' ); ?></i>
+				<i><?php echo esc_html( ! $tbc && ! empty( $m['time'] ) ? substr( $m['time'], 0, 5 ) : '' ); ?></i>
 				<?php endif; ?>
 			</span>
 			<span class="ewp-ha is-<?php echo $home ? 'home' : 'away'; ?>"
@@ -323,8 +332,8 @@ function ew_hb_card( $m, $done = false, $cta = array(), $label = '' ) {
 				<?php endif; ?>
 			</span>
 		</span>
-	</a>
-	<?php if ( $home && ! $done && ! empty( $cta['label'] ) && ! empty( $cta['url'] ) ) : ?>
+	<?php echo $tbc ? '</span>' : '</a>'; ?>
+	<?php if ( $home && ! $done && ! $tbc && ! empty( $cta['label'] ) && ! empty( $cta['url'] ) ) : ?>
 	<a class="ewp-cardCta" href="<?php echo esc_url( $cta['url'] ); ?>"><?php
 		echo esc_html( $cta['label'] ); ?></a>
 	<?php endif; ?>
@@ -364,14 +373,15 @@ function ew_hb_panel( $m, $opts = array() ) {
 	// A home game that has something to sell turns over instead of
 	// navigating. One flag here, so the hero and every row in the list
 	// behave the same way without either knowing about the other.
-	$ewf = ! $opts['done']
+	$tbc = ! empty( $m['ew-tbc'] );
+	$ewf = ! $opts['done'] && ! $tbc
 		&& function_exists( 'ew_sales_panel' )
 		&& (int) ( ( (array) ( $m['home-team'] ?? array() ) )['id'] ?? 0 ) === (int) EW_TEAM;
 
 	$home    = (array) ( $m['home-team'] ?? array() );
 	$away    = (array) ( $m['away-team'] ?? array() );
 	$at_home = (int) ( $home['id'] ?? 0 ) === (int) EW_TEAM;
-	$ts      = strtotime( (string) ( $m['date'] ?? '' ) . ' ' . (string) ( $m['time'] ?? '15:00' ) );
+	$ts      = $tbc ? false : strtotime( (string) ( $m['date'] ?? '' ) . ' ' . (string) ( $m['time'] ?? '15:00' ) );
 	$comp    = (string) ( $m['competition']['name'] ?? '' );
 	$comp_id = (int) ( $m['competition']['id'] ?? 0 );
 	$badge   = $comp_id ? ew_comp_badge( $comp_id ) : '';
@@ -387,7 +397,7 @@ function ew_hb_panel( $m, $opts = array() ) {
 			loading="lazy" decoding="async"
 			onerror="this.parentNode.remove()"></span>
 		<?php endif; ?>
-		<b><?php echo esc_html( $ts ? date_i18n( 'D j M', $ts ) : '' ); ?></b>
+		<b><?php echo esc_html( $tbc ? 'Date TBC' : ( $ts ? date_i18n( 'D j M', $ts ) : '' ) ); ?></b>
 		<?php if ( $opts['done'] ) : ?>
 		<i>FT</i>
 		<?php elseif ( $ts ) : ?>
@@ -397,9 +407,11 @@ function ew_hb_panel( $m, $opts = array() ) {
 			<?php if ( '' !== $comp ) : ?>
 			<span class="ewp-rowComp"><?php echo esc_html( $comp ); ?></span>
 			<?php endif; ?>
+			<?php if ( ! $tbc ) : ?>
 			<a class="ewp-rowMore" title="More info" aria-label="More info" href="<?php
 				echo esc_url( home_url( $opts['centre_url'] . (int) ( $m['id'] ?? 0 ) . '/' ) ); ?>"><?php
 				echo ew_hb_icon( 'info' ); // phpcs:ignore ?></a>
+			<?php endif; ?>
 		</span>
 	</div>
 
@@ -430,7 +442,7 @@ function ew_hb_panel( $m, $opts = array() ) {
 		</div>
 
 		<?php
-		if ( ! $opts['done'] && $at_home ) {
+		if ( ! $opts['done'] && $at_home && ! $tbc ) {
 			if ( function_exists( 'ew_sales_actions' ) ) {
 				echo ew_sales_actions( $m, $opts ); // phpcs:ignore
 			} elseif ( '' !== $opts['cta'] || '' !== $opts['hosp'] ) {
@@ -450,7 +462,7 @@ function ew_hb_panel( $m, $opts = array() ) {
 		}
 		?>
 
-		<?php if ( '' !== $opts['centre'] ) : ?>
+		<?php if ( '' !== $opts['centre'] && ! $tbc ) : ?>
 		<p class="ewp-rowCentre"><a href="<?php
 			echo esc_url( home_url( $opts['centre_url'] . (int) ( $m['id'] ?? 0 ) . '/' ) ); ?>"><?php
 			echo ew_hb_icon( 'ball' ); // phpcs:ignore ?><span><?php
@@ -458,7 +470,7 @@ function ew_hb_panel( $m, $opts = array() ) {
 		<?php endif; ?>
 	</div>
 
-	<?php if ( ! $opts['done'] && $at_home && '' !== $opts['featured'] ) : ?>
+	<?php if ( ! $opts['done'] && $at_home && ! $tbc && '' !== $opts['featured'] ) : ?>
 	<div class="ewp-rowFoot">
 		<span><?php echo esc_html( $opts['featured'] ); ?></span>
 		<?php if ( '' !== $opts['featured_icon'] ) : ?>
@@ -524,14 +536,15 @@ function ew_hb_list( $matches, $opts, $empty ) {
 			$split = true;
 		}
 		$i++;
-		$ts  = strtotime( (string) ( $m['date'] ?? '' ) );
-		$key = $ts ? date_i18n( 'F Y', $ts ) : '';
+		$tbc = ! empty( $m['ew-tbc'] );
+		$ts  = $tbc ? false : strtotime( (string) ( $m['date'] ?? '' ) );
+		$key = $tbc ? 'tbc' : ( $ts ? date_i18n( 'F Y', $ts ) : '' );
 		if ( $key !== $month ) {
 			if ( $open ) {
 				$out .= '</ul>';
 			}
 			$month = $key;
-			$out  .= '<p class="ewp-month">' . esc_html( $ts ? date_i18n( 'F', $ts ) : '' ) . '</p>';
+			$out  .= '<p class="ewp-month">' . esc_html( $tbc ? 'Date TBC' : ( $ts ? date_i18n( 'F', $ts ) : '' ) ) . '</p>';
 			$out  .= '<ul class="ewp-rows">';
 			$open  = true;
 		}
@@ -1163,6 +1176,11 @@ function ew_hb_fixtures_sc( $atts, $content = '' ) {
 						}
 					}
 					$show = $n ? array_slice( $todo, 0, $n ) : $todo;
+					// Games the league has still to date go last, as Date TBC,
+					// when the block is showing the whole run-in.
+					if ( ! $n || count( $todo ) <= $n ) {
+						$show = array_merge( $show, (array) ( $team['split']['tbc'] ?? array() ) );
+					}
 					echo $list // phpcs:ignore
 						? ew_hb_list( $show, $opts, 'No fixtures published yet.' )
 						: ew_hb_rail( $show, false, 'No fixtures published yet.' );
