@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Eastwood — club data
  * Description: Everything the Eastwood site needs from outside WordPress: the Football Web Pages proxy (live fixtures, results, league table and full match detail), the club-badge store, and the importer that pulls the club's news across from Pitchero.
- * Version: 3.109.1
+ * Version: 3.109.2
  * Author: Eastwood FC
  *
  * INSTALL: a normal plugin at wp-content/plugins/eastwood-fwp/. Updates come
@@ -3064,18 +3064,18 @@ function ew_rewrite_markup( $html ) {
 	);
 
 	// The five social buttons in the captured footer are that club's, and
-	// their icon files are dead links even at source. Eastwood has three
-	// accounts, so wire those and drop the other two.
+	// their icon files are dead links even at source. Eastwood has five
+	// accounts, checked on each platform 12 Nov 2026, so wire all five.
 	//
 	// These are written as wordmarks rather than icons on purpose: the
 	// platforms' logos are their trademarks, and the official brand assets
 	// are the right thing to drop in here if icons are wanted later.
 	$socials = array(
 		'8cfaffe0-bd39-11ef-9e59-6983f36cdfe4.png' => array( 'Facebook',  'https://www.facebook.com/eastwoodcfc' ),
-		'8cfe8250-bd39-11ef-b90c-0f7ac1549ec6.png' => array( 'Instagram', 'https://www.instagram.com/eastwoodcommunityfootballclub/' ),
-		'8d140620-bd39-11ef-ba23-df171f225609.png' => array( 'X',         'https://twitter.com/EastwoodCFCV2' ),
-		'9c5fbc00-bd39-11ef-9130-d1f2c200ae5f.png' => array( '', '' ),
-		'9c58de30-bd39-11ef-ba23-df171f225609.png' => array( '', '' ),
+		'8cfe8250-bd39-11ef-b90c-0f7ac1549ec6.png' => array( 'Instagram', 'https://www.instagram.com/eastwoodfootballclub/' ),
+		'8d140620-bd39-11ef-ba23-df171f225609.png' => array( 'X',         'https://x.com/EastwoodTownFC' ),
+		'9c5fbc00-bd39-11ef-9130-d1f2c200ae5f.png' => array( 'TikTok',    'https://www.tiktok.com/@eastwoodfootballclub' ),
+		'9c58de30-bd39-11ef-ba23-df171f225609.png' => array( 'YouTube',   'https://www.youtube.com/@eastwoodfootballclub' ),
 	);
 	foreach ( $socials as $file => $row ) {
 		$html = preg_replace_callback(
@@ -4198,7 +4198,7 @@ add_action( 'wp_enqueue_scripts', 'ew_teams_assets', 20 );
  * while the header reached 2.37.0, so the site was offered a version
  * older than the one it had and seven releases never landed.
  */
-const EW_FWP_VERSION = '3.109.1';
+const EW_FWP_VERSION = '3.109.2';
 
 /*
  * Parts loader.
