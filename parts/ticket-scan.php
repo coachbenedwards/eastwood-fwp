@@ -96,6 +96,8 @@ function ew_ticket_payload($id, $status) {
 		'checked_in_at' => get_post_meta($id, '_ewt_in', true) ?: null,
 		// A match ticket is tied to a fixture; anything else is an event ticket.
 		'kind'          => (int) get_post_meta($id, '_ewt_fixture', true) > 0 ? 'match' : 'event',
+		// The gate this ticket was told to use, when every ticket has its own.
+		'gate'          => function_exists('ew_gate_for_booking') ? ((ew_gate_for_booking($id))['entrance'] ?? null) : null,
 	];
 }
 

@@ -92,6 +92,8 @@ function ew_wallet_item( $id ) {
 		'qr_rows' => ew_wallet_qr_rows( function_exists( 'ew_booking_key' ) ? ew_booking_key( $id ) : $m( 'key' ) ),
 		'used'   => '' !== $m( 'in' ),
 		'when'   => get_post_time( 'c', true, $id ),
+		// Its gate right now, when every ticket has its own (parts/gates.php).
+		'gate'   => function_exists( 'ew_gate_for_booking' ) && '' === $m( 'in' ) ? (object) ew_gate_for_booking( $id ) : (object) array(),
 	);
 }
 

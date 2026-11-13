@@ -1,0 +1,346 @@
+<?php
+/**
+ * Every ticket gets its own gate (option C, 13 Nov 2026).
+ *
+ * For the game set under Bookings > Matchday entrances, each booking is given
+ * one of the open gates, balanced by the number of people on it, so the queues
+ * at Gate 1, Gate 2, Gate 3, Gate N4 and Gate N5 come out even. A booking keeps
+ * its gate (a family always enters together). On the day a gate can be moved:
+ * everyone whose ticket says Gate 3 is sent to Gate 2, or spread across the
+ * other open gates, and the next time they open their ticket it says so.
+ *
+ * Gate 1 and Gate 2 are separate turnstiles at the Chewton St End. The ground
+ * map labels them together as "Gate 1&2"; here they are set and counted apart.
+ *
+ * The gate is only ever shown live on the ticket (app and website), never in
+ * an email or on a page, so it can move with the crowd.
+ *
+ *   Bookings > Matchday gates            switch on, pick open gates, move gates
+ *   GET /eastwood/v1/app/entrance?id=&code=   one ticket's gate (see app-entrance.php)
+ *
+ * @package eastwood-fwp
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+/** The turnstiles: key => [name, end]. */
+function ew_gate_list() {
+	return array(
+		'1'  => array( 'Gate 1', 'Chewton St End' ),
+		'2'  => array( 'Gate 2', 'Chewton St End' ),
+		'3'  => array( 'Gate 3', 'Coronation Park End' ),
+		'N4' => array( 'Gate N4', 'North End' ),
+		'N5' => array( 'Gate N5', 'North End' ),
+	);
+}
+
+function ew_gates_cfg() {
+	$s = get_option( 'ew_gates', array() );
+	$s = wp_parse_args( is_array( $s ) ? $s : array(), array(
+		'on'      => 0,
+		'open'    => array_keys( ew_gate_list() ),
+		'moves'   => array(),
+		'updated' => 0,
+	) );
+	$all       = array_keys( ew_gate_list() );
+	$s['open'] = array_values( array_intersect( $all, (array) $s['open'] ) );
+	$s['moves'] = is_array( $s['moves'] ) ? $s['moves'] : array();
+	return $s;
+}
+
+/** People on a booking: adults + children, else the quantity bought, at least 1. */
+function ew_gate_heads( $id ) {
+	$n = (int) get_post_meta( $id, '_ewt_adults', true ) + (int) get_post_meta( $id, '_ewt_children', true );
+	if ( $n < 1 ) {
+		$n = (int) get_post_meta( $id, '_ewt_qty', true );
+	}
+	return max( 1, $n );
+}
+
+/** Is this booking a ticket for the game currently set? */
+function ew_gate_in_game( $id ) {
+	if ( ! function_exists( 'ew_ent_get' ) ) {
+		return false;
+	}
+	$e = ew_ent_get();
+	if ( '' === trim( $e['game'] ) || '' === $e['date'] || wp_date( 'Y-m-d' ) > $e['date'] ) {
+		return false;
+	}
+	if ( false === stripos( (string) get_post_meta( $id, '_ewt_event', true ), trim( $e['game'] ) ) ) {
+		return false;
+	}
+	return in_array( (string) get_post_meta( $id, '_ewt_status', true ), array( 'claimed', 'paid', 'community' ), true );
+}
+
+/** Every booking for the current game. */
+function ew_gate_bookings() {
+	$e = ew_ent_get();
+	if ( '' === trim( $e['game'] ) ) {
+		return array();
+	}
+	$ids = get_posts( array(
+		'post_type'   => 'ewt_booking',
+		'post_status' => 'any',
+		'numberposts' => -1,
+		'fields'      => 'ids',
+		'meta_query'  => array( // phpcs:ignore WordPress.DB.SlowDBQuery
+			array( 'key' => '_ewt_event', 'value' => trim( $e['game'] ), 'compare' => 'LIKE' ),
+			array( 'key' => '_ewt_status', 'value' => array( 'claimed', 'paid', 'community' ), 'compare' => 'IN' ),
+		),
+	) );
+	$ids = array_map( 'intval', $ids );
+	if ( $ids ) {
+		update_meta_cache( 'post', $ids ); // one query for every ticket's details, not three each
+	}
+	return $ids;
+}
+
+/** People already given each gate, for the current game. */
+function ew_gate_load() {
+	$load = array_fill_keys( array_keys( ew_gate_list() ), 0 );
+	foreach ( ew_gate_bookings() as $id ) {
+		$g = (string) get_post_meta( $id, '_ewt_gate', true );
+		if ( isset( $load[ $g ] ) ) {
+			$load[ $g ] += ew_gate_heads( $id );
+		}
+	}
+	return $load;
+}
+
+/** The open gate with the fewest people on it. */
+function ew_gate_pick( $load, $open ) {
+	$best = '';
+	foreach ( $open as $g ) {
+		if ( '' === $best || $load[ $g ] < $load[ $best ] ) {
+			$best = $g;
+		}
+	}
+	return $best;
+}
+
+/** This booking's own gate, given now if it has none yet. */
+function ew_gate_assign( $id, $cfg = null ) {
+	$cfg  = $cfg ? $cfg : ew_gates_cfg();
+	$have = (string) get_post_meta( $id, '_ewt_gate', true );
+	if ( isset( ew_gate_list()[ $have ] ) ) {
+		return $have;
+	}
+	if ( ! $cfg['open'] ) {
+		return '';
+	}
+	$load = get_transient( 'ew_gate_load' );
+	if ( ! is_array( $load ) ) {
+		$load = ew_gate_load();
+	}
+	$g = ew_gate_pick( $load, $cfg['open'] );
+	update_post_meta( $id, '_ewt_gate', $g );
+	$load[ $g ] += ew_gate_heads( $id );
+	set_transient( 'ew_gate_load', $load, 10 * MINUTE_IN_SECONDS );
+	return $g;
+}
+
+/** Where a ticket for gate $g goes right now, after any move. */
+function ew_gate_effective( $id, $g, $cfg ) {
+	$to = isset( $cfg['moves'][ $g ] ) ? (string) $cfg['moves'][ $g ] : '';
+	if ( '' === $to ) {
+		return $g;
+	}
+	if ( 'spread' === $to ) {
+		$others = array_values( array_diff( $cfg['open'], array( $g ) ) );
+		return $others ? $others[ $id % count( $others ) ] : $g;
+	}
+	return isset( ew_gate_list()[ $to ] ) ? $to : $g;
+}
+
+/**
+ * What one ticket shows right now: its gate, the end it's at, and whether it
+ * was moved. Empty when gates are off or the ticket isn't for this game.
+ */
+function ew_gate_for_booking( $id ) {
+	$cfg = ew_gates_cfg();
+	if ( empty( $cfg['on'] ) || ! ew_gate_in_game( $id ) ) {
+		return array();
+	}
+	$own = ew_gate_assign( $id, $cfg );
+	if ( '' === $own ) {
+		return array();
+	}
+	$g     = ew_gate_effective( $id, $own, $cfg );
+	$names = ew_gate_list();
+	$e     = ew_ent_get();
+	return array(
+		'gate'     => $g,
+		'entrance' => $names[ $g ][0],
+		'end'      => $names[ $g ][1],
+		'moved'    => $g !== $own ? $names[ $own ][0] : '',
+		'note'     => trim( $e['note'] ),
+		'updated'  => $cfg['updated'] ? wp_date( 'g:ia', (int) $cfg['updated'] ) : '',
+	);
+}
+
+/** Give every ticket for the game a gate. $fresh starts everyone again. */
+function ew_gate_assign_all( $fresh = false ) {
+	$cfg = ew_gates_cfg();
+	$ids = ew_gate_bookings();
+	if ( $fresh ) {
+		foreach ( $ids as $id ) {
+			delete_post_meta( $id, '_ewt_gate' );
+		}
+	}
+	$load = ew_gate_load();
+	$todo = array();
+	foreach ( $ids as $id ) {
+		if ( ! isset( ew_gate_list()[ (string) get_post_meta( $id, '_ewt_gate', true ) ] ) ) {
+			$todo[ $id ] = ew_gate_heads( $id );
+		}
+	}
+	arsort( $todo ); // biggest groups first keeps the gates level
+	foreach ( $todo as $id => $n ) {
+		$g = ew_gate_pick( $load, $cfg['open'] );
+		if ( '' === $g ) {
+			break;
+		}
+		update_post_meta( $id, '_ewt_gate', $g );
+		$load[ $g ] += $n;
+	}
+	delete_transient( 'ew_gate_load' );
+	return count( $todo );
+}
+
+function ew_gates_save( $in ) {
+	$cfg = ew_gates_cfg();
+	$all = array_keys( ew_gate_list() );
+	if ( isset( $in['on'] ) ) {
+		$cfg['on'] = (int) ! empty( $in['on'] );
+	}
+	if ( isset( $in['open'] ) ) {
+		$cfg['open'] = array_values( array_intersect( $all, array_map( 'strval', (array) $in['open'] ) ) );
+	}
+	if ( isset( $in['moves'] ) && is_array( $in['moves'] ) ) {
+		$moves = array();
+		foreach ( $in['moves'] as $from => $to ) {
+			$from = (string) $from;
+			$to   = sanitize_text_field( wp_unslash( (string) $to ) );
+			if ( in_array( $from, $all, true ) && ( 'spread' === $to || ( in_array( $to, $all, true ) && $to !== $from ) ) ) {
+				$moves[ $from ] = $to;
+			}
+		}
+		$cfg['moves'] = $moves;
+	}
+	$cfg['updated'] = time();
+	update_option( 'ew_gates', $cfg, false );
+	delete_transient( 'ew_gate_load' );
+	do_action( 'ew_gates_changed', $cfg );
+	return $cfg;
+}
+
+// ---------- Bookings > Matchday gates ----------
+
+add_action( 'admin_menu', function () {
+	add_submenu_page( 'edit.php?post_type=ewt_booking', 'Matchday gates', 'Matchday gates', 'edit_pages', 'ew-gates', 'ew_gates_page' );
+} );
+
+function ew_gates_page() {
+	if ( ! current_user_can( 'edit_pages' ) ) {
+		return;
+	}
+	$msg = '';
+	if ( isset( $_POST['ew_gates_nonce'] ) && wp_verify_nonce( sanitize_key( $_POST['ew_gates_nonce'] ), 'ew_gates' ) ) {
+		// phpcs:disable WordPress.Security.NonceVerification
+		$in = array(
+			'on'    => ! empty( $_POST['on'] ),
+			'open'  => isset( $_POST['open'] ) ? (array) wp_unslash( $_POST['open'] ) : array(),
+			'moves' => isset( $_POST['moves'] ) ? (array) wp_unslash( $_POST['moves'] ) : array(),
+		);
+		// phpcs:enable
+		ew_gates_save( $in );
+		$msg = 'Saved. The next time someone opens their ticket, it shows this.';
+		if ( ! empty( $_POST['assign'] ) ) {
+			$n   = ew_gate_assign_all( 'fresh' === $_POST['assign'] );
+			$msg = 'fresh' === $_POST['assign'] ? 'Every ticket was given a gate again, evenly (' . $n . ' tickets).' : 'Gave a gate to ' . $n . ' tickets that had none.';
+		}
+	}
+	$cfg   = ew_gates_cfg();
+	$e     = ew_ent_get();
+	$names = ew_gate_list();
+	$own   = array_fill_keys( array_keys( $names ), array( 0, 0 ) );
+	$now   = array_fill_keys( array_keys( $names ), 0 );
+	$none  = 0;
+	foreach ( ew_gate_bookings() as $id ) {
+		$g = (string) get_post_meta( $id, '_ewt_gate', true );
+		$n = ew_gate_heads( $id );
+		if ( ! isset( $names[ $g ] ) ) {
+			$none += $n;
+			continue;
+		}
+		$own[ $g ][0]++;
+		$own[ $g ][1] += $n;
+		$now[ ew_gate_effective( $id, $g, $cfg ) ] += $n;
+	}
+	echo '<div class="wrap"><h1>Matchday gates</h1>';
+	echo '<p>Every ticket for <strong>' . esc_html( $e['game'] ? $e['game'] : '(set the game under Matchday entrances)' ) . '</strong> gets its own gate, shared out evenly by the number of people. The gate shows live on the ticket in the app and on the website, never in emails.</p>';
+	if ( $msg ) {
+		echo '<div class="notice notice-success"><p>' . esc_html( $msg ) . '</p></div>';
+	}
+	echo '<form method="post">';
+	wp_nonce_field( 'ew_gates', 'ew_gates_nonce' );
+	echo '<p><label><input type="checkbox" name="on" value="1"' . checked( ! empty( $cfg['on'] ), true, false ) . '> <strong>Give every ticket its own gate</strong></label></p>';
+	echo '<table class="widefat striped" style="max-width:820px"><thead><tr><th>Gate</th><th>Takes new tickets</th><th>Tickets</th><th>People given this gate</th><th>Send these people to</th><th>People coming here now</th></tr></thead><tbody>';
+	foreach ( $names as $k => $nm ) {
+		$sel = isset( $cfg['moves'][ $k ] ) ? $cfg['moves'][ $k ] : '';
+		echo '<tr><td><strong>' . esc_html( $nm[0] ) . '</strong><br><span class="description">' . esc_html( $nm[1] ) . '</span></td>';
+		echo '<td><input type="checkbox" name="open[]" value="' . esc_attr( $k ) . '"' . checked( in_array( $k, $cfg['open'], true ), true, false ) . '></td>';
+		echo '<td>' . (int) $own[ $k ][0] . '</td><td>' . (int) $own[ $k ][1] . '</td>';
+		echo '<td><select name="moves[' . esc_attr( $k ) . ']"><option value="">Keep at ' . esc_html( $nm[0] ) . '</option>';
+		foreach ( $names as $k2 => $nm2 ) {
+			if ( $k2 !== $k ) {
+				echo '<option value="' . esc_attr( $k2 ) . '"' . selected( $sel, $k2, false ) . '>' . esc_html( $nm2[0] ) . '</option>';
+			}
+		}
+		echo '<option value="spread"' . selected( $sel, 'spread', false ) . '>Spread across the other open gates</option></select></td>';
+		echo '<td><strong>' . (int) $now[ $k ] . '</strong></td></tr>';
+	}
+	echo '</tbody></table>';
+	if ( $none ) {
+		echo '<p>' . (int) $none . ' people on tickets without a gate yet. They get one the moment they open their ticket, or give them one now.</p>';
+	}
+	echo '<p><button class="button button-primary" type="submit">Save</button> ';
+	echo '<button class="button" type="submit" name="assign" value="missing">Save and give a gate to every ticket without one</button> ';
+	echo '<button class="button" type="submit" name="assign" value="fresh" onclick="return confirm(\'Give every ticket a gate again from scratch? People who already looked will see a different gate.\')">Share out every ticket again</button></p>';
+	echo '<p class="description">Updated ' . esc_html( $cfg['updated'] ? wp_date( 'D j M, g:ia', (int) $cfg['updated'] ) : 'never' ) . '. Moving a gate doesn\'t change the ticket\'s own gate, so setting it back to "Keep" undoes the move.</p>';
+	echo '</form></div>';
+}
+
+// ---------- REST for the staff app ----------
+
+add_action( 'rest_api_init', function () {
+	register_rest_route( 'eastwood/v1', '/gates', array(
+		array(
+			'methods'             => 'GET',
+			'permission_callback' => function () {
+				return current_user_can( 'edit_pages' );
+			},
+			'callback'            => function () {
+				$cfg = ew_gates_cfg();
+				return array( 'cfg' => $cfg, 'load' => ew_gate_load(), 'gates' => ew_gate_list() );
+			},
+		),
+		array(
+			'methods'             => 'POST',
+			'permission_callback' => function () {
+				return current_user_can( 'edit_pages' );
+			},
+			'callback'            => function ( $req ) {
+				$in  = (array) $req->get_json_params();
+				$cfg = ew_gates_save( $in );
+				$n   = 0;
+				if ( ! empty( $in['assign'] ) ) {
+					$n = ew_gate_assign_all( 'fresh' === $in['assign'] );
+				}
+				return array( 'cfg' => $cfg, 'assigned' => $n, 'load' => ew_gate_load() );
+			},
+		),
+	) );
+} );

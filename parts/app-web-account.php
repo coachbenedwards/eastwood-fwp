@@ -98,6 +98,8 @@ function ew_acc_defaults() {
 		'android_url'   => 'https://play.google.com/store/apps/details?id=com.eastwoodfc.team',
 		'short_pw'      => 'At least 8 characters, please.',
 		'bad_email'     => 'That email does not look right.',
+		'entrance_label' => 'Your entrance',
+		'moved_from'    => 'moved from',
 		'kind_match'    => 'Match ticket',
 		'kind_event'    => 'Event ticket',
 		'kind_food'     => 'Food tokens',
@@ -165,6 +167,10 @@ function ew_acc_css() {
 .ewac-tk .qr{background:#fff;border-radius:8px;padding:6px;flex:none;display:block;line-height:0}
 .ewac-tk .q .c{display:block;font-family:Anton,sans-serif;font-size:22px;letter-spacing:2px}
 .ewac-tk .g{display:block;font-size:13px;color:rgba(255,255,255,.7);margin-top:4px}
+.ewac-tk .gt{background:#CC0000;border-radius:8px;padding:10px 14px;margin-top:10px;display:flex;flex-direction:column;gap:2px}
+.ewac-tk .gk{font-size:12px;font-weight:700;letter-spacing:2px;color:rgba(255,255,255,.85);text-transform:uppercase}
+.ewac-tk .gn{font-family:Anton,sans-serif;font-size:28px;line-height:1.1;text-transform:uppercase}
+.ewac-tk .ge{font-size:14px;color:rgba(255,255,255,.9)}
 .ewac-fine{line-height:1.8}
 .ewac-box{line-height:1.8}
 .ewac-head{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px}
@@ -285,8 +291,11 @@ function ew_acc_js() {
         var foot = (qrOn && i.qr_rows && i.qr_rows.length)
           ? '<div class="q"><span class="qr">' + qrSvg(i.qr_rows) + '</span><span><span class="c">' + e(i.code) + '</span><span class="g">' + e(i.used ? W.used : W.show_gate) + '</span></span></div>'
           : '<div class="r"><span class="c">' + e(i.code) + '</span><a href="' + e(W.app_url) + '">' + e(W.show_app) + '</a></div>';
+        var gt = (!i.used && i.gate && i.gate.entrance)
+          ? '<div class="gt"><span class="gk">' + e(W.entrance_label) + '</span><span class="gn">' + e(i.gate.entrance) + '</span><span class="ge">' + e(i.gate.end || '') + (i.gate.moved ? ' · ' + e(W.moved_from) + ' ' + e(i.gate.moved) : '') + '</span></div>'
+          : '';
         return '<div class="ewac-tk"><p class="k">' + e(k) + (i.used ? ' · ' + e(W.used) : '') + '</p><p class="t">' + e(i.title) + '</p>'
-          + (i.lines ? '<p class="s">' + e(i.lines) + '</p>' : '') + foot + '</div>';
+          + (i.lines ? '<p class="s">' + e(i.lines) + '</p>' : '') + gt + foot + '</div>';
       }).join('');
       return '<div class="ewac-head"><div>' + (st.efc ? '<p class="ewac-id">' + e(W.id_label) + ' ' + e(st.efc) + '</p>' : '') + '<h1>' + e(W.tickets_title) + '</h1>' + (W.day_link && W.day_url ? '<p class="ewac-fine"><a href="' + e(W.day_url) + '">' + e(W.day_link) + '</a></p>' : '') + '<p class="ewac-fine">' + e(W.signed_as) + ' ' + e(st.who) + ' · <button class="ewac-link" data-do="signout">' + e(W.sign_out) + '</button></p></div>'
         + (W.buy_url ? '<a class="ewac-buy" href="' + e(W.buy_url) + '">' + e(W.buy) + '</a>' : '') + '</div>' + err()

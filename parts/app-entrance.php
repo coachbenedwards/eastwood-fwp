@@ -92,11 +92,23 @@ add_action( 'rest_api_init', function () {
 		'methods'             => 'GET',
 		'permission_callback' => '__return_true',
 		'callback'            => function ( $req ) {
-			$r = new WP_REST_Response( (object) ew_ent_for(
-				(string) $req->get_param( 'kind' ),
-				(string) $req->get_param( 'form' ),
-				(string) $req->get_param( 'title' )
-			) );
+			// A ticket that says which booking it is gets its own gate
+			// (parts/gates.php) when gates are on; the code proves it's theirs.
+			$out = array();
+			$id  = (int) $req->get_param( 'id' );
+			$cd  = (string) $req->get_param( 'code' );
+			if ( $id > 0 && '' !== $cd && function_exists( 'ew_gate_for_booking' ) && 'ewt_booking' === get_post_type( $id )
+				&& hash_equals( (string) get_post_meta( $id, '_ewt_code', true ), $cd ) ) {
+				$out = ew_gate_for_booking( $id );
+			}
+			if ( ! $out ) {
+				$out = ew_ent_for(
+					(string) $req->get_param( 'kind' ),
+					(string) $req->get_param( 'form' ),
+					(string) $req->get_param( 'title' )
+				);
+			}
+			$r = new WP_REST_Response( (object) $out );
 			$r->header( 'Cache-Control', 'no-store' );
 			return $r;
 		},
