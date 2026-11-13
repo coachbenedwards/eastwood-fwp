@@ -43,7 +43,11 @@ function ew_gates_cfg() {
 		'open'    => array_keys( ew_gate_list() ),
 		'moves'   => array(),
 		'updated' => 0,
+		'auto'    => 1,
+		'msgs'    => array(),
+		'sent'    => array(),
 	) );
+	$s['msgs'] = wp_parse_args( is_array( $s['msgs'] ) ? $s['msgs'] : array(), ew_gate_msg_defaults() );
 	$all       = array_keys( ew_gate_list() );
 	$s['open'] = array_values( array_intersect( $all, (array) $s['open'] ) );
 	$s['moves'] = is_array( $s['moves'] ) ? $s['moves'] : array();
@@ -210,7 +214,8 @@ function ew_gate_assign_all( $fresh = false ) {
 }
 
 function ew_gates_save( $in ) {
-	$cfg = ew_gates_cfg();
+	$cfg    = ew_gates_cfg();
+	$before = ! empty( $cfg['on'] ) ? ew_gate_where_now( $cfg ) : array();
 	$all = array_keys( ew_gate_list() );
 	if ( isset( $in['on'] ) ) {
 		$cfg['on'] = (int) ! empty( $in['on'] );
@@ -229,11 +234,121 @@ function ew_gates_save( $in ) {
 		}
 		$cfg['moves'] = $moves;
 	}
+	if ( isset( $in['auto'] ) ) {
+		$cfg['auto'] = (int) ! empty( $in['auto'] );
+	}
+	if ( isset( $in['msgs'] ) && is_array( $in['msgs'] ) ) {
+		foreach ( array_keys( ew_gate_msg_defaults() ) as $k ) {
+			if ( isset( $in['msgs'][ $k ] ) ) {
+				$cfg['msgs'][ $k ] = sanitize_text_field( wp_unslash( (string) $in['msgs'][ $k ] ) );
+			}
+		}
+	}
 	$cfg['updated'] = time();
 	update_option( 'ew_gates', $cfg, false );
 	delete_transient( 'ew_gate_load' );
+	// A gate moved: tell the people whose gate just changed, like a gate change at an airport.
+	if ( $before && ! empty( $cfg['on'] ) && ! empty( $cfg['auto'] ) ) {
+		$after   = ew_gate_where_now( $cfg );
+		$changed = array();
+		foreach ( $after as $id => $g ) {
+			if ( isset( $before[ $id ] ) && $before[ $id ] !== $g ) {
+				$changed[ $id ] = $before[ $id ];
+			}
+		}
+		if ( $changed ) {
+			$cfg['sent']['change'] = ew_gate_send( 'change', false, $changed );
+			update_option( 'ew_gates', $cfg, false );
+		}
+	}
 	do_action( 'ew_gates_changed', $cfg );
 	return $cfg;
+}
+
+// ---------- Airport-style alerts ----------
+
+/** The alert wording. {game} {gate} {end} {from} are filled in per ticket. */
+function ew_gate_msg_defaults() {
+	return array(
+		'announce_t' => 'Your gate: {gate}',
+		'announce_b' => '{game}: use {gate} at the {end}. Your ticket shows it.',
+		'open_t'     => 'Gates are open',
+		'open_b'     => 'Head to {gate}, {end}. Have your ticket open.',
+		'final_t'    => 'Kick-off soon',
+		'final_b'    => 'Last call for {gate}, {end}. Head in now.',
+		'change_t'   => 'Gate change: now {gate}',
+		'change_b'   => 'Your gate has moved from {from}. Use {gate}, {end}.',
+	);
+}
+
+/** Each ticket for the game and the gate it says right now. */
+function ew_gate_where_now( $cfg ) {
+	$out = array();
+	foreach ( ew_gate_bookings() as $id ) {
+		$own = (string) get_post_meta( $id, '_ewt_gate', true );
+		if ( isset( ew_gate_list()[ $own ] ) && '' === (string) get_post_meta( $id, '_ewt_in', true ) ) {
+			$out[ $id ] = ew_gate_effective( $id, $own, $cfg );
+		}
+	}
+	return $out;
+}
+
+/**
+ * Send one alert to ticket holders: 'announce', 'open', 'final' to everyone
+ * with a gate, or 'change' to the bookings in $only (id => old gate). Goes to
+ * the phones signed in to the app with the booking's email.
+ */
+function ew_gate_send( $kind, $testers = false, $only = null ) {
+	$cfg   = ew_gates_cfg();
+	if ( empty( $cfg['on'] ) ) {
+		return array( 'at' => time(), 'people' => 0, 'sent' => 0, 'testers' => (int) $testers, 'error' => 'Turn on "Give every ticket its own gate" first' );
+	}
+	$names = ew_gate_list();
+	$e     = ew_ent_get();
+	$m     = $cfg['msgs'];
+	$where = ew_gate_where_now( $cfg );
+	$msgs  = array();
+	foreach ( $where as $id => $g ) {
+		if ( null !== $only && ! isset( $only[ $id ] ) ) {
+			continue;
+		}
+		$email = strtolower( trim( (string) get_post_meta( $id, '_ewt_email', true ) ) );
+		if ( ! is_email( $email ) || isset( $msgs[ $email ] ) ) {
+			continue;
+		}
+		$fill = array(
+			'{game}' => trim( $e['game'] ),
+			'{gate}' => $names[ $g ][0],
+			'{end}'  => $names[ $g ][1],
+			'{from}' => null !== $only && isset( $names[ $only[ $id ] ] ) ? $names[ $only[ $id ] ][0] : '',
+		);
+		$msgs[ $email ] = array(
+			'email' => $email,
+			'title' => strtr( (string) $m[ $kind . '_t' ], $fill ),
+			'body'  => strtr( (string) $m[ $kind . '_b' ], $fill ),
+		);
+	}
+	$res = array( 'at' => time(), 'people' => count( $msgs ), 'sent' => 0, 'testers' => (int) $testers );
+	if ( ! $msgs || ! function_exists( 'ew_runs_key' ) || '' === ew_runs_key() ) {
+		$res['error'] = $msgs ? 'No Supabase key saved' : '';
+		return $res;
+	}
+	$r = wp_remote_post( EW_FAN_SUPABASE . '/functions/v1/gate-push', array(
+		'timeout' => 60,
+		'headers' => array( 'Authorization' => 'Bearer ' . ew_runs_key(), 'Content-Type' => 'application/json' ),
+		'body'    => wp_json_encode( array( 'kind' => 'gate_' . $kind, 'testers' => (bool) $testers, 'messages' => array_values( $msgs ) ) ),
+	) );
+	if ( is_wp_error( $r ) ) {
+		$res['error'] = $r->get_error_message();
+		return $res;
+	}
+	$b = json_decode( (string) wp_remote_retrieve_body( $r ), true );
+	$res['sent']    = (int) ( $b['sent'] ?? 0 );
+	$res['devices'] = (int) ( $b['devices'] ?? 0 );
+	if ( ! empty( $b['error'] ) ) {
+		$res['error'] = (string) $b['error'];
+	}
+	return $res;
 }
 
 // ---------- Bookings > Matchday gates ----------
@@ -253,10 +368,20 @@ function ew_gates_page() {
 			'on'    => ! empty( $_POST['on'] ),
 			'open'  => isset( $_POST['open'] ) ? (array) wp_unslash( $_POST['open'] ) : array(),
 			'moves' => isset( $_POST['moves'] ) ? (array) wp_unslash( $_POST['moves'] ) : array(),
+			'auto'  => ! empty( $_POST['auto'] ),
+			'msgs'  => isset( $_POST['msgs'] ) ? (array) wp_unslash( $_POST['msgs'] ) : array(),
 		);
 		// phpcs:enable
 		ew_gates_save( $in );
 		$msg = 'Saved. The next time someone opens their ticket, it shows this.';
+		$send = isset( $_POST['send'] ) ? sanitize_key( $_POST['send'] ) : '';
+		if ( in_array( $send, array( 'announce', 'open', 'final' ), true ) ) {
+			$r   = ew_gate_send( $send, ! empty( $_POST['testers'] ) );
+			$cfg = ew_gates_cfg();
+			$cfg['sent'][ $send ] = $r;
+			update_option( 'ew_gates', $cfg, false );
+			$msg = isset( $r['error'] ) && $r['error'] ? 'Not sent: ' . $r['error'] : 'Sent to ' . $r['sent'] . ' phones (' . $r['people'] . ' ticket holders with a gate' . ( $r['testers'] ? ', testers only' : '' ) . ').';
+		}
 		if ( ! empty( $_POST['assign'] ) ) {
 			$n   = ew_gate_assign_all( 'fresh' === $_POST['assign'] );
 			$msg = 'fresh' === $_POST['assign'] ? 'Every ticket was given a gate again, evenly (' . $n . ' tickets).' : 'Gave a gate to ' . $n . ' tickets that had none.';
@@ -310,6 +435,23 @@ function ew_gates_page() {
 	echo '<button class="button" type="submit" name="assign" value="missing">Save and give a gate to every ticket without one</button> ';
 	echo '<button class="button" type="submit" name="assign" value="fresh" onclick="return confirm(\'Give every ticket a gate again from scratch? People who already looked will see a different gate.\')">Share out every ticket again</button></p>';
 	echo '<p class="description">Updated ' . esc_html( $cfg['updated'] ? wp_date( 'D j M, g:ia', (int) $cfg['updated'] ) : 'never' ) . '. Moving a gate doesn\'t change the ticket\'s own gate, so setting it back to "Keep" undoes the move.</p>';
+	echo '<h2>Alerts to ticket holders</h2>';
+	echo '<p>Like gate calls at an airport. Each person gets their own gate in the alert. They go to phones signed in to the Eastwood FC app with the email the ticket was booked with. {gate}, {end}, {game} and {from} are filled in for each person.</p>';
+	echo '<p><label><input type="checkbox" name="auto" value="1"' . checked( ! empty( $cfg['auto'] ), true, false ) . '> Send a gate-change alert automatically when a gate is moved</label></p>';
+	$labels = array( 'announce' => 'Gate announced', 'open' => 'Gates open', 'final' => 'Final call', 'change' => 'Gate change (automatic)' );
+	echo '<table class="form-table">';
+	foreach ( $labels as $k => $lab ) {
+		$last = isset( $cfg['sent'][ $k ]['at'] ) ? 'Last sent ' . wp_date( 'D j M, g:ia', (int) $cfg['sent'][ $k ]['at'] ) . ' to ' . (int) $cfg['sent'][ $k ]['sent'] . ' phones' . ( ! empty( $cfg['sent'][ $k ]['testers'] ) ? ' (testers)' : '' ) : 'Not sent yet';
+		echo '<tr><th>' . esc_html( $lab ) . '</th><td>';
+		echo '<input class="regular-text" name="msgs[' . esc_attr( $k ) . '_t]" value="' . esc_attr( $cfg['msgs'][ $k . '_t' ] ) . '"><br>';
+		echo '<input class="large-text" name="msgs[' . esc_attr( $k ) . '_b]" value="' . esc_attr( $cfg['msgs'][ $k . '_b' ] ) . '">';
+		if ( 'change' !== $k ) {
+			echo '<br><button class="button" type="submit" name="send" value="' . esc_attr( $k ) . '" onclick="return confirm(\'Send the ' . esc_attr( $lab ) . ' alert now?\')">Send ' . esc_html( $lab ) . ' now</button>';
+		}
+		echo '<p class="description">' . esc_html( $last ) . '</p></td></tr>';
+	}
+	echo '</table>';
+	echo '<p><label><input type="checkbox" name="testers" value="1"> Send to testers only (phones marked as testers)</label></p>';
 	echo '</form></div>';
 }
 
