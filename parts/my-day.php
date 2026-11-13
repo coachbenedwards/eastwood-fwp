@@ -43,6 +43,8 @@ function ew_day_defaults() {
 		'versus'        => 'v',
 		'ticket_label'  => 'Your ticket',
 		'show_gate'     => 'Show this at the turnstile',
+		'entrance_label' => 'Your entrance',
+		'moved_from'    => 'moved from',
 		'used'          => 'Used',
 		'day_title'     => 'Your day',
 		'offer_tag'     => 'Offer',
@@ -225,6 +227,10 @@ function ew_day_css() {
 .ewday-tk{background:#000;color:#fff;border-radius:14px;padding:20px}
 .ewday-k{font-family:Anton,sans-serif;font-size:13px;letter-spacing:1px;color:#ff4d4d;text-transform:uppercase}
 .ewday-tk .q{display:flex;gap:14px;align-items:center;margin-top:12px}
+.ewday-tk .gt{background:#CC0000;color:#fff;border-radius:8px;padding:10px 14px;margin-top:10px;display:flex;flex-direction:column;gap:2px}
+.ewday-tk .gk{font-size:12px;font-weight:700;letter-spacing:2px;color:rgba(255,255,255,.85);text-transform:uppercase}
+.ewday-tk .gn{font-family:Anton,sans-serif;font-size:28px;line-height:1.1;text-transform:uppercase}
+.ewday-tk .ge{font-size:14px;color:rgba(255,255,255,.9)}
 .ewday-tk .qr{background:#fff;border-radius:8px;padding:6px;flex:none;line-height:0}
 .ewday-tk .c{display:block;font-family:Anton,sans-serif;font-size:24px;letter-spacing:2px}
 .ewday-tk .g{display:block;font-size:13px;color:rgba(255,255,255,.7);margin-top:4px}
@@ -360,6 +366,7 @@ function ew_day_js() {
       if (rows) left += '<div class="ewday-box ewday-tlb"><h2>' + e(W.day_title) + '</h2><div class="ewday-tl">' + rows + '</div></div>';
       left += '<div class="ewday-upslot"></div>';
       right += '<div class="ewday-tk"><p class="ewday-k">' + e(W.ticket_label) + '</p>'
+        + (i.gate && i.gate.entrance ? '<div class="gt"><span class="gk">' + e(W.entrance_label) + '</span><span class="gn">' + e(i.gate.entrance) + '</span><span class="ge">' + e(i.gate.end || '') + (i.gate.moved ? ' · ' + e(W.moved_from) + ' ' + e(i.gate.moved) : '') + '</span></div>' : '')
         + (i.qr_rows && i.qr_rows.length ? '<div class="q"><span class="qr">' + qrSvg(i.qr_rows) + '</span><span><span class="c">' + e(i.code) + '</span><span class="g">' + e(W.show_gate) + '</span></span></div>'
           : '<div class="q"><span><span class="c">' + e(i.code) + '</span><span class="g">' + e(W.show_gate) + '</span></span></div>')
         + '</div>';
