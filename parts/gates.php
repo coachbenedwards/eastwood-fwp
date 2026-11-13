@@ -575,23 +575,37 @@ function ew_gates_page() {
 
 // ---------- REST for the staff app ----------
 
+/**
+ * A wp-admin user who can edit pages, or the staff app's gates function
+ * (Supabase, which checks the person may manage gates) with the service key.
+ */
+function ew_gates_rest_ok( $req ) {
+	if ( current_user_can( 'edit_pages' ) ) {
+		return true;
+	}
+	$key = function_exists( 'ew_runs_key' ) ? (string) ew_runs_key() : '';
+	return '' !== $key && hash_equals( $key, (string) $req->get_header( 'x_ew_key' ) );
+}
+
 add_action( 'rest_api_init', function () {
 	register_rest_route( 'eastwood/v1', '/gates', array(
 		array(
 			'methods'             => 'GET',
-			'permission_callback' => function () {
-				return current_user_can( 'edit_pages' );
-			},
+			'permission_callback' => 'ew_gates_rest_ok',
 			'callback'            => function () {
-				$cfg = ew_gates_cfg();
-				return array( 'cfg' => $cfg, 'load' => ew_gate_load(), 'gates' => ew_gate_list() );
+				$cfg    = ew_gates_cfg();
+				$coming = array_fill_keys( array_keys( ew_gate_list() ), 0 );
+				if ( ! empty( $cfg['on'] ) ) {
+					foreach ( ew_gate_where_now( $cfg ) as $id => $g ) {
+						$coming[ $g ] += ew_gate_heads( $id );
+					}
+				}
+				return array( 'cfg' => $cfg, 'load' => ew_gate_load(), 'gates' => ew_gate_list(), 'coming' => $coming );
 			},
 		),
 		array(
 			'methods'             => 'POST',
-			'permission_callback' => function () {
-				return current_user_can( 'edit_pages' );
-			},
+			'permission_callback' => 'ew_gates_rest_ok',
 			'callback'            => function ( $req ) {
 				$in  = (array) $req->get_json_params();
 				$cfg = ew_gates_save( $in );

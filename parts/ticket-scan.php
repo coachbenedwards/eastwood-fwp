@@ -36,6 +36,11 @@ add_action('rest_api_init', function () {
 		'permission_callback' => '__return_true', // secret checked inside
 		'callback'            => 'ew_ticket_checkin',
 	]);
+	register_rest_route('eastwood/v1', '/ticket/gate-claim', [
+		'methods'             => 'POST',
+		'permission_callback' => '__return_true', // secret checked inside
+		'callback'            => 'ew_ticket_gate_claim',
+	]);
 	register_rest_route('eastwood/v1', '/ticket/food-use', [
 		'methods'             => 'POST',
 		'permission_callback' => '__return_true', // secret checked inside
@@ -96,6 +101,7 @@ function ew_ticket_payload($id, $status) {
 		'checked_in_at' => get_post_meta($id, '_ewt_in', true) ?: null,
 		// A match ticket is tied to a fixture; anything else is an event ticket.
 		'kind'          => (int) get_post_meta($id, '_ewt_fixture', true) > 0 ? 'match' : 'event',
+		'paid'          => 'paid' === get_post_meta($id, '_ewt_status', true),
 		// The gate this ticket was told to use, when every ticket has its own.
 		'gate'          => function_exists('ew_gate_for_booking') ? ((ew_gate_for_booking($id))['label'] ?? null) : null,
 	];
@@ -202,4 +208,72 @@ function ew_ticket_checkin(WP_REST_Request $r) {
 	$payload = ew_ticket_payload($id, 'valid');
 	$payload['checked_in_at'] = $now;
 	return new WP_REST_Response($payload, 200);
+}
+
+/**
+ * A paper flyer at the gate (its QR only opens eastwoodfc.com/claimticket):
+ * the steward types their name, email and how many, and this makes the
+ * ticket exactly as the claim page would (same game, same email to them),
+ * marks it as in, and answers with the ticket.
+ */
+function ew_ticket_gate_claim(WP_REST_Request $r) {
+	if (!ew_ticket_secret_ok($r)) {
+		return new WP_REST_Response(['status' => 'error', 'message' => 'Not authorised'], 401);
+	}
+	$body     = (array) $r->get_json_params();
+	$name     = function_exists('ew_person_name') ? ew_person_name(sanitize_text_field((string) ($body['name'] ?? ''))) : sanitize_text_field((string) ($body['name'] ?? ''));
+	$email    = sanitize_email((string) ($body['email'] ?? ''));
+	$adults   = max(0, min(20, (int) ($body['adults'] ?? 0)));
+	$children = max(0, min(20, (int) ($body['children'] ?? 0)));
+	if ('' === trim($name)) {
+		return new WP_REST_Response(['status' => 'error', 'message' => 'Add their name.'], 400);
+	}
+	if (!is_email($email)) {
+		return new WP_REST_Response(['status' => 'error', 'message' => 'That email does not look right.'], 400);
+	}
+	if ($adults + $children < 1) {
+		return new WP_REST_Response(['status' => 'error', 'message' => 'Add at least one person.'], 400);
+	}
+	$page  = get_page_by_path('claimticket');
+	$block = ($page && function_exists('ew_claim_block_on')) ? ew_claim_block_on($page) : null;
+	if (!$block) {
+		return new WP_REST_Response(['status' => 'error', 'message' => 'The claim page is not set up.'], 500);
+	}
+	$a = $block['atts'];
+	do {
+		$code = 'EFC-' . wp_rand(1000, 9999);
+	} while (get_posts(['post_type' => 'ewt_booking', 'post_status' => 'any', 'numberposts' => 1, 'fields' => 'ids', 'meta_key' => '_ewt_code', 'meta_value' => $code])); // phpcs:ignore WordPress.DB.SlowDBQuery
+	$id = wp_insert_post(['post_type' => 'ewt_booking', 'post_status' => 'publish', 'post_title' => $name]);
+	if (!$id || is_wp_error($id)) {
+		return new WP_REST_Response(['status' => 'error', 'message' => 'Could not make the ticket.'], 500);
+	}
+	$now = current_time('mysql');
+	foreach ([
+		'name'     => $name,
+		'email'    => $email,
+		'event'    => $a['event'] ?? '',
+		'page'     => $page->ID,
+		'url'      => get_permalink($page),
+		'lines'    => function_exists('ew_claim_party') ? ew_claim_party($a, $adults, $children) : '',
+		'extra'    => 'Paper ticket at the gate',
+		'school'   => 'Paper ticket at the gate',
+		'adults'   => $adults,
+		'children' => $children,
+		'total'    => 0,
+		'status'   => 'claimed',
+		'consent'  => 'no',
+		'code'     => $code,
+		'key'      => wp_generate_password(12, false),
+		'hook'     => (string) ($a['crm_hook'] ?? ''),
+		'source'   => 'gate',
+		'in'       => $now,
+	] as $k => $v) {
+		update_post_meta($id, '_ewt_' . $k, $v);
+	}
+	if (function_exists('ew_tix_crm') && !empty($a['crm_hook'])) {
+		ew_tix_crm((string) $a['crm_hook'], $id, 'claimed');
+	}
+	$out = ew_ticket_payload($id, 'valid');
+	$out['checked_in_at'] = $now;
+	return new WP_REST_Response($out, 200);
 }
