@@ -583,8 +583,31 @@ function ew_gates_rest_ok( $req ) {
 	if ( current_user_can( 'edit_pages' ) ) {
 		return true;
 	}
+	$given = (string) $req->get_header( 'x_ew_key' );
+	if ( strlen( $given ) < 30 ) {
+		return false;
+	}
 	$key = function_exists( 'ew_runs_key' ) ? (string) ew_runs_key() : '';
-	return '' !== $key && hash_equals( $key, (string) $req->get_header( 'x_ew_key' ) );
+	if ( '' !== $key && hash_equals( $key, $given ) ) {
+		return true;
+	}
+	// Otherwise it must be a Supabase key that can read the service-only table.
+	$t = 'ew_gates_key_' . md5( $given );
+	if ( get_transient( $t ) ) {
+		return true;
+	}
+	if ( ! defined( 'EW_FAN_SUPABASE' ) ) {
+		return false;
+	}
+	$r = wp_remote_get( EW_FAN_SUPABASE . '/rest/v1/app_secrets?select=name&limit=1', array(
+		'timeout' => 10,
+		'headers' => array( 'apikey' => $given, 'Authorization' => 'Bearer ' . $given ),
+	) );
+	if ( ! is_wp_error( $r ) && 200 === (int) wp_remote_retrieve_response_code( $r ) ) {
+		set_transient( $t, 1, 10 * MINUTE_IN_SECONDS );
+		return true;
+	}
+	return false;
 }
 
 add_action( 'rest_api_init', function () {
