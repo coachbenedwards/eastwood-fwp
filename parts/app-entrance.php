@@ -21,13 +21,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-/** The entrances at Coronation Park, offered as suggestions on the screen. */
+/**
+ * The entrances at Coronation Park, offered as suggestions on the screen.
+ * Gate 1 and Gate 2 are separate turnstiles at the Chewton St End; the
+ * ground map labels them together as "Gate 1&2", but they are set and
+ * counted one by one.
+ */
 function ew_ent_places() {
 	return array(
-		'Chewton Street End',
-		'Coronation Park End (KAM Servicing Stand)',
-		'North Stand turnstiles',
-		'North Stand gate',
+		'Gate 1 · Chewton St End',
+		'Gate 2 · Chewton St End',
+		'Gate 3 · Coronation Park End',
+		'Gate N4 · North End',
+		'Gate N5 · North End',
 	);
 }
 
