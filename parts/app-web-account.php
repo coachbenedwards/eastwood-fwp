@@ -99,7 +99,7 @@ function ew_acc_defaults() {
 		'short_pw'      => 'At least 8 characters, please.',
 		'bad_email'     => 'That email does not look right.',
 		'entrance_label' => 'Your entrance',
-		'moved_from'    => 'moved from',
+		'queue_label'   => 'Queue',
 		'kind_match'    => 'Match ticket',
 		'kind_event'    => 'Event ticket',
 		'kind_food'     => 'Food tokens',
@@ -292,7 +292,7 @@ function ew_acc_js() {
           ? '<div class="q"><span class="qr">' + qrSvg(i.qr_rows) + '</span><span><span class="c">' + e(i.code) + '</span><span class="g">' + e(i.used ? W.used : W.show_gate) + '</span></span></div>'
           : '<div class="r"><span class="c">' + e(i.code) + '</span><a href="' + e(W.app_url) + '">' + e(W.show_app) + '</a></div>';
         var gt = (!i.used && i.gate && i.gate.entrance)
-          ? '<div class="gt"><span class="gk">' + e(W.entrance_label) + '</span><span class="gn">' + e(i.gate.entrance) + '</span><span class="ge">' + e(i.gate.end || '') + (i.gate.moved ? ' · ' + e(W.moved_from) + ' ' + e(i.gate.moved) : '') + '</span></div>'
+          ? '<div class="gt"><span class="gk">' + e(W.entrance_label) + '</span><span class="gn">' + e(i.gate.entrance) + (i.gate.queue ? ' · ' + e(W.queue_label) + ' ' + e(i.gate.queue) : '') + '</span><span class="ge">' + e(i.gate.end || '') + '</span></div>'
           : '';
         return '<div class="ewac-tk"><p class="k">' + e(k) + (i.used ? ' · ' + e(W.used) : '') + '</p><p class="t">' + e(i.title) + '</p>'
           + (i.lines ? '<p class="s">' + e(i.lines) + '</p>' : '') + gt + foot + '</div>';

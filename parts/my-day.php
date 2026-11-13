@@ -44,7 +44,7 @@ function ew_day_defaults() {
 		'ticket_label'  => 'Your ticket',
 		'show_gate'     => 'Show this at the turnstile',
 		'entrance_label' => 'Your entrance',
-		'moved_from'    => 'moved from',
+		'queue_label'   => 'Queue',
 		'used'          => 'Used',
 		'day_title'     => 'Your day',
 		'offer_tag'     => 'Offer',
@@ -366,7 +366,7 @@ function ew_day_js() {
       if (rows) left += '<div class="ewday-box ewday-tlb"><h2>' + e(W.day_title) + '</h2><div class="ewday-tl">' + rows + '</div></div>';
       left += '<div class="ewday-upslot"></div>';
       right += '<div class="ewday-tk"><p class="ewday-k">' + e(W.ticket_label) + '</p>'
-        + (i.gate && i.gate.entrance ? '<div class="gt"><span class="gk">' + e(W.entrance_label) + '</span><span class="gn">' + e(i.gate.entrance) + '</span><span class="ge">' + e(i.gate.end || '') + (i.gate.moved ? ' · ' + e(W.moved_from) + ' ' + e(i.gate.moved) : '') + '</span></div>' : '')
+        + (i.gate && i.gate.entrance ? '<div class="gt"><span class="gk">' + e(W.entrance_label) + '</span><span class="gn">' + e(i.gate.entrance) + (i.gate.queue ? ' · ' + e(W.queue_label) + ' ' + e(i.gate.queue) : '') + '</span><span class="ge">' + e(i.gate.end || '') + '</span></div>' : '')
         + (i.qr_rows && i.qr_rows.length ? '<div class="q"><span class="qr">' + qrSvg(i.qr_rows) + '</span><span><span class="c">' + e(i.code) + '</span><span class="g">' + e(W.show_gate) + '</span></span></div>'
           : '<div class="q"><span><span class="c">' + e(i.code) + '</span><span class="g">' + e(W.show_gate) + '</span></span></div>')
         + '</div>';

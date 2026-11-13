@@ -12,6 +12,11 @@
  * Gate 1 and Gate 2 are separate turnstiles at the Chewton St End. The ground
  * map labels them together as "Gate 1&2"; here they are set and counted apart.
  *
+ * A gate can also have queue letters (A, B, C...). Each ticket at that gate
+ * then gets one of them, shared out evenly by people, and the ticket shows
+ * "Gate 3 · Queue B". The ticket only ever says where to go now, never where
+ * it used to say.
+ *
  * The gate is only ever shown live on the ticket (app and website), never in
  * an email or on a page, so it can move with the crowd.
  *
@@ -46,11 +51,17 @@ function ew_gates_cfg() {
 		'auto'    => 1,
 		'msgs'    => array(),
 		'sent'    => array(),
+		'queues'  => array(),
 	) );
 	$s['msgs'] = wp_parse_args( is_array( $s['msgs'] ) ? $s['msgs'] : array(), ew_gate_msg_defaults() );
 	$all       = array_keys( ew_gate_list() );
 	$s['open'] = array_values( array_intersect( $all, (array) $s['open'] ) );
 	$s['moves'] = is_array( $s['moves'] ) ? $s['moves'] : array();
+	$s['queues'] = is_array( $s['queues'] ) ? $s['queues'] : array();
+	// The gate-change wording used to name the old gate; it no longer does.
+	if ( false !== strpos( (string) $s['msgs']['change_b'], '{from}' ) ) {
+		$s['msgs']['change_b'] = ew_gate_msg_defaults()['change_b'];
+	}
 	return $s;
 }
 
@@ -158,9 +169,75 @@ function ew_gate_effective( $id, $g, $cfg ) {
 	return isset( ew_gate_list()[ $to ] ) ? $to : $g;
 }
 
+/** The queue letters set for a gate, e.g. array( 'A', 'B', 'C' ). */
+function ew_gate_queue_letters( $cfg, $g ) {
+	$raw = isset( $cfg['queues'][ $g ] ) ? (string) $cfg['queues'][ $g ] : '';
+	$out = array();
+	foreach ( preg_split( '/[\s,]+/', strtoupper( $raw ) ) as $l ) {
+		$l = preg_replace( '/[^A-Z0-9]/', '', $l );
+		if ( '' !== $l && strlen( $l ) <= 3 && ! in_array( $l, $out, true ) ) {
+			$out[] = $l;
+		}
+	}
+	return $out;
+}
+
+/** People already given each queue letter, per gate: [gate][letter] => people. */
+function ew_gate_queue_load( $cfg ) {
+	$load = array();
+	foreach ( ew_gate_bookings() as $id ) {
+		$q = (string) get_post_meta( $id, '_ewt_queue', true );
+		if ( false === strpos( $q, ':' ) ) {
+			continue;
+		}
+		list( $g, $l ) = explode( ':', $q, 2 );
+		if ( ! isset( $load[ $g ][ $l ] ) ) {
+			$load[ $g ][ $l ] = 0;
+		}
+		$load[ $g ][ $l ] += ew_gate_heads( $id );
+	}
+	return $load;
+}
+
 /**
- * What one ticket shows right now: its gate, the end it's at, and whether it
- * was moved. Empty when gates are off or the ticket isn't for this game.
+ * This ticket's queue letter at gate $g, given now if it has none there yet
+ * (the letter with the fewest people). Empty when the gate has no queues.
+ */
+function ew_gate_queue( $id, $g, $cfg ) {
+	$letters = ew_gate_queue_letters( $cfg, $g );
+	if ( ! $letters ) {
+		return '';
+	}
+	$have = (string) get_post_meta( $id, '_ewt_queue', true );
+	if ( 0 === strpos( $have, $g . ':' ) && in_array( substr( $have, strlen( $g ) + 1 ), $letters, true ) ) {
+		return substr( $have, strlen( $g ) + 1 );
+	}
+	$load = get_transient( 'ew_gate_qload' );
+	if ( ! is_array( $load ) ) {
+		$load = ew_gate_queue_load( $cfg );
+	}
+	$best = '';
+	foreach ( $letters as $l ) {
+		$n = isset( $load[ $g ][ $l ] ) ? $load[ $g ][ $l ] : 0;
+		if ( '' === $best || $n < ( isset( $load[ $g ][ $best ] ) ? $load[ $g ][ $best ] : 0 ) ) {
+			$best = $l;
+		}
+	}
+	update_post_meta( $id, '_ewt_queue', $g . ':' . $best );
+	$load[ $g ][ $best ] = ( isset( $load[ $g ][ $best ] ) ? $load[ $g ][ $best ] : 0 ) + ew_gate_heads( $id );
+	set_transient( 'ew_gate_qload', $load, 10 * MINUTE_IN_SECONDS );
+	return $best;
+}
+
+/** "Gate 3" or "Gate 3 · Queue B": how the gate reads on a ticket, the scanner and alerts. */
+function ew_gate_label( $g, $queue ) {
+	$names = ew_gate_list();
+	return $names[ $g ][0] . ( '' !== $queue ? ' · Queue ' . $queue : '' );
+}
+
+/**
+ * What one ticket shows right now: its gate, any queue letter and the end
+ * it's at. Empty when gates are off or the ticket isn't for this game.
  */
 function ew_gate_for_booking( $id ) {
 	$cfg = ew_gates_cfg();
@@ -174,11 +251,13 @@ function ew_gate_for_booking( $id ) {
 	$g     = ew_gate_effective( $id, $own, $cfg );
 	$names = ew_gate_list();
 	$e     = ew_ent_get();
+	$queue = ew_gate_queue( $id, $g, $cfg );
 	return array(
 		'gate'     => $g,
 		'entrance' => $names[ $g ][0],
+		'queue'    => $queue,
+		'label'    => ew_gate_label( $g, $queue ),
 		'end'      => $names[ $g ][1],
-		'moved'    => $g !== $own ? $names[ $own ][0] : '',
 		'note'     => trim( $e['note'] ),
 		'updated'  => $cfg['updated'] ? wp_date( 'g:ia', (int) $cfg['updated'] ) : '',
 	);
@@ -210,7 +289,29 @@ function ew_gate_assign_all( $fresh = false ) {
 		$load[ $g ] += $n;
 	}
 	delete_transient( 'ew_gate_load' );
+	ew_gate_queue_all( $fresh );
 	return count( $todo );
+}
+
+/** Give every ticket a queue letter at the gate it's going to now. $fresh starts everyone again. */
+function ew_gate_queue_all( $fresh = false ) {
+	$cfg = ew_gates_cfg();
+	if ( $fresh ) {
+		foreach ( ew_gate_bookings() as $id ) {
+			delete_post_meta( $id, '_ewt_queue' );
+		}
+	}
+	delete_transient( 'ew_gate_qload' );
+	$where = ew_gate_where_now( $cfg );
+	$heads = array();
+	foreach ( $where as $id => $g ) {
+		$heads[ $id ] = ew_gate_heads( $id );
+	}
+	arsort( $heads );
+	foreach ( array_keys( $heads ) as $id ) {
+		ew_gate_queue( $id, $where[ $id ], $cfg );
+	}
+	delete_transient( 'ew_gate_qload' );
 }
 
 function ew_gates_save( $in ) {
@@ -237,6 +338,16 @@ function ew_gates_save( $in ) {
 	if ( isset( $in['auto'] ) ) {
 		$cfg['auto'] = (int) ! empty( $in['auto'] );
 	}
+	if ( isset( $in['queues'] ) && is_array( $in['queues'] ) ) {
+		$q = array();
+		foreach ( $in['queues'] as $g => $v ) {
+			$g = (string) $g;
+			if ( in_array( $g, $all, true ) ) {
+				$q[ $g ] = sanitize_text_field( wp_unslash( (string) $v ) );
+			}
+		}
+		$cfg['queues'] = $q;
+	}
 	if ( isset( $in['msgs'] ) && is_array( $in['msgs'] ) ) {
 		foreach ( array_keys( ew_gate_msg_defaults() ) as $k ) {
 			if ( isset( $in['msgs'][ $k ] ) ) {
@@ -247,6 +358,7 @@ function ew_gates_save( $in ) {
 	$cfg['updated'] = time();
 	update_option( 'ew_gates', $cfg, false );
 	delete_transient( 'ew_gate_load' );
+	delete_transient( 'ew_gate_qload' );
 	// A gate moved: tell the people whose gate just changed, like a gate change at an airport.
 	if ( $before && ! empty( $cfg['on'] ) && ! empty( $cfg['auto'] ) ) {
 		$after   = ew_gate_where_now( $cfg );
@@ -267,7 +379,7 @@ function ew_gates_save( $in ) {
 
 // ---------- Airport-style alerts ----------
 
-/** The alert wording. {game} {gate} {end} {from} are filled in per ticket. */
+/** The alert wording. {game} {gate} {end} are filled in per ticket ({gate} carries the queue letter when there is one). */
 function ew_gate_msg_defaults() {
 	return array(
 		'announce_t' => 'Your gate: {gate}',
@@ -277,7 +389,7 @@ function ew_gate_msg_defaults() {
 		'final_t'    => 'Kick-off soon',
 		'final_b'    => 'Last call for {gate}, {end}. Head in now.',
 		'change_t'   => 'Gate change: now {gate}',
-		'change_b'   => 'Your gate has moved from {from}. Use {gate}, {end}.',
+		'change_b'   => 'Your gate has changed. Use {gate}, {end}.',
 	);
 }
 
@@ -318,7 +430,7 @@ function ew_gate_send( $kind, $testers = false, $only = null ) {
 		}
 		$fill = array(
 			'{game}' => trim( $e['game'] ),
-			'{gate}' => $names[ $g ][0],
+			'{gate}' => ew_gate_label( $g, ew_gate_queue( $id, $g, $cfg ) ),
 			'{end}'  => $names[ $g ][1],
 			'{from}' => null !== $only && isset( $names[ $only[ $id ] ] ) ? $names[ $only[ $id ] ][0] : '',
 		);
@@ -369,6 +481,7 @@ function ew_gates_page() {
 			'open'  => isset( $_POST['open'] ) ? (array) wp_unslash( $_POST['open'] ) : array(),
 			'moves' => isset( $_POST['moves'] ) ? (array) wp_unslash( $_POST['moves'] ) : array(),
 			'auto'  => ! empty( $_POST['auto'] ),
+			'queues' => isset( $_POST['queues'] ) ? (array) wp_unslash( $_POST['queues'] ) : array(),
 			'msgs'  => isset( $_POST['msgs'] ) ? (array) wp_unslash( $_POST['msgs'] ) : array(),
 		);
 		// phpcs:enable
@@ -382,7 +495,10 @@ function ew_gates_page() {
 			update_option( 'ew_gates', $cfg, false );
 			$msg = isset( $r['error'] ) && $r['error'] ? 'Not sent: ' . $r['error'] : 'Sent to ' . $r['sent'] . ' phones (' . $r['people'] . ' ticket holders with a gate' . ( $r['testers'] ? ', testers only' : '' ) . ').';
 		}
-		if ( ! empty( $_POST['assign'] ) ) {
+		if ( isset( $_POST['assign'] ) && 'queues' === $_POST['assign'] ) {
+			ew_gate_queue_all( true );
+			$msg = 'Every ticket was given a queue letter again, evenly.';
+		} elseif ( ! empty( $_POST['assign'] ) ) {
 			$n   = ew_gate_assign_all( 'fresh' === $_POST['assign'] );
 			$msg = 'fresh' === $_POST['assign'] ? 'Every ticket was given a gate again, evenly (' . $n . ' tickets).' : 'Gave a gate to ' . $n . ' tickets that had none.';
 		}
@@ -412,7 +528,7 @@ function ew_gates_page() {
 	echo '<form method="post">';
 	wp_nonce_field( 'ew_gates', 'ew_gates_nonce' );
 	echo '<p><label><input type="checkbox" name="on" value="1"' . checked( ! empty( $cfg['on'] ), true, false ) . '> <strong>Give every ticket its own gate</strong></label></p>';
-	echo '<table class="widefat striped" style="max-width:820px"><thead><tr><th>Gate</th><th>Takes new tickets</th><th>Tickets</th><th>People given this gate</th><th>Send these people to</th><th>People coming here now</th></tr></thead><tbody>';
+	echo '<table class="widefat striped" style="max-width:960px"><thead><tr><th>Gate</th><th>Takes new tickets</th><th>Tickets</th><th>People given this gate</th><th>Send these people to</th><th>People coming here now</th><th>Queue letters</th></tr></thead><tbody>';
 	foreach ( $names as $k => $nm ) {
 		$sel = isset( $cfg['moves'][ $k ] ) ? $cfg['moves'][ $k ] : '';
 		echo '<tr><td><strong>' . esc_html( $nm[0] ) . '</strong><br><span class="description">' . esc_html( $nm[1] ) . '</span></td>';
@@ -425,7 +541,8 @@ function ew_gates_page() {
 			}
 		}
 		echo '<option value="spread"' . selected( $sel, 'spread', false ) . '>Spread across the other open gates</option></select></td>';
-		echo '<td><strong>' . (int) $now[ $k ] . '</strong></td></tr>';
+		echo '<td><strong>' . (int) $now[ $k ] . '</strong></td>';
+		echo '<td><input type="text" size="8" name="queues[' . esc_attr( $k ) . ']" value="' . esc_attr( isset( $cfg['queues'][ $k ] ) ? $cfg['queues'][ $k ] : '' ) . '" placeholder="A, B, C"></td></tr>';
 	}
 	echo '</tbody></table>';
 	if ( $none ) {
@@ -433,10 +550,11 @@ function ew_gates_page() {
 	}
 	echo '<p><button class="button button-primary" type="submit">Save</button> ';
 	echo '<button class="button" type="submit" name="assign" value="missing">Save and give a gate to every ticket without one</button> ';
+	echo '<button class="button" type="submit" name="assign" value="queues">Share out the queue letters again</button> ';
 	echo '<button class="button" type="submit" name="assign" value="fresh" onclick="return confirm(\'Give every ticket a gate again from scratch? People who already looked will see a different gate.\')">Share out every ticket again</button></p>';
-	echo '<p class="description">Updated ' . esc_html( $cfg['updated'] ? wp_date( 'D j M, g:ia', (int) $cfg['updated'] ) : 'never' ) . '. Moving a gate doesn\'t change the ticket\'s own gate, so setting it back to "Keep" undoes the move.</p>';
+	echo '<p class="description">Updated ' . esc_html( $cfg['updated'] ? wp_date( 'D j M, g:ia', (int) $cfg['updated'] ) : 'never' ) . '. Moving a gate doesn\'t change the ticket\'s own gate, so setting it back to "Keep" undoes the move. Queue letters: leave blank for no queues; tickets show "Gate 3 · Queue B" when set.</p>';
 	echo '<h2>Alerts to ticket holders</h2>';
-	echo '<p>Like gate calls at an airport. Each person gets their own gate in the alert. They go to phones signed in to the Eastwood FC app with the email the ticket was booked with. {gate}, {end}, {game} and {from} are filled in for each person.</p>';
+	echo '<p>Like gate calls at an airport. Each person gets their own gate in the alert. They go to phones signed in to the Eastwood FC app with the email the ticket was booked with. {gate} (with the queue letter when there is one), {end} and {game} are filled in for each person.</p>';
 	echo '<p><label><input type="checkbox" name="auto" value="1"' . checked( ! empty( $cfg['auto'] ), true, false ) . '> Send a gate-change alert automatically when a gate is moved</label></p>';
 	$labels = array( 'announce' => 'Gate announced', 'open' => 'Gates open', 'final' => 'Final call', 'change' => 'Gate change (automatic)' );
 	echo '<table class="form-table">';
