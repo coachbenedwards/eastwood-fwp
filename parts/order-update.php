@@ -31,6 +31,9 @@ function ew_ou_defaults() {
 	$a = plugins_url( 'assets/', dirname( __DIR__ ) . '/eastwood-fwp.php' );
 	return array(
 		'subject'   => '[ORDER UPDATE] Order No. {ref}',
+		'unsub_ask'  => 'Stop getting emails like this from Eastwood FC?',
+		'unsub_btn'  => 'Unsubscribe',
+		'unsub_done' => "You're unsubscribed. You won't get these emails again.",
 		'booking'   => 'YOUR BOOKING',
 		'headline'  => 'ARE YOU STILL COMING?',
 		'intro'     => 'Hi {first_name}, lots of tickets have been claimed for today, so we want to make sure nobody misses out. Let us know if you can still make it.',
@@ -193,8 +196,14 @@ function ew_ou_send( $to, $bid, $test_code = '' ) {
 		$mail->AltBody = $text;
 	};
 	add_action( 'phpmailer_init', $alt, 99 );
-	$from = function_exists( 'ew_smtp_from' ) ? ew_smtp_from() : get_option( 'admin_email' );
-	$ok   = wp_mail( $to, $subject, $html, array( 'From: Eastwood FC <' . $from . '>', 'Content-Type: text/html; charset=UTF-8' ) );
+	$from  = function_exists( 'ew_smtp_from' ) ? ew_smtp_from() : get_option( 'admin_email' );
+	$unsub = add_query_arg( 'ew_unsub', '' !== $test_code ? $test_code : ew_ou_code( $bid ), home_url( '/' ) );
+	$ok    = wp_mail( $to, $subject, $html, array(
+		'From: Eastwood FC <' . $from . '>',
+		'Content-Type: text/html; charset=UTF-8',
+		'List-Unsubscribe: <' . $unsub . '>, <mailto:' . $from . '?subject=Unsubscribe>',
+		'List-Unsubscribe-Post: List-Unsubscribe=One-Click',
+	) );
 	remove_action( 'phpmailer_init', $alt, 99 );
 	return $ok;
 }
@@ -221,6 +230,83 @@ add_action( 'rest_api_init', function () {
 			);
 		},
 	) );
+} );
+
+/* --- Sending in batches, so a few hundred emails don't leave at once ------ */
+
+const EW_OU_BATCH = 50;
+const EW_OU_GAP   = 120;
+
+add_action( 'ew_ou_batch', 'ew_ou_run_batch' );
+function ew_ou_run_batch() {
+	if ( get_transient( 'ew_ou_lock' ) ) {
+		return;
+	}
+	set_transient( 'ew_ou_lock', 1, 110 );
+	$queue = (array) get_option( 'ew_ou_queue', array() );
+	$n     = 0;
+	foreach ( $queue as $bid => $event ) {
+		if ( $n >= EW_OU_BATCH ) {
+			break;
+		}
+		unset( $queue[ $bid ] );
+		$em = (string) get_post_meta( $bid, '_ewt_email', true );
+		if ( ! is_email( $em ) || get_post_meta( $bid, '_ewt_ou_sent', true ) || ew_is_unsub( $em ) ) {
+			continue;
+		}
+		if ( ew_ou_send( $em, $bid ) ) {
+			update_post_meta( $bid, '_ewt_ou_sent', time() );
+		} else {
+			update_post_meta( $bid, '_ewt_ou_failed', time() );
+		}
+		$n++;
+	}
+	update_option( 'ew_ou_queue', $queue, false );
+	delete_transient( 'ew_ou_lock' );
+	if ( $queue && ! wp_next_scheduled( 'ew_ou_batch' ) ) {
+		wp_schedule_single_event( time() + EW_OU_GAP, 'ew_ou_batch' );
+	}
+}
+
+/* --- Unsubscribe: one click from the mail app, or the link in a browser ---- */
+
+function ew_is_unsub( $email ) {
+	return in_array( strtolower( trim( (string) $email ) ), (array) get_option( 'ew_unsub', array() ), true );
+}
+
+add_action( 'template_redirect', function () {
+	if ( ! isset( $_GET['ew_unsub'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+		return;
+	}
+	$code = sanitize_key( wp_unslash( $_GET['ew_unsub'] ) ); // phpcs:ignore WordPress.Security.NonceVerification
+	if ( 'POST' === ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) {
+		$bid = ew_ou_by_code( $code );
+		$em  = $bid ? strtolower( (string) get_post_meta( $bid, '_ewt_email', true ) ) : '';
+		if ( $em ) {
+			$list = (array) get_option( 'ew_unsub', array() );
+			if ( ! in_array( $em, $list, true ) ) {
+				$list[] = $em;
+				update_option( 'ew_unsub', $list, false );
+			}
+			update_post_meta( $bid, '_ewt_unsub', time() );
+		}
+		if ( isset( $_POST['List-Unsubscribe'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+			status_header( 200 );
+			exit;
+		}
+		$done = true;
+	}
+	nocache_headers();
+	$o = ew_ou_get();
+	echo '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Eastwood FC</title></head>'
+		. '<body style="margin:0;background:#F3F3F3;font-family:Helvetica,Arial,sans-serif;color:#121417"><div style="max-width:420px;margin:60px auto;padding:24px;background:#fff;border:1px solid #e4e5e8;border-radius:12px;text-align:center">';
+	if ( ! empty( $done ) ) {
+		echo '<p style="font-size:18px;font-weight:700">' . esc_html( $o['unsub_done'] ) . '</p>';
+	} else {
+		echo '<p style="font-size:18px;font-weight:700">' . esc_html( $o['unsub_ask'] ) . '</p><form method="post"><button style="margin-top:12px;height:48px;padding:0 24px;border:0;border-radius:10px;background:#CC0000;color:#fff;font-size:16px;font-weight:700">' . esc_html( $o['unsub_btn'] ) . '</button></form>';
+	}
+	echo '</div></body></html>';
+	exit;
 } );
 
 /** The staff app's live numbers: every booking on the games the email went to. */
@@ -373,26 +459,32 @@ function ew_ou_page() {
 	}
 
 	if ( 'send' === $step && check_admin_referer( 'ew_ou' ) && $people ) {
-		$pick = array_map( 'intval', (array) ( $_POST['to'] ?? array() ) );
-		$sent = 0;
-		$fail = array();
+		$pick  = array_map( 'intval', (array) ( $_POST['to'] ?? array() ) );
+		$queue = (array) get_option( 'ew_ou_queue', array() );
+		$added = 0;
 		foreach ( $people as $bid => $em ) {
-			if ( ! in_array( $bid, $pick, true ) || get_post_meta( $bid, '_ewt_ou_sent', true ) ) {
+			if ( ! in_array( $bid, $pick, true ) || get_post_meta( $bid, '_ewt_ou_sent', true ) || isset( $queue[ $bid ] ) ) {
 				continue;
 			}
-			if ( ew_ou_send( $em, $bid ) ) {
-				update_post_meta( $bid, '_ewt_ou_sent', time() );
-				$evs = (array) get_option( 'ew_ou_events', array() );
-				if ( ! in_array( $event, $evs, true ) ) {
-					$evs[] = $event;
-					update_option( 'ew_ou_events', $evs, false );
-				}
-				$sent++;
-			} else {
-				$fail[] = $em;
-			}
+			$queue[ $bid ] = $event;
+			$added++;
 		}
-		echo '<div class="notice notice-' . ( $fail ? 'warning' : 'success' ) . '"><p>Sent ' . (int) $sent . '.' . ( $fail ? ' Could not send to: ' . esc_html( implode( ', ', $fail ) ) . '.' : '' ) . '</p></div>';
+		update_option( 'ew_ou_queue', $queue, false );
+		$evs = (array) get_option( 'ew_ou_events', array() );
+		if ( $added && ! in_array( $event, $evs, true ) ) {
+			$evs[] = $event;
+			update_option( 'ew_ou_events', $evs, false );
+		}
+		if ( $added && ! wp_next_scheduled( 'ew_ou_batch' ) ) {
+			wp_schedule_single_event( time(), 'ew_ou_batch' );
+		}
+		echo '<div class="notice notice-success"><p>' . (int) $added . ' added to the send. They go ' . (int) EW_OU_BATCH . ' at a time, every ' . (int) ( EW_OU_GAP / 60 ) . ' minutes.</p></div>';
+	}
+
+	$left = count( (array) get_option( 'ew_ou_queue', array() ) );
+	if ( $left ) {
+		$next = wp_next_scheduled( 'ew_ou_batch' );
+		echo '<meta http-equiv="refresh" content="60"><div class="notice notice-info"><p><strong>Sending: ' . (int) $left . ' still to go.</strong>' . ( $next ? ' Next ' . (int) EW_OU_BATCH . ' at ' . esc_html( wp_date( 'g:ia', $next ) ) . '.' : '' ) . ' This page refreshes itself.</p></div>';
 	}
 
 	echo '<form method="post">';
