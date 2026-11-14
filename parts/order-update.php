@@ -34,6 +34,7 @@ function ew_ou_defaults() {
 		'unsub_ask'  => 'Stop getting emails like this from Eastwood FC?',
 		'unsub_btn'  => 'Unsubscribe',
 		'unsub_done' => "You're unsubscribed. You won't get these emails again.",
+		'club'      => 'EASTWOOD FOOTBALL CLUB',
 		'booking'   => 'YOUR BOOKING',
 		'headline'  => 'ARE YOU STILL COMING?',
 		'intro'     => 'Hi {first_name}, lots of tickets have been claimed for today, so we want to make sure nobody misses out. Let us know if you can still make it.',
@@ -139,7 +140,7 @@ function ew_ou_email( $bid, $test_code = '' ) {
 		. '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F3F3F3"><tr><td align="center" style="padding:16px">'
 		. '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #e4e5e8;border-radius:12px;overflow:hidden">'
 		// Red header with the crest.
-		. '<tr><td align="center" style="background:#CC0000;padding:18px"><img src="' . esc_url( $o['crest'] ) . '" alt="Eastwood FC" width="56" height="56" style="width:56px;height:56px;border:0"></td></tr>'
+		. '<tr><td align="center" style="background:#CC0000;padding:20px 16px;font-family:Anton,Impact,\'Arial Narrow Bold\',sans-serif;font-weight:400;font-size:26px;line-height:1.1;letter-spacing:1px;color:#ffffff">' . esc_html( $o['club'] ) . '</td></tr>'
 		. '<tr><td style="padding:22px 20px">'
 		// Booking box: reference and email, big.
 		. '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#111111;border-radius:12px"><tr><td style="padding:18px;color:#ffffff;' . $sans . '">'
@@ -227,6 +228,7 @@ add_action( 'rest_api_init', function () {
 				'a'     => $a,
 				'first' => ew_ou_first( get_post_meta( $bid, '_ewt_name', true ) ),
 				'ref'   => function_exists( 'ew_booking_code' ) ? ew_booking_code( $bid ) : '',
+				'party' => (string) get_post_meta( $bid, '_ewt_lines', true ),
 			);
 		},
 	) );
@@ -356,33 +358,69 @@ add_action( 'rest_api_init', function () {
 	) );
 } );
 
-/** The /answer/ page's block. Every word is a field. */
+/** The /answer/ page's block. Every word is a field; the travel rows come from the email's own settings. */
 add_shortcode( 'eastwood_answer', function ( $atts ) {
 	$a = shortcode_atts( array(
-		'yes_title' => 'SEE YOU LATER',
-		'yes_text'  => 'Eastwood FC v Hucknall Town. Gates open 1pm, kick-off 3pm, Coronation Park.',
-		'yes_btn'   => 'OPEN MY TICKET IN THE APP',
-		'yes_url'   => home_url( '/app/' ),
-		'no_title'  => 'THANKS FOR LETTING US KNOW',
-		'no_text'   => 'Hope to see you at the next one.',
-		'no_btn'    => 'SEE THE NEXT HOME GAME',
-		'no_url'    => home_url( '/matches/' ),
-		'undo'      => 'I can come after all',
-		'bad'       => 'This link has expired. Your ticket is in the Eastwood FC app.',
+		'yes_kicker' => "YOU'RE ON THE LIST",
+		'yes_title'  => "THANK YOU FOR LETTING US KNOW YOU'RE ATTENDING",
+		'match'      => 'EASTWOOD FC v HUCKNALL TOWN',
+		'when'       => 'Saturday 14 November · Gates 1pm · Kick-off 3pm',
+		'ref_label'  => 'BOOKING',
+		'app_title'  => 'YOUR TICKET IS IN THE APP',
+		'app_text'   => 'Your ticket and live turnstile info are in the Eastwood FC app. Get it before you set off.',
+		'yes_btn'    => 'GET TICKETS',
+		'yes_url'    => home_url( '/app/' ),
+		'ios_url'    => 'https://apps.apple.com/app/id6820880105',
+		'android_url' => 'https://play.google.com/store/apps/details?id=com.eastwoodfc.team',
+		'no_title'   => 'THANKS FOR LETTING US KNOW',
+		'no_text'    => 'Hope to see you at the next one.',
+		'no_btn'     => 'SEE THE NEXT HOME GAME',
+		'no_url'     => home_url( '/matches/' ),
+		'undo'       => 'I can come after all',
+		'bad'        => 'This link has expired. Your ticket is in the Eastwood FC app.',
 	), $atts, 'eastwood_answer' );
-	$id  = 'ewans' . wp_rand( 1000, 9999 );
-	$out = '<style>.ewans{max-width:560px;margin:0 auto;padding:40px 20px 70px;font-family:"Instrument Sans",system-ui,sans-serif;color:#121417}'
-		. '.ewans h1{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:44px;line-height:1.05;margin:0 0 10px;background:none;padding:0;color:#121417}'
+	$o    = ew_ou_get();
+	$rows = '';
+	foreach ( preg_split( '/\r?\n/', (string) $o['rows'] ) as $line ) {
+		$bits = array_map( 'trim', explode( '|', $line, 2 ) );
+		if ( 2 === count( $bits ) && '' !== $bits[0] ) {
+			$rows .= '<div class="ewans-row"><strong>' . esc_html( $bits[0] ) . '</strong><span>' . esc_html( $bits[1] ) . '</span></div>';
+		}
+	}
+	$apple  = '<svg width="18" height="18" viewBox="0 0 384 512" aria-hidden="true"><path fill="currentColor" d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>';
+	$play   = '<svg width="16" height="18" viewBox="0 0 512 512" aria-hidden="true"><path fill="#00D7FE" d="M48 59.5v393c0 9 5 16.5 12.5 20L278 256 60.5 39.5C53 43 48 50.5 48 59.5z"/><path fill="#FFCE00" d="M354 180 278 256l76 76 86-49c18-10 18-36 0-46z"/><path fill="#00F076" d="M60.5 39.5 278 256l76-76L91 30c-10-6-22-.5-30.5 9.5z"/><path fill="#F63448" d="M60.5 472.5c8.5 10 20.5 15.5 30.5 9.5l263-150-76-76z"/></svg>';
+	$id   = 'ewans' . wp_rand( 1000, 9999 );
+	$out  = '<style>.ewans{max-width:560px;margin:0 auto;padding:32px 20px 70px;font-family:"Instrument Sans",system-ui,sans-serif;color:#121417}'
+		. '.ewans h1,.ewans h2{font-family:Anton,Impact,sans-serif;font-weight:400;background:none;padding:0;color:#121417}'
+		. '.ewans h1{font-size:40px;line-height:1.05;margin:0 0 10px}.ewans h2{font-size:24px;line-height:1.1;margin:30px 0 6px}'
 		. '.ewans p{font-size:17px;line-height:1.5;color:#3a3f46;margin:0}'
-		. '.ewans a.ewans-btn{display:flex;align-items:center;justify-content:center;min-height:54px;border-radius:10px;background:#CC0000;color:#fff;text-decoration:none;font-family:Anton,Impact,sans-serif;font-size:19px;letter-spacing:.5px;margin-top:22px}'
+		. '.ewans-tick{width:76px;height:76px;border-radius:50%;background:#CC0000;display:flex;align-items:center;justify-content:center;margin:0 0 18px}'
+		. '.ewans-kick{font-size:13px;font-weight:700;letter-spacing:2px;color:#CC0000;margin-bottom:6px}'
+		. '.ewans-card{background:#111;border-radius:14px;padding:18px;margin-top:22px;color:#fff}'
+		. '.ewans-card .m{font-family:Anton,Impact,sans-serif;font-size:24px;line-height:1.1}.ewans-card .w{font-size:14px;color:#c9c9cf;margin-top:4px}'
+		. '.ewans-card .r{display:flex;justify-content:space-between;align-items:flex-end;border-top:2px dashed rgba(255,255,255,.5);margin-top:16px;padding-top:12px}'
+		. '.ewans-card .r small{display:block;font-size:10px;letter-spacing:2px;color:#9a9aa3}.ewans-card .r b{font-size:18px;letter-spacing:2px}.ewans-card .r span{font-size:14px;color:#c9c9cf}'
+		. '.ewans-app{border:1px solid #e4e5e8;background:#fff;border-radius:14px;padding:18px;margin-top:16px}'
+		. '.ewans-app .t{font-family:Anton,Impact,sans-serif;font-size:22px;line-height:1.1}.ewans-app p{font-size:15px;margin-top:6px}'
+		. '.ewans-stores{display:flex;gap:8px;margin-top:12px}.ewans-stores a{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;height:46px;border-radius:10px;background:#000;color:#fff;text-decoration:none;font-weight:700;font-size:15px}'
+		. '.ewans a.ewans-btn{display:flex;align-items:center;justify-content:center;min-height:54px;border-radius:10px;background:#CC0000;color:#fff;text-decoration:none;font-family:Anton,Impact,sans-serif;font-size:19px;letter-spacing:.5px;margin-top:14px}'
 		. '.ewans a.ewans-undo{display:block;text-align:center;margin-top:16px;font-size:15px;font-weight:700;color:#565c64;text-decoration:underline}'
+		. '.ewans-addr{font-size:15px;color:#3a3f46}.ewans-row{border-top:1px solid #e4e5e8;padding:12px 0}.ewans-row strong{display:block;font-size:15px}.ewans-row span{display:block;font-size:15px;line-height:1.5;color:#3a3f46;margin-top:2px}'
 		. '.ewans [data-s]{display:none}.ewans.is-yes [data-s=yes],.ewans.is-no [data-s=no],.ewans.is-bad [data-s=bad]{display:block}</style>'
 		. '<div class="ewans" id="' . esc_attr( $id ) . '">'
-		. '<div data-s="yes"><h1>' . esc_html( $a['yes_title'] ) . '</h1><p>' . esc_html( $a['yes_text'] ) . '</p><a class="ewans-btn" href="' . esc_url( $a['yes_url'] ) . '">' . esc_html( $a['yes_btn'] ) . '</a></div>'
+		. '<div data-s="yes"><div class="ewans-tick"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>'
+		. '<div class="ewans-kick">' . esc_html( $a['yes_kicker'] ) . '</div><h1>' . esc_html( $a['yes_title'] ) . '</h1>'
+		. '<div class="ewans-card"><div class="m">' . esc_html( $a['match'] ) . '</div><div class="w">' . esc_html( $a['when'] ) . '</div>'
+		. '<div class="r"><div><small>' . esc_html( $a['ref_label'] ) . '</small><b data-ref></b></div><span data-party></span></div></div>'
+		. '<div class="ewans-app"><div class="t">' . esc_html( $a['app_title'] ) . '</div><p>' . esc_html( $a['app_text'] ) . '</p>'
+		. '<a class="ewans-btn" href="' . esc_url( $a['yes_url'] ) . '">' . esc_html( $a['yes_btn'] ) . '</a>'
+		. '<div class="ewans-stores"><a href="' . esc_url( $a['ios_url'] ) . '">' . $apple . 'App Store</a><a href="' . esc_url( $a['android_url'] ) . '">' . $play . 'Google Play</a></div></div>'
+		. '<h2>' . esc_html( $o['here'] ) . '</h2><p class="ewans-addr">' . esc_html( $o['address'] ) . '</p><div style="margin-top:10px">' . $rows . '</div></div>'
 		. '<div data-s="no"><h1>' . esc_html( $a['no_title'] ) . '</h1><p>' . esc_html( $a['no_text'] ) . '</p><a class="ewans-btn" href="' . esc_url( $a['no_url'] ) . '">' . esc_html( $a['no_btn'] ) . '</a><a class="ewans-undo" href="#" data-undo>' . esc_html( $a['undo'] ) . '</a></div>'
 		. '<div data-s="bad"><p>' . esc_html( $a['bad'] ) . '</p></div></div>'
 		. '<script>(function(){var el=document.getElementById(' . wp_json_encode( $id ) . '),q=new URLSearchParams(location.search),r=q.get("r"),a=q.get("a")==="no"?"no":"yes";'
-		. 'function send(x){return fetch(' . wp_json_encode( rest_url( 'eastwood/v1/answer' ) ) . ',{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({r:r,a:x})}).then(function(res){return res.json().then(function(j){return res.ok&&j.ok;});}).catch(function(){return false;});}'
+		. 'function fill(j){var f=el.querySelector("[data-ref]"),p=el.querySelector("[data-party]");if(f)f.textContent=j.ref||"";if(p)p.textContent=j.party||"";}'
+		. 'function send(x){return fetch(' . wp_json_encode( rest_url( 'eastwood/v1/answer' ) ) . ',{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({r:r,a:x})}).then(function(res){return res.json().then(function(j){if(res.ok&&j.ok){fill(j);return true;}return false;});}).catch(function(){return false;});}'
 		. 'function show(x){el.className="ewans is-"+x;}'
 		. 'if(!r){show("bad");return;}show(a);send(a).then(function(ok){if(!ok)show("bad");});'
 		. 'var u=el.querySelector("[data-undo]");if(u)u.addEventListener("click",function(e){e.preventDefault();show("yes");send("yes");});})();</script>';
