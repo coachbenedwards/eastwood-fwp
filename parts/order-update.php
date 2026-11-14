@@ -127,8 +127,11 @@ function ew_ou_email( $bid, $test_code = '' ) {
 	foreach ( array_filter( array_map( 'trim', preg_split( '/\r?\n/', (string) $o['logos'] ) ) ) as $src ) {
 		$logos .= '<img src="' . esc_url( $src ) . '" alt="" height="24" style="height:24px;width:auto;margin:6px 11px;vertical-align:middle;border:0">';
 	}
-	$store = '<a href="https://apps.apple.com/app/id6820880105" style="display:inline-block;background:#000;color:#fff;text-decoration:none;border-radius:10px;border:1px solid rgba(255,255,255,.35);padding:10px 16px;margin:4px;' . $sans . ';font-size:15px;font-weight:700">App Store</a>'
-		. '<a href="https://play.google.com/store/apps/details?id=com.eastwoodfc.team" style="display:inline-block;background:#000;color:#fff;text-decoration:none;border-radius:10px;border:1px solid rgba(255,255,255,.35);padding:10px 16px;margin:4px;' . $sans . ';font-size:15px;font-weight:700">Google Play</a>';
+	$img   = plugins_url( 'assets/email/', dirname( __DIR__ ) . '/eastwood-fwp.php' );
+	$store = '<table role="presentation" align="center" cellpadding="0" cellspacing="0" style="margin:0 auto"><tr>'
+		. '<td style="padding:4px"><a href="https://apps.apple.com/app/id6820880105"><img src="' . esc_url( $img . 'app-store.png' ) . '" alt="App Store" width="150" height="46" style="display:block;width:150px;height:46px;border:0"></a></td>'
+		. '<td style="padding:4px"><a href="https://play.google.com/store/apps/details?id=com.eastwoodfc.team"><img src="' . esc_url( $img . 'google-play.png' ) . '" alt="Google Play" width="150" height="46" style="display:block;width:150px;height:46px;border:0"></a></td>'
+		. '</tr></table>';
 	$btn = function ( $href, $label, $solid ) use ( $anton ) {
 		return '<a href="' . esc_url( $href ) . '" style="display:block;text-align:center;text-decoration:none;border-radius:10px;padding:15px 10px;margin-top:10px;' . $anton . ';font-size:19px;letter-spacing:.5px;'
 			. ( $solid ? 'background:#CC0000;color:#ffffff;border:2px solid #CC0000' : 'background:#ffffff;color:#121417;border:2px solid #121417' ) . '">' . esc_html( $label ) . '</a>';
