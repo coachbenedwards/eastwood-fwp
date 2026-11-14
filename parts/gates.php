@@ -38,14 +38,20 @@ function ew_gate_list() {
 		'3'  => array( 'Gate 3', 'Coronation Park End' ),
 		'N4' => array( 'Gate N4', 'North End' ),
 		'N5' => array( 'Gate N5', 'North End' ),
+		'H'  => array( 'Hospitality Gate', 'Chewton St End, main doors next to Gate 1' ),
 	);
+}
+
+/** Gates given out by hand only (never shared out automatically). */
+function ew_gate_manual_only() {
+	return array( 'H' );
 }
 
 function ew_gates_cfg() {
 	$s = get_option( 'ew_gates', array() );
 	$s = wp_parse_args( is_array( $s ) ? $s : array(), array(
 		'on'      => 0,
-		'open'    => array_keys( ew_gate_list() ),
+		'open'    => array_diff( array_keys( ew_gate_list() ), ew_gate_manual_only() ),
 		'moves'   => array(),
 		'updated' => 0,
 		'auto'    => 1,
@@ -55,7 +61,7 @@ function ew_gates_cfg() {
 		'tills'   => array(),
 	) );
 	$s['msgs'] = wp_parse_args( is_array( $s['msgs'] ) ? $s['msgs'] : array(), ew_gate_msg_defaults() );
-	$all       = array_keys( ew_gate_list() );
+	$all       = array_diff( array_keys( ew_gate_list() ), ew_gate_manual_only() );
 	$s['open'] = array_values( array_intersect( $all, (array) $s['open'] ) );
 	$s['moves'] = is_array( $s['moves'] ) ? $s['moves'] : array();
 	$s['queues'] = is_array( $s['queues'] ) ? $s['queues'] : array();
@@ -760,3 +766,32 @@ add_action( 'ew_square_paid', function ( $acct, $p ) {
 		update_post_meta( $id, '_ewt_' . $k, $v );
 	}
 }, 10, 2 );
+
+/**
+ * A booking's own gate, set by hand on the booking screen, e.g. a family put
+ * on the Hospitality Gate. "Automatic" leaves it to be shared out.
+ */
+add_action( 'add_meta_boxes_ewt_booking', function () {
+	add_meta_box( 'ewt_gate_box', 'Matchday gate', function ( $post ) {
+		wp_nonce_field( 'ewt_gate_box', 'ewt_gate_box_nonce' );
+		$have = (string) get_post_meta( $post->ID, '_ewt_gate', true );
+		echo '<select name="ewt_gate" style="width:100%"><option value="">Automatic</option>';
+		foreach ( ew_gate_list() as $k => $nm ) {
+			echo '<option value="' . esc_attr( $k ) . '"' . selected( $have, (string) $k, false ) . '>' . esc_html( $nm[0] . ' · ' . $nm[1] ) . '</option>';
+		}
+		echo '</select><p class="description">Shows live on their ticket in the app and on the website.</p>';
+	}, 'ewt_booking', 'side', 'high' );
+} );
+
+add_action( 'save_post_ewt_booking', function ( $id ) {
+	if ( ! isset( $_POST['ewt_gate_box_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['ewt_gate_box_nonce'] ) ), 'ewt_gate_box' ) || ! current_user_can( 'edit_post', $id ) ) {
+		return;
+	}
+	$g = isset( $_POST['ewt_gate'] ) ? sanitize_text_field( wp_unslash( $_POST['ewt_gate'] ) ) : '';
+	if ( '' === $g ) {
+		delete_post_meta( $id, '_ewt_gate' );
+	} elseif ( isset( ew_gate_list()[ $g ] ) ) {
+		update_post_meta( $id, '_ewt_gate', $g );
+	}
+	delete_transient( 'ew_gate_load' );
+} );

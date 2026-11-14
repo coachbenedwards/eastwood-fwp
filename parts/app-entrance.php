@@ -34,6 +34,7 @@ function ew_ent_places() {
 		'Gate 3 · Coronation Park End',
 		'Gate N4 · North End',
 		'Gate N5 · North End',
+		'Hospitality Gate · Chewton St End, main doors next to Gate 1',
 	);
 }
 
