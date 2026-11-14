@@ -62,7 +62,7 @@ function ew_acc_defaults() {
 		'link_failed'   => 'That link did not work. It only works in the browser you asked from, for one hour. Ask for a new one.',
 		'id_label'      => 'MyEastwood · ID',
 		'tickets_title' => 'Your tickets',
-		'day_link'      => 'My day',
+		'day_link'      => 'My Matchday',
 		'day_url'       => '/myday/',
 		'signed_as'     => 'Signed in as',
 		'sign_out'      => 'Sign out',

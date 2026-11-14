@@ -1,6 +1,6 @@
 <?php
 /**
- * eastwoodfc.com/myday: "Your day at Eastwood", for someone with a ticket.
+ * eastwoodfc.com/myday: "My Matchday", for someone with a ticket.
  *
  * [eastwood_day]
  * time|title|line|marker
@@ -38,7 +38,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 function ew_day_defaults() {
 	return array(
 		'id_label'      => 'MyEastwood · ID',
-		'title'         => 'Your day at Eastwood',
+		'title'         => 'My Matchday',
 		'kickoff_label' => 'Kick-off',
 		'versus'        => 'v',
 		'ticket_label'  => 'Your ticket',
@@ -46,7 +46,7 @@ function ew_day_defaults() {
 		'entrance_label' => 'Your entrance',
 		'queue_label'   => 'Queue',
 		'used'          => 'Used',
-		'day_title'     => 'Your day',
+		'day_title'     => 'Running order',
 		'offer_tag'     => 'Offer',
 		'next_label'    => 'Your next game',
 		'next_offer'    => '',
@@ -59,7 +59,7 @@ function ew_day_defaults() {
 		'tickets_url'   => '/my-tickets/',
 		'signed_as'     => 'Signed in as',
 		'sign_out'      => 'Sign out',
-		'signin_title'  => 'Sign in to see your day',
+		'signin_title'  => 'Sign in to see My Matchday',
 		'signin_line'   => 'The same account as My Tickets and the Eastwood FC app.',
 		'email_label'   => 'Email',
 		'password_label' => 'Password',
