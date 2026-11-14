@@ -21,7 +21,8 @@ add_shortcode( 'eastwood_matchday_banner', function ( $atts ) {
 		'kicker'      => 'MATCH DAY',
 		'title'       => 'EASTWOOD FC v HUCKNALL TOWN',
 		'when'        => 'Today · Gates open 1pm · Kick-off 3pm',
-		'crowd'       => 'Capacity crowd expected, with over 3,000 tickets claimed. Arrive early and check the travel info before you set off.',
+		'crowd'       => 'Capacity crowd expected, with over 3,000 tickets claimed.',
+		'crowd2'      => 'Arrive early and check the travel info before you set off.',
 		'travel_btn'  => 'TRAVEL INFO',
 		'travel_url'  => home_url( '/matchday/' ),
 		'home_btn'    => 'GET TICKETS',
@@ -52,7 +53,7 @@ add_shortcode( 'eastwood_matchday_banner', function ( $atts ) {
 		. '.ewmb-away .t{display:flex;align-items:center;gap:12px;font-family:Anton,Impact,sans-serif;font-size:24px;line-height:1.1;color:' . esc_attr( $col ) . '}.ewmb-away img{width:48px;height:48px;object-fit:contain}'
 		. '.ewmb-away p{margin:0;font-size:15px;color:#ededf0}.ewmb a.ewmb-aw{background:' . esc_attr( $col ) . ';color:' . esc_attr( $ink ) . ';height:52px}'
 		. '@media(max-width:820px){.ewmb-wrap{margin:12px 16px}.ewmb-top{font-size:19px;padding:12px 18px}.ewmb{grid-template-columns:1fr}.ewmb h2{font-size:28px}.ewmb-away{border-left:0;border-top:6px solid ' . esc_attr( $col ) . '}.ewmb-btns a.ewmb-b{flex:1}.ewmb-away a.ewmb-b{flex:none}}</style>'
-		. '<div class="ewmb-wrap"><div class="ewmb-top">' . esc_html( $a['crowd'] ) . '</div><div class="ewmb"><div class="ewmb-main"><div class="ewmb-k">' . esc_html( $a['kicker'] ) . '</div><h2>' . esc_html( $a['title'] ) . '</h2><div class="ewmb-w">' . esc_html( $a['when'] ) . '</div>'
+		. '<div class="ewmb-wrap"><div class="ewmb-top"><span style="display:block">' . esc_html( $a['crowd'] ) . '</span>' . ( '' !== trim( (string) $a['crowd2'] ) ? '<span style="display:block">' . esc_html( $a['crowd2'] ) . '</span>' : '' ) . '</div><div class="ewmb"><div class="ewmb-main"><div class="ewmb-k">' . esc_html( $a['kicker'] ) . '</div><h2>' . esc_html( $a['title'] ) . '</h2><div class="ewmb-w">' . esc_html( $a['when'] ) . '</div>'
 		. '<div class="ewmb-btns"><a class="ewmb-b ewmb-red" href="' . esc_url( $a['home_url'] ) . '">' . esc_html( $a['home_btn'] ) . '</a><a class="ewmb-b ewmb-line" href="' . esc_url( $a['travel_url'] ) . '">' . esc_html( $a['travel_btn'] ) . '</a></div></div>'
 		. '<div class="ewmb-away"><div class="t"><img src="' . esc_url( $a['away_badge'] ) . '" alt="">' . esc_html( $a['away_title'] ) . '</div><p>' . esc_html( $a['away_text'] ) . '</p>'
 		. '<a class="ewmb-b ewmb-aw" href="' . esc_url( $a['away_url'] ) . '">' . esc_html( $a['away_btn'] ) . '</a></div></div></div>';
