@@ -52,12 +52,14 @@ function ew_gates_cfg() {
 		'msgs'    => array(),
 		'sent'    => array(),
 		'queues'  => array(),
+		'tills'   => array(),
 	) );
 	$s['msgs'] = wp_parse_args( is_array( $s['msgs'] ) ? $s['msgs'] : array(), ew_gate_msg_defaults() );
 	$all       = array_keys( ew_gate_list() );
 	$s['open'] = array_values( array_intersect( $all, (array) $s['open'] ) );
 	$s['moves'] = is_array( $s['moves'] ) ? $s['moves'] : array();
 	$s['queues'] = is_array( $s['queues'] ) ? $s['queues'] : array();
+	$s['tills']  = is_array( $s['tills'] ) ? $s['tills'] : array();
 	// The gate-change wording used to name the old gate; it no longer does.
 	if ( false !== strpos( (string) $s['msgs']['change_b'], '{from}' ) ) {
 		$s['msgs']['change_b'] = ew_gate_msg_defaults()['change_b'];
@@ -338,6 +340,16 @@ function ew_gates_save( $in ) {
 	if ( isset( $in['auto'] ) ) {
 		$cfg['auto'] = (int) ! empty( $in['auto'] );
 	}
+	if ( isset( $in['tills'] ) && is_array( $in['tills'] ) ) {
+		$t = array();
+		foreach ( $in['tills'] as $g => $v ) {
+			$g = (string) $g;
+			if ( in_array( $g, $all, true ) ) {
+				$t[ $g ] = sanitize_text_field( wp_unslash( (string) $v ) );
+			}
+		}
+		$cfg['tills'] = $t;
+	}
 	if ( isset( $in['queues'] ) && is_array( $in['queues'] ) ) {
 		$q = array();
 		foreach ( $in['queues'] as $g => $v ) {
@@ -482,6 +494,7 @@ function ew_gates_page() {
 			'moves' => isset( $_POST['moves'] ) ? (array) wp_unslash( $_POST['moves'] ) : array(),
 			'auto'  => ! empty( $_POST['auto'] ),
 			'queues' => isset( $_POST['queues'] ) ? (array) wp_unslash( $_POST['queues'] ) : array(),
+			'tills'  => isset( $_POST['tills'] ) ? (array) wp_unslash( $_POST['tills'] ) : array(),
 			'msgs'  => isset( $_POST['msgs'] ) ? (array) wp_unslash( $_POST['msgs'] ) : array(),
 		);
 		// phpcs:enable
@@ -528,7 +541,7 @@ function ew_gates_page() {
 	echo '<form method="post">';
 	wp_nonce_field( 'ew_gates', 'ew_gates_nonce' );
 	echo '<p><label><input type="checkbox" name="on" value="1"' . checked( ! empty( $cfg['on'] ), true, false ) . '> <strong>Give every ticket its own gate</strong></label></p>';
-	echo '<table class="widefat striped" style="max-width:960px"><thead><tr><th>Gate</th><th>Takes new tickets</th><th>Tickets</th><th>People given this gate</th><th>Send these people to</th><th>People coming here now</th><th>Queue letters</th></tr></thead><tbody>';
+	echo '<table class="widefat striped" style="max-width:960px"><thead><tr><th>Gate</th><th>Takes new tickets</th><th>Tickets</th><th>People given this gate</th><th>Send these people to</th><th>People coming here now</th><th>Queue letters</th><th>Square till here</th></tr></thead><tbody>';
 	foreach ( $names as $k => $nm ) {
 		$sel = isset( $cfg['moves'][ $k ] ) ? $cfg['moves'][ $k ] : '';
 		echo '<tr><td><strong>' . esc_html( $nm[0] ) . '</strong><br><span class="description">' . esc_html( $nm[1] ) . '</span></td>';
@@ -542,7 +555,8 @@ function ew_gates_page() {
 		}
 		echo '<option value="spread"' . selected( $sel, 'spread', false ) . '>Spread across the other open gates</option></select></td>';
 		echo '<td><strong>' . (int) $now[ $k ] . '</strong></td>';
-		echo '<td><input type="text" size="8" name="queues[' . esc_attr( $k ) . ']" value="' . esc_attr( isset( $cfg['queues'][ $k ] ) ? $cfg['queues'][ $k ] : '' ) . '" placeholder="A, B, C"></td></tr>';
+		echo '<td><input type="text" size="8" name="queues[' . esc_attr( $k ) . ']" value="' . esc_attr( isset( $cfg['queues'][ $k ] ) ? $cfg['queues'][ $k ] : '' ) . '" placeholder="A, B, C"></td>';
+		echo '<td><input type="text" size="18" name="tills[' . esc_attr( $k ) . ']" value="' . esc_attr( isset( $cfg['tills'][ $k ] ) ? $cfg['tills'][ $k ] : '' ) . '" placeholder="Square Handheld 4587"></td></tr>';
 	}
 	echo '</tbody></table>';
 	if ( $none ) {
@@ -552,7 +566,7 @@ function ew_gates_page() {
 	echo '<button class="button" type="submit" name="assign" value="missing">Save and give a gate to every ticket without one</button> ';
 	echo '<button class="button" type="submit" name="assign" value="queues">Share out the queue letters again</button> ';
 	echo '<button class="button" type="submit" name="assign" value="fresh" onclick="return confirm(\'Give every ticket a gate again from scratch? People who already looked will see a different gate.\')">Share out every ticket again</button></p>';
-	echo '<p class="description">Updated ' . esc_html( $cfg['updated'] ? wp_date( 'D j M, g:ia', (int) $cfg['updated'] ) : 'never' ) . '. Moving a gate doesn\'t change the ticket\'s own gate, so setting it back to "Keep" undoes the move. Queue letters: leave blank for no queues; tickets show "Gate 3 · Queue B" when set.</p>';
+	echo '<p class="description">Updated ' . esc_html( $cfg['updated'] ? wp_date( 'D j M, g:ia', (int) $cfg['updated'] ) : 'never' ) . '. Moving a gate doesn\'t change the ticket\'s own gate, so setting it back to "Keep" undoes the move. Queue letters: leave blank for no queues; tickets show "Gate 3 · Queue B" when set. Square till here: the till\'s name as Square shows it; people paying on the gate at that till are counted at that gate.</p>';
 	echo '<h2>Alerts to ticket holders</h2>';
 	echo '<p>Like gate calls at an airport. Each person gets their own gate in the alert. They go to phones signed in to the Eastwood FC app with the email the ticket was booked with. {gate} (with the queue letter when there is one), {end} and {game} are filled in for each person.</p>';
 	echo '<p><label><input type="checkbox" name="auto" value="1"' . checked( ! empty( $cfg['auto'] ), true, false ) . '> Send a gate-change alert automatically when a gate is moved</label></p>';
@@ -641,3 +655,108 @@ add_action( 'rest_api_init', function () {
 		),
 	) );
 } );
+
+// ---------- Pay on the gate (Square tills) ----------
+
+/** Admission items on the Square tills: name => 'adult' or 'child'. Anything else on a sale is ignored. */
+function ew_gate_till_items() {
+	return array(
+		'Eastwood · Adult'                      => 'adult',
+		'Eastwood · Concession'                 => 'adult',
+		'Eastwood · Season ticket'              => 'adult',
+		'Eastwood · Under 16'                   => 'child',
+		'Eastwood · Under 16 with paying adult' => 'child',
+		'Away · Adult'                          => 'adult',
+		'Away · Concession'                     => 'adult',
+		'Away · Under 16'                       => 'child',
+		'Away · Child with adult'               => 'child',
+	);
+}
+
+/**
+ * A sale on a Square till that includes admission: count those people in at
+ * the gate that till is set against (or as "a gate till" when none is set),
+ * and when Square has the payer's email, make them a paid ticket already
+ * marked as in, so they're a customer with the ticket in their app.
+ */
+add_action( 'ew_square_paid', function ( $acct, $p ) {
+	if ( empty( $p['order_id'] ) || ! function_exists( 'ew_sqt_get' ) ) {
+		return;
+	}
+	$o = (array) ( ew_sqt_get( $acct, 'orders/' . rawurlencode( (string) $p['order_id'] ) )['order'] ?? array() );
+	$kinds = ew_gate_till_items();
+	$adults = 0;
+	$children = 0;
+	$lines = array();
+	foreach ( (array) ( $o['line_items'] ?? array() ) as $li ) {
+		$name = trim( (string) ( $li['name'] ?? '' ) );
+		$q    = (int) round( (float) ( $li['quantity'] ?? 0 ) );
+		if ( $q < 1 || ! isset( $kinds[ $name ] ) ) {
+			continue;
+		}
+		if ( 'child' === $kinds[ $name ] ) {
+			$children += $q;
+		} else {
+			$adults += $q;
+		}
+		$lines[] = $q . ' × ' . $name;
+	}
+	$heads = $adults + $children;
+	if ( $heads < 1 ) {
+		return;
+	}
+	$device = trim( (string) ( $p['device_details']['device_name'] ?? '' ) );
+	$cfg    = ew_gates_cfg();
+	$gate   = 'till';
+	foreach ( (array) $cfg['tills'] as $g => $names ) {
+		foreach ( preg_split( '/\s*,\s*/', (string) $names ) as $n ) {
+			if ( '' !== $n && '' !== $device && 0 === strcasecmp( $n, $device ) ) {
+				$gate = (string) $g;
+				break 2;
+			}
+		}
+	}
+	if ( function_exists( 'ew_runs_sb' ) ) {
+		ew_runs_sb( 'POST', '/rest/v1/gate_admissions', array(
+			'gate'  => $gate,
+			'heads' => min( 50, $heads ),
+			'kind'  => 'gate_pay',
+			'ref'   => (string) $p['order_id'],
+		), array( 'Prefer' => 'return=minimal' ) );
+	}
+	$email = function_exists( 'ew_sqt_email' ) ? strtolower( trim( (string) ew_sqt_email( $acct, $p ) ) ) : '';
+	if ( ! is_email( $email ) ) {
+		return;
+	}
+	$name = '';
+	if ( ! empty( $p['customer_id'] ) ) {
+		$c    = (array) ( ew_sqt_get( $acct, 'customers/' . rawurlencode( (string) $p['customer_id'] ), HOUR_IN_SECONDS )['customer'] ?? array() );
+		$name = trim( (string) ( $c['given_name'] ?? '' ) . ' ' . (string) ( $c['family_name'] ?? '' ) );
+	}
+	do {
+		$code = 'EFC-' . wp_rand( 1000, 9999 );
+	} while ( get_posts( array( 'post_type' => 'ewt_booking', 'post_status' => 'any', 'numberposts' => 1, 'fields' => 'ids', 'meta_key' => '_ewt_code', 'meta_value' => $code ) ) ); // phpcs:ignore WordPress.DB.SlowDBQuery
+	$id = wp_insert_post( array( 'post_type' => 'ewt_booking', 'post_status' => 'publish', 'post_title' => '' !== $name ? $name : $email ) );
+	if ( ! $id || is_wp_error( $id ) ) {
+		return;
+	}
+	$e = function_exists( 'ew_ent_get' ) ? ew_ent_get() : array( 'game' => '' );
+	foreach ( array(
+		'name'     => $name,
+		'email'    => $email,
+		'event'    => trim( (string) $e['game'] ),
+		'lines'    => implode( ', ', $lines ),
+		'adults'   => $adults,
+		'children' => $children,
+		'total'    => (int) ( $p['total_money']['amount'] ?? 0 ) / 100,
+		'status'   => 'paid',
+		'code'     => $code,
+		'key'      => wp_generate_password( 12, false ),
+		'source'   => 'gate_till',
+		'square'   => (string) $p['order_id'],
+		'gate'     => 'till' === $gate ? '' : $gate,
+		'in'       => current_time( 'mysql' ),
+	) as $k => $v ) {
+		update_post_meta( $id, '_ewt_' . $k, $v );
+	}
+}, 10, 2 );

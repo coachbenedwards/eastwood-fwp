@@ -166,6 +166,9 @@ function ew_sqt_handle( $acct, $ev ) {
 			'order'       => (string) ( $p['order_id'] ?? '' ),
 			'receipt'     => (string) ( $p['receipt_number'] ?? '' ),
 		), ew_sqt_email( $acct, $p ), $map[ $status ][1] );
+		if ( 'COMPLETED' === $status ) {
+			do_action( 'ew_square_paid', $acct, $p );
+		}
 		return;
 	}
 
