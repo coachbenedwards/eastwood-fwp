@@ -85,6 +85,9 @@ function ew_mt_defaults() {
 		'away_colour'  => '#FFD200',
 		'away_ink'     => '#111111',
 		'travel_head'  => 'GETTING HERE',
+		'away_bg'      => plugins_url( 'assets/claim/ticket-bg-hucknall.jpg', dirname( __DIR__ ) . '/eastwood-fwp.php' ),
+		'sponsor_label' => 'SPONSORED BY',
+		'sponsor_logo' => plugins_url( 'assets/email/solopress-white.png', dirname( __DIR__ ) . '/eastwood-fwp.php' ),
 	);
 }
 
@@ -137,6 +140,8 @@ function ew_mt_away_head( $a ) {
 		. '.ewmt-away .t{font-family:Anton,Impact,sans-serif;font-size:30px;line-height:1.05;color:' . esc_attr( $col ) . ';margin:4px 0}'
 		. '.ewmt-away .x{font-size:15px;line-height:1.45;color:#ededf0;margin:0}'
 		. '.ewmt.is-away .ewmt-tie em{color:' . esc_attr( $col ) . '}'
+		. ( '' !== trim( (string) $a['away_bg'] ) ? '.ewmt.is-away .ewmt-tkMatch{background:linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,.72)),url(' . esc_url( $a['away_bg'] ) . ') left center/cover no-repeat}' : '' )
+		. '.ewmt-spons{display:flex;align-items:center;gap:10px;margin:4px 0 0}.ewmt-spons span{font-family:Anton,Impact,sans-serif;font-size:13px;letter-spacing:1px;color:#c9c9cf}.ewmt-spons img{height:20px;width:auto;display:block}'
 		. '.ewmt.is-away .ewmt-go,.ewmt.is-away .ewmt-go:hover{background:' . esc_attr( $col ) . ';border-color:' . esc_attr( $col ) . ';color:' . esc_attr( $ink ) . '}'
 		. '.ewmt-travel{margin:28px 0 8px}.ewmt-travel h2{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:26px;margin:0 0 6px;color:#121417;background:none;padding:0}'
 		. '.ewmt-travel .a{font-size:15px;color:#3a3f46;margin:0 0 8px}.ewmt-travel .r{border-top:1px solid #e4e5e8;padding:12px 0}.ewmt-travel .r b{display:block;font-size:15px;color:#121417}.ewmt-travel .r span{display:block;font-size:15px;line-height:1.5;color:#3a3f46;margin-top:2px}'
@@ -338,6 +343,9 @@ function ew_mt_one( $m, $a ) {
 	$h .= '<p class="ewmt-tkWhen"><b>' . esc_html( $ts ? date_i18n( 'l j F Y', $ts ) : '' ) . '</b>'
 		. '<i>' . esc_html( $ts ? date_i18n( 'H:i', $ts ) : '' ) . '</i></p>';
 	$h .= '<p class="ewmt-tkAt">Coronation Park, Chewton Street, Eastwood NG16 3HB</p>';
+	if ( $is_away && '' !== trim( (string) $a['sponsor_logo'] ) ) {
+		$h .= '<p class="ewmt-spons"><span>' . esc_html( $a['sponsor_label'] ) . '</span><img src="' . esc_url( $a['sponsor_logo'] ) . '" alt=""></p>';
+	}
 	if ( $st['cap'] ) {
 		$h .= '<p class="ewmt-tkLeft">' . esc_html( str_replace( '{n}', number_format_i18n( $st['left'] ), $a['left'] ) ) . '</p>';
 	}
