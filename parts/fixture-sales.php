@@ -917,7 +917,11 @@ function ew_sales_admin() {
 				<?php
 				echo $tix['cap']
 					? esc_html( $tix['sold'] . ' sold, ' . $tix['left'] . ' left' )
-					: 'no limit';
+					: esc_html( $tix['sold'] . ' sold, no limit' );
+				if ( function_exists( 'ew_mt_away' ) ) {
+					$away = ew_mt_away( $id );
+					echo esc_html( ' · away fans ' . $away['seats'] );
+				}
 				?>
 			</span>
 			</p>

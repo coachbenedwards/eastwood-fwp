@@ -522,6 +522,10 @@ function ew_mt_start( $req ) {
 	}
 	update_post_meta( $bid, '_ewt_fixture', (int) $b['fx'] );
 	update_post_meta( $bid, '_ewt_seats', (int) $b['seats'] );
+	// Bought through the away fans link (?fan=away): counted apart.
+	if ( 'away' === ( $_COOKIE['ew_fan'] ?? '' ) ) { // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+		update_post_meta( $bid, '_ewt_fan', 'away' );
+	}
 	return array( 'bid' => (int) $bid, 'key' => ew_tix_key( $bid ) );
 }
 
@@ -968,3 +972,30 @@ add_action( 'wp_head', function () {
 			. '?family=Anton&amp;family=Instrument+Sans:wght@400;600;700&amp;display=swap">' . "\n";
 	}
 }, 20 );
+
+
+/* The away fans link is the tickets link with ?fan=away. The page is cached,
+   so the browser remembers it for the day and the checkout reads it. */
+add_action( 'wp_footer', function () {
+	echo "<script>(function(){try{var f=new URLSearchParams(location.search).get('fan');if(f==='away'){document.cookie='ew_fan=away;path=/;max-age=86400;samesite=lax';}else if(f==='home'){document.cookie='ew_fan=;path=/;max-age=0';}}catch(e){}})();</script>";
+}, 31 );
+
+/** Away fans' paid tickets for a fixture: bookings and seats. */
+function ew_mt_away( $fx ) {
+	$ids = get_posts( array(
+		'post_type'   => 'ewt_booking',
+		'post_status' => 'any',
+		'numberposts' => -1,
+		'fields'      => 'ids',
+		'meta_query'  => array( // phpcs:ignore WordPress.DB.SlowDBQuery
+			array( 'key' => '_ewt_fixture', 'value' => (int) $fx ),
+			array( 'key' => '_ewt_status', 'value' => 'paid' ),
+			array( 'key' => '_ewt_fan', 'value' => 'away' ),
+		),
+	) );
+	$seats = 0;
+	foreach ( $ids as $id ) {
+		$seats += max( 0, (int) get_post_meta( $id, '_ewt_seats', true ) );
+	}
+	return array( 'bookings' => count( $ids ), 'seats' => $seats );
+}
