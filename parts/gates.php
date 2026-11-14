@@ -59,7 +59,10 @@ function ew_gates_cfg() {
 		'sent'    => array(),
 		'queues'  => array(),
 		'tills'   => array(),
+		'away'    => array(),
+		'away_only' => 0,
 	) );
+	$s['away'] = array_values( array_intersect( array_keys( ew_gate_list() ), (array) $s['away'] ) );
 	$s['msgs'] = wp_parse_args( is_array( $s['msgs'] ) ? $s['msgs'] : array(), ew_gate_msg_defaults() );
 	$all       = array_diff( array_keys( ew_gate_list() ), ew_gate_manual_only() );
 	$s['open'] = array_values( array_intersect( $all, (array) $s['open'] ) );
@@ -154,18 +157,32 @@ function ew_gate_assign( $id, $cfg = null ) {
 	if ( isset( ew_gate_list()[ $have ] ) ) {
 		return $have;
 	}
-	if ( ! $cfg['open'] ) {
+	// Away fans go to the gates set for them; with "away fans only" on, home fans are kept off those gates.
+	$pool = $cfg['open'];
+	if ( $cfg['away'] ) {
+		if ( ew_gate_is_away( $id ) ) {
+			$pool = $cfg['away'];
+		} elseif ( ! empty( $cfg['away_only'] ) && array_diff( $pool, $cfg['away'] ) ) {
+			$pool = array_values( array_diff( $pool, $cfg['away'] ) );
+		}
+	}
+	if ( ! $pool ) {
 		return '';
 	}
 	$load = get_transient( 'ew_gate_load' );
 	if ( ! is_array( $load ) ) {
 		$load = ew_gate_load();
 	}
-	$g = ew_gate_pick( $load, $cfg['open'] );
+	$g = ew_gate_pick( $load, $pool );
 	update_post_meta( $id, '_ewt_gate', $g );
 	$load[ $g ] += ew_gate_heads( $id );
 	set_transient( 'ew_gate_load', $load, 10 * MINUTE_IN_SECONDS );
 	return $g;
+}
+
+/** A ticket bought through the away fans link. */
+function ew_gate_is_away( $id ) {
+	return 'away' === (string) get_post_meta( $id, '_ewt_fan', true );
 }
 
 /** Where a ticket for gate $g goes right now, after any move. */
@@ -350,6 +367,10 @@ function ew_gates_save( $in ) {
 	if ( isset( $in['auto'] ) ) {
 		$cfg['auto'] = (int) ! empty( $in['auto'] );
 	}
+	if ( isset( $in['away'] ) ) {
+		$cfg['away']      = array_values( array_intersect( array_keys( ew_gate_list() ), array_map( 'strval', (array) $in['away'] ) ) );
+		$cfg['away_only'] = (int) ! empty( $in['away_only'] );
+	}
 	if ( isset( $in['tills'] ) && is_array( $in['tills'] ) ) {
 		$t = array();
 		foreach ( $in['tills'] as $g => $v ) {
@@ -503,6 +524,8 @@ function ew_gates_page() {
 			'open'  => isset( $_POST['open'] ) ? (array) wp_unslash( $_POST['open'] ) : array(),
 			'moves' => isset( $_POST['moves'] ) ? (array) wp_unslash( $_POST['moves'] ) : array(),
 			'auto'  => ! empty( $_POST['auto'] ),
+			'away'  => isset( $_POST['away'] ) ? (array) wp_unslash( $_POST['away'] ) : array(),
+			'away_only' => ! empty( $_POST['away_only'] ),
 			'queues' => isset( $_POST['queues'] ) ? (array) wp_unslash( $_POST['queues'] ) : array(),
 			'tills'  => isset( $_POST['tills'] ) ? (array) wp_unslash( $_POST['tills'] ) : array(),
 			'msgs'  => isset( $_POST['msgs'] ) ? (array) wp_unslash( $_POST['msgs'] ) : array(),
@@ -551,11 +574,12 @@ function ew_gates_page() {
 	echo '<form method="post">';
 	wp_nonce_field( 'ew_gates', 'ew_gates_nonce' );
 	echo '<p><label><input type="checkbox" name="on" value="1"' . checked( ! empty( $cfg['on'] ), true, false ) . '> <strong>Give every ticket its own gate</strong></label></p>';
-	echo '<table class="widefat striped" style="max-width:960px"><thead><tr><th>Gate</th><th>Takes new tickets</th><th>Tickets</th><th>People given this gate</th><th>Send these people to</th><th>People coming here now</th><th>Queue letters</th><th>Square till here</th></tr></thead><tbody>';
+	echo '<table class="widefat striped" style="max-width:960px"><thead><tr><th>Gate</th><th>Takes new tickets</th><th>Away fans</th><th>Tickets</th><th>People given this gate</th><th>Send these people to</th><th>People coming here now</th><th>Queue letters</th><th>Square till here</th></tr></thead><tbody>';
 	foreach ( $names as $k => $nm ) {
 		$sel = isset( $cfg['moves'][ $k ] ) ? $cfg['moves'][ $k ] : '';
 		echo '<tr><td><strong>' . esc_html( $nm[0] ) . '</strong><br><span class="description">' . esc_html( $nm[1] ) . '</span></td>';
 		echo '<td><input type="checkbox" name="open[]" value="' . esc_attr( $k ) . '"' . checked( in_array( $k, $cfg['open'], true ), true, false ) . '></td>';
+		echo '<td><input type="checkbox" name="away[]" value="' . esc_attr( $k ) . '"' . checked( in_array( $k, $cfg['away'], true ), true, false ) . ' aria-label="Away fans use ' . esc_attr( $nm[0] ) . '"></td>';
 		echo '<td>' . (int) $own[ $k ][0] . '</td><td>' . (int) $own[ $k ][1] . '</td>';
 		echo '<td><select name="moves[' . esc_attr( $k ) . ']"><option value="">Keep at ' . esc_html( $nm[0] ) . '</option>';
 		foreach ( $names as $k2 => $nm2 ) {
@@ -569,6 +593,7 @@ function ew_gates_page() {
 		echo '<td><input type="text" size="18" name="tills[' . esc_attr( $k ) . ']" value="' . esc_attr( isset( $cfg['tills'][ $k ] ) ? $cfg['tills'][ $k ] : '' ) . '" placeholder="Square Handheld 4587"></td></tr>';
 	}
 	echo '</tbody></table>';
+	echo '<p><label><input type="checkbox" name="away_only" value="1"' . checked( ! empty( $cfg['away_only'] ), true, false ) . '> Keep the away fans gates for away fans only</label> <span class="description">Away fans are tickets bought through the away fans link (the tickets link with ?fan=away). No away gate ticked: they get a gate like everyone else. Change it any time, then press "Share out every ticket again" to move tickets already given a gate.</span></p>';
 	if ( $none ) {
 		echo '<p>' . (int) $none . ' people on tickets without a gate yet. They get one the moment they open their ticket, or give them one now.</p>';
 	}
