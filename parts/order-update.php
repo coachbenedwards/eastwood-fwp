@@ -261,20 +261,68 @@ function ew_ou_merge_dups( $event ) {
 }
 
 /** The places set for a game, 0 for no limit. */
+/** The game a booking's event belongs to: everything before the first comma ("Eastwood FC v Hucknall Town"). */
+function ew_ou_game( $event ) {
+	return trim( strtok( (string) $event, ',' ) );
+}
+
+/** Every event name (free claims, paid tickets) that belongs to the same game. */
+function ew_ou_game_events( $event ) {
+	global $wpdb;
+	$game = ew_ou_game( $event );
+	if ( '' === $game ) {
+		return array( $event );
+	}
+	$rows = $wpdb->get_col( $wpdb->prepare( "SELECT DISTINCT meta_value FROM {$wpdb->postmeta} WHERE meta_key = '_ewt_event' AND meta_value LIKE %s", $wpdb->esc_like( $game ) . '%' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+	return $rows ? $rows : array( $event );
+}
+
+/** The places set for a game (one number across free and paid tickets), 0 for no limit. */
 function ew_ou_cap( $event ) {
 	$caps = (array) get_option( 'ew_ou_caps', array() );
+	$game = ew_ou_game( $event );
+	if ( isset( $caps[ 'game:' . $game ] ) ) {
+		return max( 0, (int) $caps[ 'game:' . $game ] );
+	}
 	return max( 0, (int) ( $caps[ $event ] ?? 0 ) );
 }
 
-/** People holding a ticket for a game, leaving out anyone who said they can't come. $skip leaves one booking out. */
+/** People holding a ticket for the whole game, leaving out anyone who said they can't come. $skip leaves one booking out. */
 function ew_ou_taken( $event, $skip = 0 ) {
 	$n = 0;
-	foreach ( ew_ou_people( $event ) as $bid => $em ) {
-		if ( (int) $bid !== (int) $skip && 'no' !== (string) get_post_meta( $bid, '_ewt_answer', true ) ) {
-			$n += ew_ou_heads( $bid );
+	foreach ( ew_ou_game_events( $event ) as $ev ) {
+		foreach ( ew_ou_people( $ev ) as $bid => $em ) {
+			if ( (int) $bid !== (int) $skip && 'no' !== (string) get_post_meta( $bid, '_ewt_answer', true ) ) {
+				$n += ew_ou_heads( $bid );
+			}
 		}
 	}
 	return $n;
+}
+
+/** Tell Ben once each as the game passes 2,500, 3,000 and the cap. */
+function ew_ou_alerts( $event ) {
+	$game = ew_ou_game( $event );
+	$cap  = ew_ou_cap( $event );
+	if ( '' === $game ) {
+		return;
+	}
+	$taken = ew_ou_taken( $event );
+	$sent  = (array) get_option( 'ew_ou_alerted', array() );
+	foreach ( array_unique( array_filter( array( 2500, 3000, $cap ) ) ) as $mark ) {
+		$k = $game . '|' . $mark;
+		if ( $taken >= $mark && empty( $sent[ $k ] ) ) {
+			$sent[ $k ] = time();
+			update_option( 'ew_ou_alerted', $sent, false );
+			$full = $cap && $mark === $cap;
+			wp_mail(
+				(string) get_option( 'ew_ou_alert_to', 'ben@eastwoodfc.com' ),
+				( $full ? 'FULL: ' : '' ) . $game . ': ' . number_format( $taken ) . ' tickets',
+				$game . "\n\n" . number_format( $taken ) . ' people now hold a ticket' . ( $cap ? ' (places: ' . number_format( $cap ) . ', ' . number_format( max( 0, $cap - $taken ) ) . ' left)' : '' ) . '.'
+					. ( $full ? "\n\nTicket sales and free claims have now stopped." : '' )
+			);
+		}
+	}
 }
 
 /**
@@ -643,8 +691,9 @@ function ew_ou_page() {
 	}
 
 	if ( 'cap' === $step && check_admin_referer( 'ew_ou' ) && $event ) {
-		$caps           = (array) get_option( 'ew_ou_caps', array() );
-		$caps[ $event ] = max( 0, (int) ( $_POST['cap'] ?? 0 ) );
+		$caps = (array) get_option( 'ew_ou_caps', array() );
+		unset( $caps[ $event ] );
+		$caps[ 'game:' . ew_ou_game( $event ) ] = max( 0, (int) ( $_POST['cap'] ?? 0 ) );
 		update_option( 'ew_ou_caps', $caps, false );
 		echo '<div class="notice notice-success"><p>Places saved.</p></div>';
 	}
@@ -710,7 +759,7 @@ function ew_ou_page() {
 		}
 		echo '<p style="font-size:16px"><strong>Coming ' . (int) $n['yes'] . " · Can't make it " . (int) $n['no'] . ' · No answer ' . (int) $n['none'] . ' · Got the app since the email ' . (int) $n['app'] . '</strong> · Sent ' . (int) $n['sent'] . ' of ' . count( $people ) . '</p>';
 		$pl = ew_ou_places( $event );
-		echo '<p style="font-size:15px">People holding a ticket: <strong>' . (int) $pl['taken'] . '</strong>' . ( $pl['cap'] ? ' of ' . (int) $pl['cap'] . ' places · <strong>' . (int) $pl['left'] . ' left</strong>' : '' )
+		echo '<p style="font-size:15px">People holding a ticket for this game (free and paid): <strong>' . (int) $pl['taken'] . '</strong>' . ( $pl['cap'] ? ' of ' . (int) $pl['cap'] . ' places · <strong>' . (int) $pl['left'] . ' left</strong>' : '' )
 			. ' &nbsp; <label>Places for this game <input type="number" min="0" name="cap" value="' . ( $pl['cap'] ? (int) $pl['cap'] : '' ) . '" placeholder="No limit" style="width:110px"></label> <button class="button" name="step" value="cap">Save places</button> <button class="button" name="step" value="dups">Merge duplicate claims</button> <button class="button" name="step" value="reclaims">Merge repeat claims (same name and email, keep the bigger)</button></p>'
 			. '<p class="description">Anyone who says they can\'t make it frees their places. Someone changing back to coming only gets back in while places are left. Blank means no limit.</p>';
 		$me = wp_get_current_user();

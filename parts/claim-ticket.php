@@ -676,6 +676,9 @@ add_action( 'rest_api_init', function () {
 			if ( function_exists( 'ew_tix_crm' ) ) {
 				ew_tix_crm( (string) $a['crm_hook'], $id, 'claimed' );
 			}
+			if ( function_exists( 'ew_ou_alerts' ) ) {
+				ew_ou_alerts( $a['event'] );
+			}
 			// The last page is the app; the shirt offer has moved into the app, so it is not sent.
 			return function_exists( 'ew_optin_finished' ) ? ew_optin_finished( $id ) : array( 'html' => ew_claim_pass_html( $a, $id ) );
 		},

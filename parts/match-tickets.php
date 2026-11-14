@@ -85,6 +85,7 @@ function ew_mt_defaults() {
 		'away_colour'  => '#FFD200',
 		'away_ink'     => '#111111',
 		'travel_head'  => 'GETTING HERE',
+		'all_gone'     => "Sorry, today's tickets have all gone.",
 		'away_bg'      => plugins_url( 'assets/claim/ticket-bg-hucknall.jpg', dirname( __DIR__ ) . '/eastwood-fwp.php' ),
 		'sponsor_label' => 'SPONSORED BY',
 		'sponsor_logo' => plugins_url( 'assets/email/solopress-white.png', dirname( __DIR__ ) . '/eastwood-fwp.php' ),
@@ -512,6 +513,9 @@ function ew_mt_booking( $s, $fx ) {
 	$bid = (int) $bid;
 
 	update_post_meta( $bid, '_ewt_status', 'paid' );
+	if ( function_exists( 'ew_ou_alerts' ) ) {
+		ew_ou_alerts( (string) ( $s['metadata']['what'] ?? '' ) );
+	}
 	update_post_meta( $bid, '_ewt_session', (string) $s['id'] );
 	update_post_meta( $bid, '_ewt_fixture', (int) $fx );
 	update_post_meta( $bid, '_ewt_seats', (int) ( $s['metadata']['seats'] ?? 0 ) );
@@ -574,6 +578,9 @@ function ew_mt_start( $req ) {
 	$b = ew_mt_basket( (int) $req->get_param( 'fx' ), (array) $req->get_param( 'items' ) );
 	if ( is_wp_error( $b ) ) {
 		return $b;
+	}
+	if ( function_exists( 'ew_ou_cap' ) && ew_ou_cap( $b['what'] ) && ew_ou_taken( $b['what'] ) + (int) $b['seats'] > ew_ou_cap( $b['what'] ) ) {
+		return new WP_Error( 'ewmt_full', $a['all_gone'], array( 'status' => 400 ) );
 	}
 	if ( ! $post || ! function_exists( 'ew_tix_booking_start' ) ) {
 		return new WP_Error( 'ewmt_failed', $a['failed'], array( 'status' => 500 ) );
