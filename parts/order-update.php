@@ -88,6 +88,23 @@ function ew_ou_by_code( $code ) {
 	return $ids ? (int) $ids[0] : 0;
 }
 
+/**
+ * A test email's code: "tst" plus the booking it's written as. Its Yes and
+ * Can't make it links open the real answer page for that booking, but nothing
+ * is recorded on it, so a test never changes anyone's answer and never expires.
+ */
+function ew_ou_test_code( $bid ) {
+	return 'tst' . str_pad( base_convert( (string) (int) $bid, 10, 36 ), 5, '0', STR_PAD_LEFT );
+}
+
+function ew_ou_test_bid( $code ) {
+	if ( ! preg_match( '/^tst([a-z0-9]{5})$/', (string) $code, $m ) ) {
+		return 0;
+	}
+	$bid = (int) base_convert( $m[1], 36, 10 );
+	return $bid && 'ewt_booking' === get_post_type( $bid ) ? $bid : 0;
+}
+
 function ew_ou_first( $name ) {
 	$f = trim( strtok( (string) $name, ' ' ) );
 	return '' === $f ? '' : ucfirst( strtolower( $f ) );
@@ -309,7 +326,18 @@ add_action( 'rest_api_init', function () {
 		'methods'             => 'POST',
 		'permission_callback' => '__return_true',
 		'callback'            => function ( WP_REST_Request $req ) {
-			$a   = 'no' === $req->get_param( 'a' ) ? 'no' : 'yes';
+			$a    = 'no' === $req->get_param( 'a' ) ? 'no' : 'yes';
+			$test = ew_ou_test_bid( (string) $req->get_param( 'r' ) );
+			if ( $test ) {
+				return array(
+					'ok'    => true,
+					'test'  => true,
+					'a'     => $a,
+					'first' => ew_ou_first( get_post_meta( $test, '_ewt_name', true ) ),
+					'ref'   => function_exists( 'ew_booking_code' ) ? ew_booking_code( $test ) : '',
+					'party' => (string) get_post_meta( $test, '_ewt_lines', true ),
+				);
+			}
 			$bid = ew_ou_by_code( (string) $req->get_param( 'r' ) );
 			if ( ! $bid ) {
 				return new WP_REST_Response( array( 'ok' => false ), 404 );
@@ -625,7 +653,7 @@ function ew_ou_page() {
 
 	if ( 'test' === $step && check_admin_referer( 'ew_ou' ) && $people ) {
 		$to = sanitize_email( wp_unslash( $_POST['test_to'] ?? '' ) );
-		$ok = is_email( $to ) && ew_ou_send( $to, (int) array_key_first( $people ), 'testtest' );
+		$ok = is_email( $to ) && ew_ou_send( $to, (int) array_key_first( $people ), ew_ou_test_code( (int) array_key_first( $people ) ) );
 		echo '<div class="notice notice-' . ( $ok ? 'success' : 'error' ) . '"><p>' . ( $ok ? 'Test sent to ' . esc_html( $to ) . ', written as the first booking on the list.' : 'The test could not be sent.' ) . '</p></div>';
 	}
 
