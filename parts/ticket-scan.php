@@ -103,6 +103,7 @@ function ew_ticket_payload($id, $status) {
 		'kind'          => (int) get_post_meta($id, '_ewt_fixture', true) > 0 ? 'match' : 'event',
 		'paid'          => 'paid' === get_post_meta($id, '_ewt_status', true),
 		// The gate this ticket was told to use, when every ticket has its own.
+		'test'          => function_exists('ew_is_test_ticket') && ew_is_test_ticket($id),
 		'gate'          => function_exists('ew_gate_for_booking') ? ((ew_gate_for_booking($id))['label'] ?? null) : null,
 	];
 }
@@ -178,7 +179,8 @@ function ew_ticket_verify(WP_REST_Request $r) {
 	if (!ew_ticket_admissible($bstatus)) {
 		return new WP_REST_Response(ew_ticket_payload($id, 'unpaid'), 200);
 	}
-	$in = get_post_meta($id, '_ewt_in', true);
+	// A staff test ticket is never used up, so the gate can be tried again and again.
+	$in = function_exists('ew_is_test_ticket') && ew_is_test_ticket($id) ? '' : get_post_meta($id, '_ewt_in', true);
 	return new WP_REST_Response(ew_ticket_payload($id, $in ? 'used' : 'valid'), 200);
 }
 
@@ -198,13 +200,14 @@ function ew_ticket_checkin(WP_REST_Request $r) {
 		return new WP_REST_Response(ew_ticket_payload($id, 'unpaid'), 200);
 	}
 
-	$in = get_post_meta($id, '_ewt_in', true);
+	$test = function_exists('ew_is_test_ticket') && ew_is_test_ticket($id);
+	$in = $test ? '' : get_post_meta($id, '_ewt_in', true);
 	if ($in) {
 		return new WP_REST_Response(ew_ticket_payload($id, 'used'), 200);
 	}
 
 	$now = current_time('mysql');
-	update_post_meta($id, '_ewt_in', $now);
+	if (!$test) update_post_meta($id, '_ewt_in', $now);
 	$payload = ew_ticket_payload($id, 'valid');
 	$payload['checked_in_at'] = $now;
 	return new WP_REST_Response($payload, 200);
