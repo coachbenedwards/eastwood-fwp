@@ -54,7 +54,7 @@ function ew_mt_defaults() {
 		'payoff'     => 'Card payments are not switched on right now. You can pay on the gate.',
 		'thanks'     => "You're in. Your tickets are on the way to your email.",
 		'ref'        => 'Reference {code}',
-		'gate'       => 'Show the email at the turnstile. Parking on site is free.',
+		'gate'       => 'Your ticket is in the Eastwood FC app. There is no spectator parking at the ground.',
 		'hosp'       => 'Make a day of it — hospitality',
 		'hosp_url'   => '/hospitality/',
 		'hosp_sub'   => 'The whole afternoon rather than a better seat: in early, food at your table, and your match ticket included.',
@@ -77,6 +77,14 @@ function ew_mt_defaults() {
 		'app_title'    => 'Your tickets are in the app',
 		'ticket_title' => 'Eastwood FC',
 		'ticket_sub'   => 'v {away}',
+		// The away fans link (?fan=away): just their ticket, in their colours, and how to get here.
+		'away_kicker'  => 'AWAY FANS',
+		'away_title'   => 'HUCKNALL TOWN FANS',
+		'away_text'    => 'Get your away tickets here. Gates open 1pm, kick-off 3pm.',
+		'away_badge'   => plugins_url( 'assets/claim/hucknall-town-white.png', dirname( __DIR__ ) . '/eastwood-fwp.php' ),
+		'away_colour'  => '#FFD200',
+		'away_ink'     => '#111111',
+		'travel_head'  => 'GETTING HERE',
 	);
 }
 
@@ -90,7 +98,11 @@ function ew_mt_shortcode( $atts ) {
 	$paid = (string) ( $_GET['ewt_paid'] ?? '' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 	$fx   = (int) ( $_GET['fx'] ?? 0 );           // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
-	$h = '<section class="ewmt" id="tickets">';
+	$away = 'away' === ( $_GET['fan'] ?? '' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+	$h    = '<section class="ewmt' . ( $away ? ' is-away' : '' ) . '" id="tickets">';
+	if ( $away ) {
+		$h .= ew_mt_away_head( $a );
+	}
 
 	if ( '' !== $paid ) {
 		$h .= ew_mt_done( $paid, $a );
@@ -103,9 +115,58 @@ function ew_mt_shortcode( $atts ) {
 		$h .= ew_mt_many( $a );
 	}
 
+	if ( $away ) {
+		$h .= ew_mt_away_travel( $a );
+	}
 	return $h . '</section>';
 }
 add_shortcode( 'eastwood_match_tickets', 'ew_mt_shortcode' );
+
+/** Away fans: their badge and colours at the top, and everything else on the page hidden. */
+function ew_mt_away_head( $a ) {
+	$col = sanitize_hex_color( $a['away_colour'] ) ? $a['away_colour'] : '#FFD200';
+	$ink = sanitize_hex_color( $a['away_ink'] ) ? $a['away_ink'] : '#111111';
+	return '<style>'
+		. 'body.ew-away [data-elementor-type="wp-page"] .elementor-widget:not(.elementor-widget-shortcode){display:none!important}'
+		. 'body.ew-away [data-elementor-type="wp-page"] .e-con:not(:has(.elementor-widget-shortcode)){display:none!important}'
+		. 'body.ew-away [data-elementor-type="wp-page"] .e-con{padding-top:0}'
+		. '.ewmt.is-away{padding-top:0}'
+		. '.ewmt-away{background:#111;border-left:6px solid ' . esc_attr( $col ) . ';border-radius:12px;padding:20px 22px;margin:0 0 18px;display:flex;align-items:center;gap:16px;color:#fff}'
+		. '.ewmt-away img{width:64px;height:64px;object-fit:contain;flex:none}'
+		. '.ewmt-away .k{font-size:12px;font-weight:700;letter-spacing:2px;color:' . esc_attr( $col ) . ';margin:0}'
+		. '.ewmt-away .t{font-family:Anton,Impact,sans-serif;font-size:30px;line-height:1.05;color:' . esc_attr( $col ) . ';margin:4px 0}'
+		. '.ewmt-away .x{font-size:15px;line-height:1.45;color:#ededf0;margin:0}'
+		. '.ewmt.is-away .ewmt-tie em{color:' . esc_attr( $col ) . '}'
+		. '.ewmt.is-away .ewmt-go,.ewmt.is-away .ewmt-go:hover{background:' . esc_attr( $col ) . ';border-color:' . esc_attr( $col ) . ';color:' . esc_attr( $ink ) . '}'
+		. '.ewmt-travel{margin:28px 0 8px}.ewmt-travel h2{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:26px;margin:0 0 6px;color:#121417;background:none;padding:0}'
+		. '.ewmt-travel .a{font-size:15px;color:#3a3f46;margin:0 0 8px}.ewmt-travel .r{border-top:1px solid #e4e5e8;padding:12px 0}.ewmt-travel .r b{display:block;font-size:15px;color:#121417}.ewmt-travel .r span{display:block;font-size:15px;line-height:1.5;color:#3a3f46;margin-top:2px}'
+		. '@media(max-width:600px){.ewmt-away{padding:16px}.ewmt-away img{width:52px;height:52px}.ewmt-away .t{font-size:24px}}'
+		. '</style>'
+		. '<div class="ewmt-away"><img src="' . esc_url( $a['away_badge'] ) . '" alt=""><div><p class="k">' . esc_html( $a['away_kicker'] ) . '</p><p class="t">' . esc_html( $a['away_title'] ) . '</p><p class="x">' . esc_html( $a['away_text'] ) . '</p></div></div>';
+}
+
+/** Away fans: how to get here, from the same words as the order update email. */
+function ew_mt_away_travel( $a ) {
+	if ( ! function_exists( 'ew_ou_get' ) ) {
+		return '';
+	}
+	$o = ew_ou_get();
+	$h = '<div class="ewmt-travel"><h2>' . esc_html( $a['travel_head'] ) . '</h2><p class="a">' . esc_html( $o['address'] ) . '</p>';
+	foreach ( preg_split( '/\r?\n/', (string) $o['rows'] ) as $line ) {
+		$bits = array_map( 'trim', explode( '|', $line, 2 ) );
+		if ( 2 === count( $bits ) && '' !== $bits[0] ) {
+			$h .= '<div class="r"><b>' . esc_html( $bits[0] ) . '</b><span>' . esc_html( $bits[1] ) . '</span></div>';
+		}
+	}
+	return $h . '</div>';
+}
+
+add_filter( 'body_class', function ( $c ) {
+	if ( 'away' === ( $_GET['fan'] ?? '' ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$c[] = 'ew-away';
+	}
+	return $c;
+} );
 
 /** One fixture from the feed, corrections applied, or null. */
 function ew_mt_game( $id ) {
@@ -255,7 +316,8 @@ function ew_mt_one( $m, $a ) {
 	$away = (array) ( $m['away-team'] ?? array() );
 	$want = ew_mt_wanted();
 
-	$h  = '<p class="ewmt-back"><a href="' . esc_url( remove_query_arg( array( 'fx', 'q' ) ) ) . '">'
+	$is_away = 'away' === ( $_GET['fan'] ?? '' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+	$h       = $is_away ? '' : '<p class="ewmt-back"><a href="' . esc_url( remove_query_arg( array( 'fx', 'q', 'fan' ) ) ) . '">'
 		. '&larr; ' . esc_html( $a['back'] ) . '</a></p>';
 
 	$h .= '<div class="ewmt-tk" data-fx="' . $id . '" data-page="' . (int) get_the_ID() . '"'
@@ -317,7 +379,7 @@ function ew_mt_one( $m, $a ) {
 	$h .= '<div class="ewmt-mount" data-ewmt-mount></div>';
 	$h .= '</div>';
 
-	return $h . ew_mt_hosp( $a );
+	return $h . ( $is_away ? '' : ew_mt_hosp( $a ) );
 }
 
 /** The numbers the fixture card handed over: "adult:2,u16:2". */
