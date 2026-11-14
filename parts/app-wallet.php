@@ -41,17 +41,13 @@ function ew_wallet_email( $w ) {
 }
 
 /**
- * Wrong tries are counted per email from one address (ten an hour), so a
- * crowd sharing the ground WiFi never locks each other out. A wider cap of
- * 200 an hour per address still stops anyone guessing at scale.
+ * Ten wrong tries an hour per email, then that email waits. Nothing is shared
+ * between people, so a crowd on one WiFi or one mobile network can never lock
+ * each other out.
  */
 function ew_wallet_throttled( $email = '' ) {
-	$ip  = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
-	$key = 'ew_wtry_' . md5( $ip . '|' . strtolower( trim( (string) $email ) ) );
-	$all = 'ew_wtry_ip_' . md5( $ip );
-	$n   = (int) get_transient( $key );
-	$a   = (int) get_transient( $all );
-	return array( $key, ( $a >= 200 ) ? 10 : $n, $all, $a );
+	$key = 'ew_wtry_' . md5( strtolower( trim( (string) $email ) ) );
+	return array( $key, (int) get_transient( $key ) );
 }
 
 /** The QR code as rows of 1s and 0s, so the app draws it without a library. */
@@ -108,7 +104,7 @@ add_action( 'rest_api_init', function () {
 		'methods'             => 'POST',
 		'permission_callback' => '__return_true',
 		'callback'            => function ( $req ) {
-			list( $tkey, $tries, $akey, $atries ) = ew_wallet_throttled( (string) $req->get_param( 'email' ) );
+			list( $tkey, $tries ) = ew_wallet_throttled( (string) $req->get_param( 'email' ) );
 			if ( $tries >= 10 ) {
 				return new WP_REST_Response( array( 'message' => 'Too many tries. Please wait an hour and try again.' ), 429 );
 			}
@@ -150,7 +146,6 @@ add_action( 'rest_api_init', function () {
 			}
 			if ( ! $bid ) {
 				set_transient( $tkey, $tries + 1, HOUR_IN_SECONDS );
-				set_transient( $akey, $atries + 1, HOUR_IN_SECONDS );
 				return new WP_REST_Response( array( 'message' => "We couldn't find that booking. Check the email and the reference in your confirmation email." ), 404 );
 			}
 			$email = (string) get_post_meta( $bid, '_ewt_email', true );
