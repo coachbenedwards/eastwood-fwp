@@ -157,6 +157,12 @@ add_action( 'rest_api_init', function () {
 			}
 			$emails = ew_fan_emails( $fan );
 			$ids    = ew_wallet_ids_for( $emails );
+			// The first time a booking shows in someone's app: counted on the order update screens.
+			foreach ( $ids as $bid ) {
+				if ( ! get_post_meta( $bid, '_ewt_in_app', true ) ) {
+					update_post_meta( $bid, '_ewt_in_app', time() );
+				}
+			}
 			nocache_headers();
 			return array(
 				'email'  => $fan['email'],

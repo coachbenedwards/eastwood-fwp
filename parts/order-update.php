@@ -223,6 +223,53 @@ add_action( 'rest_api_init', function () {
 	) );
 } );
 
+/** The staff app's live numbers: every booking on the games the email went to. */
+function ew_ou_live() {
+	$out = array( 'coming' => 0, 'people' => 0, 'cant' => 0, 'none' => 0, 'app' => 0, 'sent' => 0, 'rows' => array() );
+	foreach ( (array) get_option( 'ew_ou_events', array() ) as $event ) {
+		foreach ( ew_ou_people( $event ) as $bid => $em ) {
+			$ans   = (string) get_post_meta( $bid, '_ewt_answer', true );
+			$sent  = (int) get_post_meta( $bid, '_ewt_ou_sent', true );
+			$inapp = (int) get_post_meta( $bid, '_ewt_in_app', true );
+			$heads = (int) get_post_meta( $bid, '_ewt_adults', true ) + (int) get_post_meta( $bid, '_ewt_children', true );
+			$out['sent'] += $sent ? 1 : 0;
+			if ( 'yes' === $ans ) {
+				$out['coming']++;
+				$out['people'] += max( 1, $heads );
+			} elseif ( 'no' === $ans ) {
+				$out['cant']++;
+			} else {
+				$out['none']++;
+			}
+			$app = $sent && $inapp >= $sent;
+			$out['app'] += $app ? 1 : 0;
+			$out['rows'][] = array(
+				'name'   => (string) get_post_meta( $bid, '_ewt_name', true ),
+				'email'  => $em,
+				'ref'    => function_exists( 'ew_booking_code' ) ? ew_booking_code( $bid ) : '',
+				'party'  => (string) get_post_meta( $bid, '_ewt_lines', true ),
+				'answer' => '' === $ans ? 'none' : $ans,
+				'inApp'  => (bool) $inapp,
+				'newApp' => $app,
+			);
+		}
+	}
+	return $out;
+}
+
+add_action( 'rest_api_init', function () {
+	register_rest_route( 'eastwood/v1', '/order-update/live', array(
+		'methods'             => 'GET',
+		'permission_callback' => function ( $r ) {
+			return function_exists( 'ew_sho_rest_ok' ) && ew_sho_rest_ok( $r );
+		},
+		'callback'            => function () {
+			nocache_headers();
+			return ew_ou_live();
+		},
+	) );
+} );
+
 /** The /answer/ page's block. Every word is a field. */
 add_shortcode( 'eastwood_answer', function ( $atts ) {
 	$a = shortcode_atts( array(
@@ -335,6 +382,11 @@ function ew_ou_page() {
 			}
 			if ( ew_ou_send( $em, $bid ) ) {
 				update_post_meta( $bid, '_ewt_ou_sent', time() );
+				$evs = (array) get_option( 'ew_ou_events', array() );
+				if ( ! in_array( $event, $evs, true ) ) {
+					$evs[] = $event;
+					update_option( 'ew_ou_events', $evs, false );
+				}
 				$sent++;
 			} else {
 				$fail[] = $em;
@@ -352,21 +404,23 @@ function ew_ou_page() {
 	echo '</select> <button class="button" name="step" value="show">Show who it goes to</button></p>';
 
 	if ( $people ) {
-		$n    = array( 'yes' => 0, 'no' => 0, 'none' => 0, 'sent' => 0 );
+		$n    = array( 'yes' => 0, 'no' => 0, 'none' => 0, 'sent' => 0, 'app' => 0 );
 		$rows = '';
 		foreach ( $people as $bid => $em ) {
 			$ans  = (string) get_post_meta( $bid, '_ewt_answer', true );
 			$sent = (int) get_post_meta( $bid, '_ewt_ou_sent', true );
 			$n[ '' === $ans ? 'none' : $ans ]++;
 			$n['sent'] += $sent ? 1 : 0;
+			$inapp      = (int) get_post_meta( $bid, '_ewt_in_app', true );
+			$n['app']  += ( $sent && $inapp >= $sent ) ? 1 : 0;
 			$rows .= '<tr><td><input type="checkbox" name="to[]" value="' . (int) $bid . '"' . ( $sent ? '' : ' checked' ) . '></td><td>' . esc_html( get_post_meta( $bid, '_ewt_name', true ) ) . '</td><td>' . esc_html( $em ) . '</td><td>'
 				. esc_html( function_exists( 'ew_booking_code' ) ? ew_booking_code( $bid ) : '' ) . '</td><td>' . esc_html( get_post_meta( $bid, '_ewt_lines', true ) ) . '</td><td>'
-				. ( $sent ? esc_html( wp_date( 'j M, g:ia', $sent ) ) : '' ) . '</td><td>' . ( 'yes' === $ans ? '<strong>Coming</strong>' : ( 'no' === $ans ? "Can't make it" : '' ) ) . '</td></tr>';
+				. ( $sent ? esc_html( wp_date( 'j M, g:ia', $sent ) ) : '' ) . '</td><td>' . ( 'yes' === $ans ? '<strong>Coming</strong>' : ( 'no' === $ans ? "Can't make it" : '' ) ) . '</td><td>' . ( $inapp ? 'Yes' : '' ) . '</td></tr>';
 		}
-		echo '<p style="font-size:16px"><strong>Coming ' . (int) $n['yes'] . " · Can't make it " . (int) $n['no'] . ' · No answer ' . (int) $n['none'] . '</strong> · Sent ' . (int) $n['sent'] . ' of ' . count( $people ) . '</p>';
+		echo '<p style="font-size:16px"><strong>Coming ' . (int) $n['yes'] . " · Can't make it " . (int) $n['no'] . ' · No answer ' . (int) $n['none'] . ' · Got the app since the email ' . (int) $n['app'] . '</strong> · Sent ' . (int) $n['sent'] . ' of ' . count( $people ) . '</p>';
 		$me = wp_get_current_user();
 		echo '<p><label>Send a test to <input type="email" name="test_to" value="' . esc_attr( $me ? $me->user_email : '' ) . '" class="regular-text"></label> <button class="button" name="step" value="test">Send a test</button></p>';
-		echo '<table class="widefat striped"><thead><tr><th></th><th>Name</th><th>Email</th><th>Reference</th><th>Party</th><th>Sent</th><th>Answer</th></tr></thead><tbody>' . $rows . '</tbody></table>';
+		echo '<table class="widefat striped"><thead><tr><th></th><th>Name</th><th>Email</th><th>Reference</th><th>Party</th><th>Sent</th><th>Answer</th><th>In the app</th></tr></thead><tbody>' . $rows . '</tbody></table>';
 		echo '<p><button class="button button-primary" name="step" value="send">Send to the ticked bookings</button></p>';
 	}
 
