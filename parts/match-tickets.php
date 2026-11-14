@@ -579,9 +579,6 @@ function ew_mt_start( $req ) {
 	if ( is_wp_error( $b ) ) {
 		return $b;
 	}
-	if ( function_exists( 'ew_ou_cap' ) && ew_ou_cap( $b['what'] ) && ew_ou_taken( $b['what'] ) + (int) $b['seats'] > ew_ou_cap( $b['what'] ) ) {
-		return new WP_Error( 'ewmt_full', $a['all_gone'], array( 'status' => 400 ) );
-	}
 	if ( ! $post || ! function_exists( 'ew_tix_booking_start' ) ) {
 		return new WP_Error( 'ewmt_failed', $a['failed'], array( 'status' => 500 ) );
 	}

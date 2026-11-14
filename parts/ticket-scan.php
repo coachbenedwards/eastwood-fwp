@@ -184,6 +184,51 @@ function ew_ticket_verify(WP_REST_Request $r) {
 	return new WP_REST_Response(ew_ticket_payload($id, $in ? 'used' : 'valid'), 200);
 }
 
+/**
+ * Is the ground full? The staff app's "at capacity" switch, or live
+ * attendance (people scanned in today) at the capacity. Checked fresh at most
+ * every 10 seconds. If it can't be checked, the gate stays open.
+ */
+function ew_md_state() {
+	$hit = get_transient('ew_md_state');
+	if (is_array($hit)) return $hit;
+	$out = array('closed' => false, 'inside' => 0, 'capacity' => 0);
+	if (defined('EW_FAN_SUPABASE') && defined('EW_FAN_ANON')) {
+		$res = wp_remote_post(EW_FAN_SUPABASE . '/rest/v1/rpc/matchday_closed', array(
+			'timeout' => 4,
+			'headers' => array('apikey' => EW_FAN_ANON, 'Authorization' => 'Bearer ' . EW_FAN_ANON, 'Content-Type' => 'application/json'),
+			'body'    => '{}',
+		));
+		$j = is_wp_error($res) ? null : json_decode(wp_remote_retrieve_body($res), true);
+		if (is_array($j) && isset($j['closed'])) $out = array('closed' => (bool) $j['closed'], 'inside' => (int) ($j['inside'] ?? 0), 'capacity' => (int) ($j['capacity'] ?? 0));
+	}
+	set_transient('ew_md_state', $out, 10);
+	return $out;
+}
+
+function ew_md_full_reply() {
+	return new WP_REST_Response(['status' => 'error', 'message' => (string) get_option('ew_md_full_msg', "AT CAPACITY. Don't let anyone else in. Ask the gate manager.")], 200);
+}
+
+/** Live attendance alerts to Ben: once at 3,000 inside and once at capacity. */
+function ew_md_alerts() {
+	$st = ew_md_state();
+	if (!$st['inside']) return;
+	$day  = wp_date('Y-m-d');
+	$sent = (array) get_option('ew_md_alerted', array());
+	foreach (array_unique(array_filter(array(3000, $st['capacity']))) as $mark) {
+		$k = $day . '|' . $mark;
+		if ($st['inside'] >= $mark && empty($sent[$k])) {
+			$sent[$k] = time();
+			update_option('ew_md_alerted', $sent, false);
+			if (function_exists('ew_ou_tell_ben')) {
+				$full = $mark === $st['capacity'];
+				ew_ou_tell_ben(($full ? 'AT CAPACITY: ' : 'Live attendance: ') . number_format($st['inside']) . ' inside', number_format($st['inside']) . ' people are inside Coronation Park (capacity ' . number_format($st['capacity']) . ').' . ($full ? ' The turnstile scanners are now refusing entry.' : ''));
+			}
+		}
+	}
+}
+
 function ew_ticket_checkin(WP_REST_Request $r) {
 	$secret = get_option('ew_scan_secret', '') ?: EW_SCAN_SECRET_DEFAULT;
 	$given  = $r->get_header('x_scan_secret'); // WP maps X-Scan-Secret -> x_scan_secret
@@ -206,8 +251,13 @@ function ew_ticket_checkin(WP_REST_Request $r) {
 		return new WP_REST_Response(ew_ticket_payload($id, 'used'), 200);
 	}
 
+	if (ew_md_state()['closed']) {
+		return ew_md_full_reply();
+	}
+
 	$now = current_time('mysql');
 	if (!$test) update_post_meta($id, '_ewt_in', $now);
+	ew_md_alerts();
 	$payload = ew_ticket_payload($id, 'valid');
 	$payload['checked_in_at'] = $now;
 	return new WP_REST_Response($payload, 200);
@@ -222,6 +272,9 @@ function ew_ticket_checkin(WP_REST_Request $r) {
 function ew_ticket_gate_claim(WP_REST_Request $r) {
 	if (!ew_ticket_secret_ok($r)) {
 		return new WP_REST_Response(['status' => 'error', 'message' => 'Not authorised'], 401);
+	}
+	if (ew_md_state()['closed']) {
+		return ew_md_full_reply();
 	}
 	$body     = (array) $r->get_json_params();
 	$name     = function_exists('ew_person_name') ? ew_person_name(sanitize_text_field((string) ($body['name'] ?? ''))) : sanitize_text_field((string) ($body['name'] ?? ''));

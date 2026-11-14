@@ -300,27 +300,31 @@ function ew_ou_taken( $event, $skip = 0 ) {
 	return $n;
 }
 
-/** Tell Ben once each as the game passes 2,500, 3,000 and the cap. */
+/** Tell Ben by email and by Emma on WhatsApp. */
+function ew_ou_tell_ben( $subject, $text ) {
+	wp_mail( (string) get_option( 'ew_ou_alert_to', 'ben@benedwards.com' ), $subject, $text );
+	wp_remote_post( 'https://enabled.app.n8n.cloud/webhook/eastwood-ben-update-7b0c5d20f14a4110b8fe', array(
+		'timeout'  => 5,
+		'blocking' => false,
+		'headers'  => array( 'Content-Type' => 'application/json' ),
+		'body'     => wp_json_encode( array( 'text' => $subject . "\n\n" . $text, 'p1' => $subject, 'p2' => 'none', 'p3' => 'none', 'p4' => 'none', 'p5' => 'none' ) ),
+	) );
+}
+
+/** Tell Ben once each as tickets for the game pass 2,500 and 3,000. Claims and sales never stop. */
 function ew_ou_alerts( $event ) {
 	$game = ew_ou_game( $event );
-	$cap  = ew_ou_cap( $event );
 	if ( '' === $game ) {
 		return;
 	}
 	$taken = ew_ou_taken( $event );
 	$sent  = (array) get_option( 'ew_ou_alerted', array() );
-	foreach ( array_unique( array_filter( array( 2500, 3000, $cap ) ) ) as $mark ) {
+	foreach ( array( 2500, 3000 ) as $mark ) {
 		$k = $game . '|' . $mark;
 		if ( $taken >= $mark && empty( $sent[ $k ] ) ) {
 			$sent[ $k ] = time();
 			update_option( 'ew_ou_alerted', $sent, false );
-			$full = $cap && $mark === $cap;
-			wp_mail(
-				(string) get_option( 'ew_ou_alert_to', 'ben@eastwoodfc.com' ),
-				( $full ? 'FULL: ' : '' ) . $game . ': ' . number_format( $taken ) . ' tickets',
-				$game . "\n\n" . number_format( $taken ) . ' people now hold a ticket' . ( $cap ? ' (places: ' . number_format( $cap ) . ', ' . number_format( max( 0, $cap - $taken ) ) . ' left)' : '' ) . '.'
-					. ( $full ? "\n\nTicket sales and free claims have now stopped." : '' )
-			);
+			ew_ou_tell_ben( $game . ': ' . number_format( $taken ) . ' tickets', number_format( $taken ) . ' people now hold a ticket for ' . $game . ' (free claims and paid tickets together). Tickets are still on sale; the turnstiles stop at capacity.' );
 		}
 	}
 }
