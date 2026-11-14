@@ -104,8 +104,8 @@ function ew_ou_email( $bid, $test_code = '' ) {
 	$first = ew_ou_first( get_post_meta( $bid, '_ewt_name', true ) );
 	$lines = trim( (string) get_post_meta( $bid, '_ewt_lines', true ) );
 	$code  = '' !== $test_code ? $test_code : ew_ou_code( $bid );
-	$yes   = add_query_arg( array( 'r' => $code, 'a' => 'yes' ), home_url( '/answer/' ) );
-	$no    = add_query_arg( array( 'r' => $code, 'a' => 'no' ), home_url( '/answer/' ) );
+	$yes   = add_query_arg( array( 'k' => $code, 'a' => 'yes' ), home_url( '/answer/' ) );
+	$no    = add_query_arg( array( 'k' => $code, 'a' => 'no' ), home_url( '/answer/' ) );
 	$fill  = function ( $s ) use ( $ref, $first ) {
 		$s = strtr( (string) $s, array( '{ref}' => $ref, '{first_name}' => $first ) );
 		return preg_replace( '/ +,/', ',', $s );
@@ -212,6 +212,37 @@ function ew_ou_send( $to, $bid, $test_code = '' ) {
 	return $ok;
 }
 
+/* --- Places: one live number per game ------------------------------------ */
+
+/** People on a booking (adults + children, at least 1). */
+function ew_ou_heads( $bid ) {
+	return max( 1, (int) get_post_meta( $bid, '_ewt_adults', true ) + (int) get_post_meta( $bid, '_ewt_children', true ) );
+}
+
+/** The places set for a game, 0 for no limit. */
+function ew_ou_cap( $event ) {
+	$caps = (array) get_option( 'ew_ou_caps', array() );
+	return max( 0, (int) ( $caps[ $event ] ?? 0 ) );
+}
+
+/** People holding a ticket for a game, leaving out anyone who said they can't come. $skip leaves one booking out. */
+function ew_ou_taken( $event, $skip = 0 ) {
+	$n = 0;
+	foreach ( ew_ou_people( $event ) as $bid => $em ) {
+		if ( (int) $bid !== (int) $skip && 'no' !== (string) get_post_meta( $bid, '_ewt_answer', true ) ) {
+			$n += ew_ou_heads( $bid );
+		}
+	}
+	return $n;
+}
+
+/** cap, taken and left for a game; left is null when there is no limit. */
+function ew_ou_places( $event ) {
+	$cap   = ew_ou_cap( $event );
+	$taken = ew_ou_taken( $event );
+	return array( 'cap' => $cap, 'taken' => $taken, 'left' => $cap ? max( 0, $cap - $taken ) : null );
+}
+
 /* --- The answer: recorded from the /answer/ page ------------------------ */
 
 add_action( 'rest_api_init', function () {
@@ -223,6 +254,12 @@ add_action( 'rest_api_init', function () {
 			$bid = ew_ou_by_code( (string) $req->get_param( 'r' ) );
 			if ( ! $bid ) {
 				return new WP_REST_Response( array( 'ok' => false ), 404 );
+			}
+			$was   = (string) get_post_meta( $bid, '_ewt_answer', true );
+			$event = (string) get_post_meta( $bid, '_ewt_event', true );
+			$cap   = ew_ou_cap( $event );
+			if ( 'yes' === $a && 'no' === $was && $cap && ew_ou_taken( $event, $bid ) + ew_ou_heads( $bid ) > $cap ) {
+				return array( 'ok' => true, 'full' => true, 'a' => 'no', 'ref' => function_exists( 'ew_booking_code' ) ? ew_booking_code( $bid ) : '', 'party' => (string) get_post_meta( $bid, '_ewt_lines', true ) );
 			}
 			update_post_meta( $bid, '_ewt_answer', $a );
 			update_post_meta( $bid, '_ewt_answer_at', time() );
@@ -316,8 +353,11 @@ add_action( 'template_redirect', function () {
 
 /** The staff app's live numbers: every booking on the games the email went to. */
 function ew_ou_live() {
-	$out = array( 'coming' => 0, 'people' => 0, 'cant' => 0, 'none' => 0, 'app' => 0, 'sent' => 0, 'rows' => array() );
+	$out = array( 'coming' => 0, 'people' => 0, 'cant' => 0, 'none' => 0, 'app' => 0, 'sent' => 0, 'taken' => 0, 'cap' => 0, 'left' => null, 'rows' => array() );
 	foreach ( (array) get_option( 'ew_ou_events', array() ) as $event ) {
+		$pl            = ew_ou_places( $event );
+		$out['taken'] += $pl['taken'];
+		$out['cap']   += $pl['cap'];
 		foreach ( ew_ou_people( $event ) as $bid => $em ) {
 			$ans   = (string) get_post_meta( $bid, '_ewt_answer', true );
 			$sent  = (int) get_post_meta( $bid, '_ewt_ou_sent', true );
@@ -345,6 +385,7 @@ function ew_ou_live() {
 			);
 		}
 	}
+	$out['left'] = $out['cap'] ? max( 0, $out['cap'] - $out['taken'] ) : null;
 	return $out;
 }
 
@@ -380,6 +421,8 @@ add_shortcode( 'eastwood_answer', function ( $atts ) {
 		'no_btn'     => 'SEE THE NEXT HOME GAME',
 		'no_url'     => home_url( '/matches/' ),
 		'undo'       => 'I can come after all',
+		'change'     => "Can't make it after all?",
+		'full'       => "Sorry, today's places have all gone, so we can't put you back on the list.",
 		'bad'        => 'This link has expired. Your ticket is in the Eastwood FC app.',
 	), $atts, 'eastwood_answer' );
 	$o    = ew_ou_get();
@@ -409,7 +452,8 @@ add_shortcode( 'eastwood_answer', function ( $atts ) {
 		. '.ewans a.ewans-btn{display:flex;align-items:center;justify-content:center;min-height:54px;border-radius:10px;background:#CC0000;color:#fff;text-decoration:none;font-family:Anton,Impact,sans-serif;font-size:19px;letter-spacing:.5px;margin-top:14px}'
 		. '.ewans a.ewans-undo{display:block;text-align:center;margin-top:16px;font-size:15px;font-weight:700;color:#565c64;text-decoration:underline}'
 		. '.ewans-addr{font-size:15px;color:#3a3f46}.ewans-row{border-top:1px solid #e4e5e8;padding:12px 0}.ewans-row strong{display:block;font-size:15px}.ewans-row span{display:block;font-size:15px;line-height:1.5;color:#3a3f46;margin-top:2px}'
-		. '.ewans [data-s]{display:none}.ewans.is-yes [data-s=yes],.ewans.is-no [data-s=no],.ewans.is-bad [data-s=bad]{display:block}</style>'
+		. '.ewans-full{display:none;background:#fff;border:1px solid #e4e5e8;border-radius:10px;padding:12px 14px;margin-top:16px;font-size:15px;color:#121417}.ewans.is-full .ewans-full{display:block}'
+		. '.ewans [data-s]{display:none}.ewans.is-yes [data-s=yes],.ewans.is-no [data-s=no],.ewans.is-full [data-s=no],.ewans.is-bad [data-s=bad]{display:block}</style>'
 		. '<div class="ewans" id="' . esc_attr( $id ) . '">'
 		. '<div data-s="yes"><div class="ewans-tick"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>'
 		. '<div class="ewans-kick">' . esc_html( $a['yes_kicker'] ) . '</div><h1>' . esc_html( $a['yes_title'] ) . '</h1>'
@@ -418,15 +462,18 @@ add_shortcode( 'eastwood_answer', function ( $atts ) {
 		. '<div class="ewans-app"><div class="t">' . esc_html( $a['app_title'] ) . '</div><p>' . esc_html( $a['app_text'] ) . '</p>'
 		. '<a class="ewans-btn" href="' . esc_url( $a['yes_url'] ) . '">' . esc_html( $a['yes_btn'] ) . '</a>'
 		. '<div class="ewans-stores"><a href="' . esc_url( $a['ios_url'] ) . '">' . $apple . 'App Store</a><a href="' . esc_url( $a['android_url'] ) . '">' . $play . 'Google Play</a></div></div>'
-		. '<h2>' . esc_html( $o['here'] ) . '</h2><p class="ewans-addr">' . esc_html( $o['address'] ) . '</p><div style="margin-top:10px">' . $rows . '</div></div>'
-		. '<div data-s="no"><h1>' . esc_html( $a['no_title'] ) . '</h1><p>' . esc_html( $a['no_text'] ) . '</p><a class="ewans-btn" href="' . esc_url( $a['no_url'] ) . '">' . esc_html( $a['no_btn'] ) . '</a><a class="ewans-undo" href="#" data-undo>' . esc_html( $a['undo'] ) . '</a></div>'
+		. '<h2>' . esc_html( $o['here'] ) . '</h2><p class="ewans-addr">' . esc_html( $o['address'] ) . '</p><div style="margin-top:10px">' . $rows . '</div>'
+		. '<a class="ewans-undo" href="#" data-change>' . esc_html( $a['change'] ) . '</a></div>'
+		. '<div data-s="no"><h1>' . esc_html( $a['no_title'] ) . '</h1><p>' . esc_html( $a['no_text'] ) . '</p><a class="ewans-btn" href="' . esc_url( $a['no_url'] ) . '">' . esc_html( $a['no_btn'] ) . '</a><a class="ewans-undo" href="#" data-undo>' . esc_html( $a['undo'] ) . '</a><div class="ewans-full">' . esc_html( $a['full'] ) . '</div></div>'
 		. '<div data-s="bad"><p>' . esc_html( $a['bad'] ) . '</p></div></div>'
-		. '<script>(function(){var el=document.getElementById(' . wp_json_encode( $id ) . '),q=new URLSearchParams(location.search),r=q.get("r"),a=q.get("a")==="no"?"no":"yes";'
+		. '<script>(function(){var el=document.getElementById(' . wp_json_encode( $id ) . '),q=new URLSearchParams(location.search),r=q.get("k")||q.get("r")||window.ewR||"",a=q.get("a")==="no"?"no":"yes";'
+		. 'if(!r){try{r=sessionStorage.getItem("ew_r")||"";}catch(x){}}'
 		. 'function fill(j){var f=el.querySelector("[data-ref]"),p=el.querySelector("[data-party]");if(f)f.textContent=j.ref||"";if(p)p.textContent=j.party||"";}'
-		. 'function send(x){return fetch(' . wp_json_encode( rest_url( 'eastwood/v1/answer' ) ) . ',{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({r:r,a:x})}).then(function(res){return res.json().then(function(j){if(res.ok&&j.ok){fill(j);return true;}return false;});}).catch(function(){return false;});}'
-		. 'function show(x){el.className="ewans is-"+x;}'
-		. 'if(!r){show("bad");return;}show(a);send(a).then(function(ok){if(!ok)show("bad");});'
-		. 'var u=el.querySelector("[data-undo]");if(u)u.addEventListener("click",function(e){e.preventDefault();show("yes");send("yes");});})();</script>';
+		. 'function show(x){el.className="ewans is-"+x;window.scrollTo(0,0);}'
+		. 'function send(x){return fetch(' . wp_json_encode( rest_url( 'eastwood/v1/answer' ) ) . ',{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({r:r,a:x})}).then(function(res){return res.json().then(function(j){if(!(res.ok&&j.ok)){show("bad");return;}fill(j);show(j.full?"full":x);});}).catch(function(){show("bad");});}'
+		. 'if(!r){show("bad");return;}show(a);send(a);'
+		. 'var u=el.querySelector("[data-undo]");if(u)u.addEventListener("click",function(e){e.preventDefault();send("yes");});'
+		. 'var c=el.querySelector("[data-change]");if(c)c.addEventListener("click",function(e){e.preventDefault();send("no");});})();</script>';
 	return $out;
 } );
 
@@ -457,7 +504,11 @@ add_action( 'admin_menu', function () {
 /** Everyone claimed or paid for an event: one row per booking. */
 function ew_ou_people( $event ) {
 	$out = array();
-	foreach ( get_posts( array( 'post_type' => 'ewt_booking', 'post_status' => 'any', 'posts_per_page' => -1, 'fields' => 'ids', 'orderby' => 'date', 'order' => 'ASC', 'meta_query' => array( array( 'key' => '_ewt_event', 'value' => $event ) ) ) ) as $id ) { // phpcs:ignore WordPress.DB.SlowDBQuery
+	$ids = get_posts( array( 'post_type' => 'ewt_booking', 'post_status' => 'any', 'posts_per_page' => -1, 'fields' => 'ids', 'orderby' => 'date', 'order' => 'ASC', 'meta_query' => array( array( 'key' => '_ewt_event', 'value' => $event ) ) ) ); // phpcs:ignore WordPress.DB.SlowDBQuery
+	if ( $ids ) {
+		update_meta_cache( 'post', $ids ); // one query for every booking's details
+	}
+	foreach ( $ids as $id ) {
 		if ( ! in_array( (string) get_post_meta( $id, '_ewt_status', true ), array( 'claimed', 'paid' ), true ) ) {
 			continue;
 		}
@@ -489,6 +540,13 @@ function ew_ou_page() {
 		update_option( 'ew_ou', $new );
 		$o = ew_ou_get();
 		echo '<div class="notice notice-success"><p>Saved.</p></div>';
+	}
+
+	if ( 'cap' === $step && check_admin_referer( 'ew_ou' ) && $event ) {
+		$caps           = (array) get_option( 'ew_ou_caps', array() );
+		$caps[ $event ] = max( 0, (int) ( $_POST['cap'] ?? 0 ) );
+		update_option( 'ew_ou_caps', $caps, false );
+		echo '<div class="notice notice-success"><p>Places saved.</p></div>';
 	}
 
 	$people = $event ? ew_ou_people( $event ) : array();
@@ -551,6 +609,10 @@ function ew_ou_page() {
 				. ( $sent ? esc_html( wp_date( 'j M, g:ia', $sent ) ) : '' ) . '</td><td>' . ( 'yes' === $ans ? '<strong>Coming</strong>' : ( 'no' === $ans ? "Can't make it" : '' ) ) . '</td><td>' . ( $inapp ? 'Yes' : '' ) . '</td></tr>';
 		}
 		echo '<p style="font-size:16px"><strong>Coming ' . (int) $n['yes'] . " · Can't make it " . (int) $n['no'] . ' · No answer ' . (int) $n['none'] . ' · Got the app since the email ' . (int) $n['app'] . '</strong> · Sent ' . (int) $n['sent'] . ' of ' . count( $people ) . '</p>';
+		$pl = ew_ou_places( $event );
+		echo '<p style="font-size:15px">People holding a ticket: <strong>' . (int) $pl['taken'] . '</strong>' . ( $pl['cap'] ? ' of ' . (int) $pl['cap'] . ' places · <strong>' . (int) $pl['left'] . ' left</strong>' : '' )
+			. ' &nbsp; <label>Places for this game <input type="number" min="0" name="cap" value="' . ( $pl['cap'] ? (int) $pl['cap'] : '' ) . '" placeholder="No limit" style="width:110px"></label> <button class="button" name="step" value="cap">Save places</button></p>'
+			. '<p class="description">Anyone who says they can\'t make it frees their places. Someone changing back to coming only gets back in while places are left. Blank means no limit.</p>';
 		$me = wp_get_current_user();
 		echo '<p><label>Send a test to <input type="email" name="test_to" value="' . esc_attr( $me ? $me->user_email : '' ) . '" class="regular-text"></label> <button class="button" name="step" value="test">Send a test</button></p>';
 		echo '<table class="widefat striped"><thead><tr><th></th><th>Name</th><th>Email</th><th>Reference</th><th>Party</th><th>Sent</th><th>Answer</th><th>In the app</th></tr></thead><tbody>' . $rows . '</tbody></table>';

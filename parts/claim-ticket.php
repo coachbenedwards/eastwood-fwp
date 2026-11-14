@@ -57,6 +57,7 @@ function ew_claim_defaults() {
 		'continue'      => 'Continue',
 		'need_school'   => 'Pick your school, or add it.',
 		'need_people'   => 'Add at least one person.',
+		'all_gone'      => "Sorry, today's tickets have all gone.",
 		'details_title' => 'Your details',
 		'name_label'    => 'Your Full Name',
 		'email_label'   => 'Your email',
@@ -629,6 +630,10 @@ add_action( 'rest_api_init', function () {
 			}
 			if ( $adults + $children < 1 ) {
 				return new WP_REST_Response( array( 'message' => $a['need_people'] ), 400 );
+			}
+			// One live number per game: the places set on the order update screen.
+			if ( function_exists( 'ew_ou_cap' ) && ew_ou_cap( $a['event'] ) && ew_ou_taken( $a['event'], $bid ) + $adults + $children > ew_ou_cap( $a['event'] ) ) {
+				return new WP_REST_Response( array( 'message' => $a['all_gone'] ), 400 );
 			}
 			do {
 				$code = 'EFC-' . wp_rand( 1000, 9999 );

@@ -75,6 +75,10 @@ function ew_gates_cfg() {
 
 /** People on a booking: adults + children, else the quantity bought, at least 1. */
 function ew_gate_heads( $id ) {
+	// Told us they can't make it (and haven't come in anyway): not expected at a gate.
+	if ( 'no' === (string) get_post_meta( $id, '_ewt_answer', true ) && '' === (string) get_post_meta( $id, '_ewt_in', true ) ) {
+		return 0;
+	}
 	$n = (int) get_post_meta( $id, '_ewt_adults', true ) + (int) get_post_meta( $id, '_ewt_children', true );
 	if ( $n < 1 ) {
 		$n = (int) get_post_meta( $id, '_ewt_qty', true );
