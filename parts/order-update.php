@@ -216,7 +216,31 @@ function ew_ou_send( $to, $bid, $test_code = '' ) {
 
 /** People on a booking (adults + children, at least 1). */
 function ew_ou_heads( $bid ) {
-	return max( 1, (int) get_post_meta( $bid, '_ewt_adults', true ) + (int) get_post_meta( $bid, '_ewt_children', true ) );
+	$n = (int) get_post_meta( $bid, '_ewt_adults', true ) + (int) get_post_meta( $bid, '_ewt_children', true );
+	if ( $n < 1 ) {
+		$n = (int) get_post_meta( $bid, '_ewt_seats', true ); // paid match tickets
+	}
+	return max( 1, $n );
+}
+
+/**
+ * Same email, same party, same game, claimed more than once: the later ones
+ * are marked as copies of the first. Nothing is deleted and every QR still
+ * scans; copies just stop counting and stop getting emails.
+ */
+function ew_ou_merge_dups( $event ) {
+	$seen = array();
+	$n    = 0;
+	foreach ( ew_ou_people( $event ) as $bid => $em ) {
+		$k = $em . '|' . strtolower( trim( (string) get_post_meta( $bid, '_ewt_lines', true ) ) );
+		if ( isset( $seen[ $k ] ) ) {
+			update_post_meta( $bid, '_ewt_dup_of', $seen[ $k ] );
+			$n++;
+		} else {
+			$seen[ $k ] = $bid;
+		}
+	}
+	return $n;
 }
 
 /** The places set for a game, 0 for no limit. */
@@ -362,7 +386,7 @@ function ew_ou_live() {
 			$ans   = (string) get_post_meta( $bid, '_ewt_answer', true );
 			$sent  = (int) get_post_meta( $bid, '_ewt_ou_sent', true );
 			$inapp = (int) get_post_meta( $bid, '_ewt_in_app', true );
-			$heads = (int) get_post_meta( $bid, '_ewt_adults', true ) + (int) get_post_meta( $bid, '_ewt_children', true );
+			$heads = ew_ou_heads( $bid );
 			$out['sent'] += $sent ? 1 : 0;
 			if ( 'yes' === $ans ) {
 				$out['coming']++;
@@ -512,6 +536,9 @@ function ew_ou_people( $event ) {
 		if ( ! in_array( (string) get_post_meta( $id, '_ewt_status', true ), array( 'claimed', 'paid' ), true ) ) {
 			continue;
 		}
+		if ( get_post_meta( $id, '_ewt_dup_of', true ) ) {
+			continue;
+		}
 		$em = strtolower( trim( (string) get_post_meta( $id, '_ewt_email', true ) ) );
 		if ( ! is_email( $em ) ) {
 			continue;
@@ -540,6 +567,11 @@ function ew_ou_page() {
 		update_option( 'ew_ou', $new );
 		$o = ew_ou_get();
 		echo '<div class="notice notice-success"><p>Saved.</p></div>';
+	}
+
+	if ( 'dups' === $step && check_admin_referer( 'ew_ou' ) && $event ) {
+		$m = ew_ou_merge_dups( $event );
+		echo '<div class="notice notice-success"><p>' . (int) $m . ' duplicate claims merged. Their QR codes still work; they no longer count twice.</p></div>';
 	}
 
 	if ( 'cap' === $step && check_admin_referer( 'ew_ou' ) && $event ) {
@@ -611,7 +643,7 @@ function ew_ou_page() {
 		echo '<p style="font-size:16px"><strong>Coming ' . (int) $n['yes'] . " · Can't make it " . (int) $n['no'] . ' · No answer ' . (int) $n['none'] . ' · Got the app since the email ' . (int) $n['app'] . '</strong> · Sent ' . (int) $n['sent'] . ' of ' . count( $people ) . '</p>';
 		$pl = ew_ou_places( $event );
 		echo '<p style="font-size:15px">People holding a ticket: <strong>' . (int) $pl['taken'] . '</strong>' . ( $pl['cap'] ? ' of ' . (int) $pl['cap'] . ' places · <strong>' . (int) $pl['left'] . ' left</strong>' : '' )
-			. ' &nbsp; <label>Places for this game <input type="number" min="0" name="cap" value="' . ( $pl['cap'] ? (int) $pl['cap'] : '' ) . '" placeholder="No limit" style="width:110px"></label> <button class="button" name="step" value="cap">Save places</button></p>'
+			. ' &nbsp; <label>Places for this game <input type="number" min="0" name="cap" value="' . ( $pl['cap'] ? (int) $pl['cap'] : '' ) . '" placeholder="No limit" style="width:110px"></label> <button class="button" name="step" value="cap">Save places</button> <button class="button" name="step" value="dups">Merge duplicate claims</button></p>'
 			. '<p class="description">Anyone who says they can\'t make it frees their places. Someone changing back to coming only gets back in while places are left. Blank means no limit.</p>';
 		$me = wp_get_current_user();
 		echo '<p><label>Send a test to <input type="email" name="test_to" value="' . esc_attr( $me ? $me->user_email : '' ) . '" class="regular-text"></label> <button class="button" name="step" value="test">Send a test</button></p>';

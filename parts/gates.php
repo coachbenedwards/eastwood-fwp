@@ -82,9 +82,15 @@ function ew_gate_heads( $id ) {
 	if ( 'no' === (string) get_post_meta( $id, '_ewt_answer', true ) && '' === (string) get_post_meta( $id, '_ewt_in', true ) ) {
 		return 0;
 	}
+	if ( get_post_meta( $id, '_ewt_dup_of', true ) && '' === (string) get_post_meta( $id, '_ewt_in', true ) ) {
+		return 0; // a duplicate claim: counted on the first one
+	}
 	$n = (int) get_post_meta( $id, '_ewt_adults', true ) + (int) get_post_meta( $id, '_ewt_children', true );
 	if ( $n < 1 ) {
 		$n = (int) get_post_meta( $id, '_ewt_qty', true );
+	}
+	if ( $n < 1 ) {
+		$n = (int) get_post_meta( $id, '_ewt_seats', true );
 	}
 	return max( 1, $n );
 }
