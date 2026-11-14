@@ -260,6 +260,41 @@ function ew_ou_taken( $event, $skip = 0 ) {
 	return $n;
 }
 
+/**
+ * Same email and same name claimed again with a different party (usually
+ * correcting their numbers): the biggest booking stays, the others are marked
+ * as copies of it. Nothing is deleted and every QR still scans.
+ */
+function ew_ou_merge_reclaims( $event ) {
+	$groups = array();
+	foreach ( ew_ou_people( $event ) as $bid => $em ) {
+		$name = strtolower( preg_replace( '/\s+/', ' ', trim( (string) get_post_meta( $bid, '_ewt_name', true ) ) ) );
+		if ( '' === $name ) {
+			continue;
+		}
+		$groups[ $em . '|' . $name ][] = $bid;
+	}
+	$n = 0;
+	foreach ( $groups as $ids ) {
+		if ( count( $ids ) < 2 ) {
+			continue;
+		}
+		$keep = 0;
+		foreach ( $ids as $bid ) {
+			if ( ! $keep || ew_ou_heads( $bid ) > ew_ou_heads( $keep ) || ( ew_ou_heads( $bid ) === ew_ou_heads( $keep ) && $bid > $keep ) ) {
+				$keep = $bid;
+			}
+		}
+		foreach ( $ids as $bid ) {
+			if ( $bid !== $keep ) {
+				update_post_meta( $bid, '_ewt_dup_of', $keep );
+				$n++;
+			}
+		}
+	}
+	return $n;
+}
+
 /** cap, taken and left for a game; left is null when there is no limit. */
 function ew_ou_places( $event ) {
 	$cap   = ew_ou_cap( $event );
@@ -569,6 +604,11 @@ function ew_ou_page() {
 		echo '<div class="notice notice-success"><p>Saved.</p></div>';
 	}
 
+	if ( 'reclaims' === $step && check_admin_referer( 'ew_ou' ) && $event ) {
+		$m = ew_ou_merge_reclaims( $event );
+		echo '<div class="notice notice-success"><p>' . (int) $m . ' repeat claims merged into the same person\'s bigger booking. Their QR codes still work.</p></div>';
+	}
+
 	if ( 'dups' === $step && check_admin_referer( 'ew_ou' ) && $event ) {
 		$m = ew_ou_merge_dups( $event );
 		echo '<div class="notice notice-success"><p>' . (int) $m . ' duplicate claims merged. Their QR codes still work; they no longer count twice.</p></div>';
@@ -643,7 +683,7 @@ function ew_ou_page() {
 		echo '<p style="font-size:16px"><strong>Coming ' . (int) $n['yes'] . " · Can't make it " . (int) $n['no'] . ' · No answer ' . (int) $n['none'] . ' · Got the app since the email ' . (int) $n['app'] . '</strong> · Sent ' . (int) $n['sent'] . ' of ' . count( $people ) . '</p>';
 		$pl = ew_ou_places( $event );
 		echo '<p style="font-size:15px">People holding a ticket: <strong>' . (int) $pl['taken'] . '</strong>' . ( $pl['cap'] ? ' of ' . (int) $pl['cap'] . ' places · <strong>' . (int) $pl['left'] . ' left</strong>' : '' )
-			. ' &nbsp; <label>Places for this game <input type="number" min="0" name="cap" value="' . ( $pl['cap'] ? (int) $pl['cap'] : '' ) . '" placeholder="No limit" style="width:110px"></label> <button class="button" name="step" value="cap">Save places</button> <button class="button" name="step" value="dups">Merge duplicate claims</button></p>'
+			. ' &nbsp; <label>Places for this game <input type="number" min="0" name="cap" value="' . ( $pl['cap'] ? (int) $pl['cap'] : '' ) . '" placeholder="No limit" style="width:110px"></label> <button class="button" name="step" value="cap">Save places</button> <button class="button" name="step" value="dups">Merge duplicate claims</button> <button class="button" name="step" value="reclaims">Merge repeat claims (same name and email, keep the bigger)</button></p>'
 			. '<p class="description">Anyone who says they can\'t make it frees their places. Someone changing back to coming only gets back in while places are left. Blank means no limit.</p>';
 		$me = wp_get_current_user();
 		echo '<p><label>Send a test to <input type="email" name="test_to" value="' . esc_attr( $me ? $me->user_email : '' ) . '" class="regular-text"></label> <button class="button" name="step" value="test">Send a test</button></p>';
