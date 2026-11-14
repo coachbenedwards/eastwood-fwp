@@ -10,7 +10,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 function ew_hd_templates_default() {
-	return "Ticket not showing in the app | Your Eastwood FC ticket | Hi {first_name},\n\nThanks for getting in touch. Your booking is {ref} for {party}.\n\nTo see your ticket in the Eastwood FC app, sign in (or sign up) with the email you booked with: {email}. Your ticket then shows in the app.\n\nIf it still doesn't show, add it in the app using your email {email} and the reference {ref}.\n\nIf you have any trouble at the gate, give the steward your reference {ref} and they can find you.\n\nSee you later,\nEastwood FC\n"
+	return "Your reference (we write first) | Your Eastwood FC ticket reference | Hi {first_name},\n\nYour booking for today's game is {ref} for {party}.\n\nTo see your ticket in the Eastwood FC app, sign in (or sign up) with the email you booked with: {email}. Your ticket then shows in the app.\n\nIf it doesn't show, add it in the app using your email {email} and the reference {ref}.\n\nIf you have any trouble at the gate, give the steward your reference {ref} and they can find you.\n\nSee you later,\nEastwood FC\n"
+		. "---\nTicket not showing in the app | Your Eastwood FC ticket | Hi {first_name},\n\nThanks for getting in touch. Your booking is {ref} for {party}.\n\nTo see your ticket in the Eastwood FC app, sign in (or sign up) with the email you booked with: {email}. Your ticket then shows in the app.\n\nIf it still doesn't show, add it in the app using your email {email} and the reference {ref}.\n\nIf you have any trouble at the gate, give the steward your reference {ref} and they can find you.\n\nSee you later,\nEastwood FC\n"
 		. "---\nReference not recognised | Your Eastwood FC booking {ref} | Hi {first_name},\n\nSorry about that. Your reference is {ref} and it's booked under {email}. In the app, enter that email exactly, with the reference {ref}.\n\nThe easiest way is to sign in to the Eastwood FC app with {email}, and your ticket shows by itself.\n\nIf you have any trouble at the gate, give the steward your reference {ref}.\n\nSee you later,\nEastwood FC\n"
 		. "---\nGetting here and parking | Getting to Coronation Park today | Hi {first_name},\n\nCoronation Park, Chewton Street, Eastwood, NG16 3HB. Gates open at 1pm and kick-off is 3pm.\n\nThere is no spectator parking at the ground, so bus or train is best if you can. Accessible parking must be booked with the club before you come.\n\nAll the travel info is at eastwoodfc.com/matchday\n\nSee you later,\nEastwood FC\n"
 		. "---\nCan I still get tickets | Tickets for today | Hi {first_name},\n\nYes, you can get tickets here: eastwoodfc.com/tickets/?fx=585791\n\nYour ticket goes into the Eastwood FC app. We're expecting a big crowd, so please arrive early.\n\nSee you later,\nEastwood FC\n"
@@ -31,11 +32,32 @@ function ew_hd_templates() {
 	return $out;
 }
 
+/**
+ * A first name to greet someone by, or "there". Titles are skipped (Mr Adrian
+ * Rice is Adrian), and a name that looks wrong (an email, one long run of
+ * letters like "AndrewFletcher", initials) gets "there" rather than a guess.
+ */
+function ew_hd_first( $name ) {
+	$name  = trim( preg_replace( '/\s+/', ' ', (string) $name ) );
+	$words = array_values( array_filter( explode( ' ', str_replace( '.', ' ', $name ) ) ) );
+	while ( $words && in_array( strtolower( $words[0] ), array( 'mr', 'mrs', 'ms', 'miss', 'mx', 'dr', 'sir', 'rev' ), true ) ) {
+		array_shift( $words );
+	}
+	$f = $words ? $words[0] : '';
+	if ( '' === $f || false !== strpos( $name, '@' ) || strlen( $f ) < 2 || ! preg_match( "/^[\\p{L}'-]+$/u", $f ) ) {
+		return 'there';
+	}
+	// One word with a capital in the middle, or a single long word: two names typed together.
+	if ( 1 === count( $words ) && ( preg_match( '/\p{Ll}\p{Lu}/u', $f ) || mb_strlen( $f ) > 12 ) ) {
+		return 'there';
+	}
+	return mb_strtoupper( mb_substr( $f, 0, 1 ) ) . mb_strtolower( mb_substr( $f, 1 ) );
+}
+
 function ew_hd_fill( $text, $bid ) {
 	$name = (string) get_post_meta( $bid, '_ewt_name', true );
-	$f    = trim( strtok( $name, ' ' ) );
 	return strtr( $text, array(
-		'{first_name}' => '' !== $f ? ucfirst( strtolower( $f ) ) : 'there',
+		'{first_name}' => ew_hd_first( $name ),
 		'{name}'       => $name,
 		'{ref}'        => function_exists( 'ew_booking_code' ) ? ew_booking_code( $bid ) : '',
 		'{email}'      => (string) get_post_meta( $bid, '_ewt_email', true ),
