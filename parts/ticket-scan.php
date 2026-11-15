@@ -229,6 +229,31 @@ function ew_md_alerts() {
 	}
 }
 
+/**
+ * Count someone in on the day's attendance the moment their ticket is marked
+ * in, whichever app version the steward has (15 Nov 2026: a phone without a
+ * gate set let 110 tickets in uncounted). The gate is the one the phone sends,
+ * or 'unset'; a phone that also records the ticket fills in the gate instead
+ * of counting it twice (merge_gate_admission in Supabase).
+ */
+function ew_ticket_count_in($id, $kind, $gate = '') {
+	$key = function_exists('ew_runs_key') ? ew_runs_key() : '';
+	if ('' === $key || !defined('EW_FAN_SUPABASE')) return;
+	$gate = in_array((string) $gate, ['1', '2', '3', 'N4', 'N5'], true) ? (string) $gate : 'unset';
+	$code = (string) get_post_meta($id, '_ewt_code', true);
+	// A short wait at most, so a slow database never holds up the turnstile.
+	wp_remote_post(EW_FAN_SUPABASE . '/rest/v1/gate_admissions', [
+		'timeout' => 3,
+		'headers' => ['apikey' => $key, 'Authorization' => 'Bearer ' . $key, 'Content-Type' => 'application/json', 'Prefer' => 'return=minimal'],
+		'body'    => wp_json_encode([
+			'gate'  => $gate,
+			'heads' => max(1, min(50, (int) ew_ticket_headcount($id))),
+			'kind'  => $kind,
+			'ref'   => '' !== $code ? $code : null,
+		]),
+	]);
+}
+
 function ew_ticket_checkin(WP_REST_Request $r) {
 	$secret = get_option('ew_scan_secret', '') ?: EW_SCAN_SECRET_DEFAULT;
 	$given  = $r->get_header('x_scan_secret'); // WP maps X-Scan-Secret -> x_scan_secret
@@ -256,7 +281,10 @@ function ew_ticket_checkin(WP_REST_Request $r) {
 	}
 
 	$now = current_time('mysql');
-	if (!$test) update_post_meta($id, '_ewt_in', $now);
+	if (!$test) {
+		update_post_meta($id, '_ewt_in', $now);
+		ew_ticket_count_in($id, 'paid' === $bstatus ? 'paid' : 'free', (string) ($body['gate'] ?? ''));
+	}
 	ew_md_alerts();
 	$payload = ew_ticket_payload($id, 'valid');
 	$payload['checked_in_at'] = $now;
@@ -329,6 +357,7 @@ function ew_ticket_gate_claim(WP_REST_Request $r) {
 	if (function_exists('ew_tix_crm') && !empty($a['crm_hook'])) {
 		ew_tix_crm((string) $a['crm_hook'], $id, 'claimed');
 	}
+	ew_ticket_count_in($id, 'paper', (string) ($body['gate'] ?? ''));
 	$out = ew_ticket_payload($id, 'valid');
 	$out['checked_in_at'] = $now;
 	return new WP_REST_Response($out, 200);
