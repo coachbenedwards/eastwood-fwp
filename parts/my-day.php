@@ -1,6 +1,6 @@
 <?php
 /**
- * eastwoodfc.com/myday: "My Matchday", for someone with a ticket.
+ * eastwoodfc.com/my-matchday: "My Matchday", for someone with a ticket.
  *
  * [eastwood_day]
  * time|title|line|marker
@@ -455,3 +455,14 @@ add_filter( 'ew_blocks_allowed', function ( $tags ) {
 	$tags[] = 'eastwood_day_upgrades';
 	return $tags;
 } );
+
+/** The page was /myday until November 2026: old links still land on it. */
+add_action( 'template_redirect', function () {
+	$path = trim( (string) wp_parse_url( isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '', PHP_URL_PATH ), '/' );
+	if ( 'myday' !== strtolower( $path ) ) {
+		return;
+	}
+	$query = isset( $_SERVER['QUERY_STRING'] ) ? (string) wp_unslash( $_SERVER['QUERY_STRING'] ) : '';
+	wp_safe_redirect( home_url( '/my-matchday/' ) . ( '' !== $query ? '?' . $query : '' ), 301 );
+	exit;
+}, 1 );

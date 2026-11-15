@@ -63,7 +63,7 @@ function ew_acc_defaults() {
 		'id_label'      => 'MyEastwood · ID',
 		'tickets_title' => 'Your tickets',
 		'day_link'      => 'My Matchday',
-		'day_url'       => '/myday/',
+		'day_url'       => '/my-matchday/',
 		'signed_as'     => 'Signed in as',
 		'sign_out'      => 'Sign out',
 		'none'          => 'Nothing booked under your account yet.',
