@@ -6,10 +6,10 @@
  *   GET  /wp-json/eastwood/v1/ticket/verify?ref=<EFC-code or _ewt_key>
  *        Public read. Looks a ticket up; does NOT mark it.
  *   POST /wp-json/eastwood/v1/ticket/checkin   { "ref": "<...>" }
- *        Header  X-Scan-Secret: <ew_scan_secret option>
+ *        Header  Authorization: Bearer <the steward's app sign-in>
  *        Marks _ewt_in once (admits the ticket).
  *   POST /wp-json/eastwood/v1/ticket/food-use   { "ref": "<...>", "i": <token> }
- *        Header  X-Scan-Secret. Takes one token off a food token pass.
+ *        Same sign-in. Takes one token off a food token pass.
  *
  * A food token pass is not a way through the turnstile, so check-in never
  * admits one. Verify still recognises it and answers status "food" with
@@ -17,13 +17,10 @@
  *
  * Reuses the existing ewt_booking records (paid tickets + free claims).
  *
- * The check-in secret defaults to the value baked into the app build below, so
- * nothing needs setting up. To rotate it later, set the ew_scan_secret option
- * (and change EXPO_PUBLIC_SCAN_SECRET in the app build to match).
+ * Every write needs a signed-in staff member with Scan tickets. There is no
+ * shared secret any more.
  */
 
-/** Shared secret for the check-in write. Default matches the app build. */
-const EW_SCAN_SECRET_DEFAULT = '02be2f0e444a7321a1b8dbf8da19087ad3122112ef8dc42a';
 
 add_action('rest_api_init', function () {
 	register_rest_route('eastwood/v1', '/ticket/verify', [
@@ -33,17 +30,17 @@ add_action('rest_api_init', function () {
 	]);
 	register_rest_route('eastwood/v1', '/ticket/checkin', [
 		'methods'             => 'POST',
-		'permission_callback' => '__return_true', // secret checked inside
+		'permission_callback' => '__return_true', // sign-in checked inside
 		'callback'            => 'ew_ticket_checkin',
 	]);
 	register_rest_route('eastwood/v1', '/ticket/gate-claim', [
 		'methods'             => 'POST',
-		'permission_callback' => '__return_true', // secret checked inside
+		'permission_callback' => '__return_true', // sign-in checked inside
 		'callback'            => 'ew_ticket_gate_claim',
 	]);
 	register_rest_route('eastwood/v1', '/ticket/food-use', [
 		'methods'             => 'POST',
-		'permission_callback' => '__return_true', // secret checked inside
+		'permission_callback' => '__return_true', // sign-in checked inside
 		'callback'            => 'ew_ticket_food_use',
 	]);
 });
@@ -135,9 +132,6 @@ function ew_ticket_food_payload($id) {
 	];
 }
 
-/** The old shared secret still works until this day, so phones on an older app keep scanning while they update. */
-const EW_SCAN_SECRET_UNTIL = '2026-11-30';
-
 /** A signed-in staff member with Scan tickets, checked against the app's database with their own sign-in. */
 function ew_scan_staff_ok(WP_REST_Request $r) {
 	if (!defined('EW_FAN_SUPABASE') || !defined('EW_FAN_ANON')) return false;
@@ -162,16 +156,13 @@ function ew_scan_staff_ok(WP_REST_Request $r) {
 	return $ok;
 }
 
-function ew_ticket_secret_ok(WP_REST_Request $r) {
-	if (ew_scan_staff_ok($r)) return true;
-	if (current_time('Y-m-d') > EW_SCAN_SECRET_UNTIL) return false;
-	$secret = get_option('ew_scan_secret', '') ?: EW_SCAN_SECRET_DEFAULT;
-	return $secret && hash_equals((string) $secret, (string) $r->get_header('x_scan_secret'));
+function ew_ticket_staff_ok(WP_REST_Request $r) {
+	return ew_scan_staff_ok($r);
 }
 
 /** Take one token off a food pass, from the app's scanner. */
 function ew_ticket_food_use(WP_REST_Request $r) {
-	if (!ew_ticket_secret_ok($r)) {
+	if (!ew_ticket_staff_ok($r)) {
 		return new WP_REST_Response(['status' => 'error', 'message' => 'Not authorised'], 401);
 	}
 	$body = $r->get_json_params();
@@ -284,7 +275,7 @@ function ew_ticket_count_in($id, $kind, $gate = '') {
 }
 
 function ew_ticket_checkin(WP_REST_Request $r) {
-	if (!ew_ticket_secret_ok($r)) {
+	if (!ew_ticket_staff_ok($r)) {
 		return new WP_REST_Response(['status' => 'error', 'message' => 'Not authorised'], 401);
 	}
 
@@ -325,7 +316,7 @@ function ew_ticket_checkin(WP_REST_Request $r) {
  * marks it as in, and answers with the ticket.
  */
 function ew_ticket_gate_claim(WP_REST_Request $r) {
-	if (!ew_ticket_secret_ok($r)) {
+	if (!ew_ticket_staff_ok($r)) {
 		return new WP_REST_Response(['status' => 'error', 'message' => 'Not authorised'], 401);
 	}
 	if (ew_md_state()['closed']) {
