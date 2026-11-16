@@ -20,7 +20,6 @@
 defined( 'ABSPATH' ) || exit;
 
 const EW_SHO_SUPABASE  = 'https://gimtavaqkkowjwffeefm.supabase.co';
-const EW_SHO_ROLES     = array( 'owner', 'admin' );
 const EW_SHO_OWNERS    = array( 'ben@benedwards.com', 'ben@eastwoodfc.com' );
 const EW_SHO_SINCE     = '2026-10-01 00:00:00';
 
@@ -232,11 +231,12 @@ function ew_sho_rest_ok( WP_REST_Request $r ) {
 	$token = $m[1];
 	$cache = 'ew_sho_ok_' . md5( $token );
 	$hit   = get_transient( $cache );
-	if ( is_array( $hit ) ) {
-		$GLOBALS['ew_sho_who'] = $hit['who'];
+	if ( is_array( $hit ) && isset( $hit['perms'] ) ) {
+		$GLOBALS['ew_sho_who']   = $hit['who'];
+		$GLOBALS['ew_sho_perms'] = $hit['perms'];
 		return (bool) $hit['ok'];
 	}
-	$res = wp_remote_post( EW_SHO_SUPABASE . '/rest/v1/rpc/my_eastwood_role', array(
+	$res = wp_remote_post( EW_SHO_SUPABASE . '/rest/v1/rpc/my_staff_permissions', array(
 		'timeout' => 8,
 		'headers' => array( 'apikey' => $key, 'Authorization' => 'Bearer ' . $token, 'Content-Type' => 'application/json' ),
 		'body'    => '{}',
@@ -244,15 +244,27 @@ function ew_sho_rest_ok( WP_REST_Request $r ) {
 	if ( is_wp_error( $res ) || 200 !== (int) wp_remote_retrieve_response_code( $res ) ) {
 		return false;
 	}
-	$role  = json_decode( wp_remote_retrieve_body( $res ), true );
+	$perms = json_decode( wp_remote_retrieve_body( $res ), true );
+	$perms = is_array( $perms ) ? $perms : array();
 	$parts = explode( '.', $token );
 	$claim = isset( $parts[1] ) ? json_decode( base64_decode( strtr( $parts[1], '-_', '+/' ) ), true ) : array();
 	$email = strtolower( trim( (string) ( $claim['email'] ?? '' ) ) );
-	$ok    = in_array( $role, EW_SHO_ROLES, true ) || in_array( $email, EW_SHO_OWNERS, true );
+	$owner = in_array( $email, EW_SHO_OWNERS, true );
+	$ok    = $owner || in_array( 'shirts.view', $perms, true );
 	$who   = '' !== $email ? $email : 'app';
-	set_transient( $cache, array( 'ok' => $ok, 'who' => $who ), 5 * MINUTE_IN_SECONDS );
+	$can   = $owner ? array( 'shirts.view', 'shirts.address', 'shirts.mark', 'shirts.undo' ) : $perms;
+	set_transient( $cache, array( 'ok' => $ok, 'who' => $who, 'perms' => $can ), 5 * MINUTE_IN_SECONDS );
+	$GLOBALS['ew_sho_perms'] = $can;
 	$GLOBALS['ew_sho_who'] = $who;
 	return $ok;
+}
+
+/** A staff tick the app sign-in carries; a signed-in WordPress admin has them all. */
+function ew_sho_can( $key ) {
+	if ( ! isset( $GLOBALS['ew_sho_perms'] ) ) {
+		return true;
+	}
+	return in_array( $key, (array) $GLOBALS['ew_sho_perms'], true );
 }
 
 add_action( 'rest_api_init', function () {
@@ -260,7 +272,15 @@ add_action( 'rest_api_init', function () {
 		'methods'             => 'GET',
 		'permission_callback' => 'ew_sho_rest_ok',
 		'callback'            => function () {
-			$rows   = array_map( 'ew_sho_row', ew_sho_orders() );
+			$rows = array_map( 'ew_sho_row', ew_sho_orders() );
+			if ( ! ew_sho_can( 'shirts.address' ) ) {
+				$rows = array_map( function ( $r ) {
+					$r['address'] = '';
+					$r['email']   = '';
+					$r['phone']   = '';
+					return $r;
+				}, $rows );
+			}
 			$counts = array( 'print' => 0, 'post' => 0, 'collect' => 0, 'done' => 0 );
 			foreach ( $rows as $r ) {
 				$counts[ $r['stage'] ]++;
@@ -272,7 +292,11 @@ add_action( 'rest_api_init', function () {
 		'methods'             => 'POST',
 		'permission_callback' => 'ew_sho_rest_ok',
 		'callback'            => function ( WP_REST_Request $r ) {
-			$b   = (array) $r->get_json_params();
+			$b    = (array) $r->get_json_params();
+			$step = sanitize_key( (string) ( $b['step'] ?? '' ) );
+			if ( ! ew_sho_can( 'undo' === $step ? 'shirts.undo' : 'shirts.mark' ) ) {
+				return new WP_REST_Response( array( 'error' => 'Not allowed' ), 403 );
+			}
 			$res = ew_sho_mark( (int) ( $b['id'] ?? 0 ), sanitize_key( (string) ( $b['step'] ?? '' ) ), (string) ( $GLOBALS['ew_sho_who'] ?? 'app' ) );
 			return is_wp_error( $res ) ? new WP_REST_Response( array( 'error' => $res->get_error_message() ), 400 ) : $res;
 		},
