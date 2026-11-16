@@ -135,7 +135,36 @@ function ew_ticket_food_payload($id) {
 	];
 }
 
+/** The old shared secret still works until this day, so phones on an older app keep scanning while they update. */
+const EW_SCAN_SECRET_UNTIL = '2026-11-30';
+
+/** A signed-in staff member with Scan tickets, checked against the app's database with their own sign-in. */
+function ew_scan_staff_ok(WP_REST_Request $r) {
+	if (!defined('EW_FAN_SUPABASE') || !defined('EW_FAN_ANON')) return false;
+	$auth = (string) $r->get_header('authorization');
+	if (0 !== stripos($auth, 'bearer ')) return false;
+	$tok = trim(substr($auth, 7));
+	if ('' === $tok || strlen($tok) > 4096) return false;
+	$ck  = 'ew_scan_ok_' . md5($tok);
+	$hit = get_transient($ck);
+	if (false !== $hit) return '1' === $hit;
+	$res = wp_remote_post(EW_FAN_SUPABASE . '/rest/v1/rpc/has_staff_permission', [
+		'timeout' => 5,
+		'headers' => ['apikey' => EW_FAN_ANON, 'Authorization' => 'Bearer ' . $tok, 'Content-Type' => 'application/json'],
+		'body'    => wp_json_encode(['p_key' => 'scan']),
+	]);
+	if (is_wp_error($res)) return false;
+	$code = (int) wp_remote_retrieve_response_code($res);
+	$ok   = 200 === $code && 'true' === trim((string) wp_remote_retrieve_body($res));
+	if (200 === $code || 401 === $code || 403 === $code) {
+		set_transient($ck, $ok ? '1' : '0', $ok ? 5 * MINUTE_IN_SECONDS : MINUTE_IN_SECONDS);
+	}
+	return $ok;
+}
+
 function ew_ticket_secret_ok(WP_REST_Request $r) {
+	if (ew_scan_staff_ok($r)) return true;
+	if (current_time('Y-m-d') > EW_SCAN_SECRET_UNTIL) return false;
 	$secret = get_option('ew_scan_secret', '') ?: EW_SCAN_SECRET_DEFAULT;
 	return $secret && hash_equals((string) $secret, (string) $r->get_header('x_scan_secret'));
 }
@@ -255,9 +284,7 @@ function ew_ticket_count_in($id, $kind, $gate = '') {
 }
 
 function ew_ticket_checkin(WP_REST_Request $r) {
-	$secret = get_option('ew_scan_secret', '') ?: EW_SCAN_SECRET_DEFAULT;
-	$given  = $r->get_header('x_scan_secret'); // WP maps X-Scan-Secret -> x_scan_secret
-	if (!$secret || !hash_equals((string) $secret, (string) $given)) {
+	if (!ew_ticket_secret_ok($r)) {
 		return new WP_REST_Response(['status' => 'error', 'message' => 'Not authorised'], 401);
 	}
 
