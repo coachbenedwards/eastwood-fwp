@@ -159,6 +159,9 @@ function ew_claim_defaults() {
 		'next_time'       => '',
 		'next_stub_day'   => '',
 		'next_stub_month' => '',
+		/* "next": the game, crest and date come from the next home game,
+		   turning over at half time. Empty: the game typed above stays. */
+		'follow'          => '',
 	);
 }
 
@@ -190,6 +193,20 @@ function ew_claim_next_fields( $a ) {
 
 /** The block as it reads right now: this game, or the next one once its time has come. */
 function ew_claim_live( $a ) {
+	if ( function_exists( 'ew_ng_follows' ) && ew_ng_follows( $a ) ) {
+		$g = ew_ng_now();
+		if ( $g ) {
+			$a['event']      = $g['event'];
+			$a['away']       = $g['away'];
+			$a['away_crest'] = $g['white'];
+			$a['day']        = $g['day'];
+			$a['date']       = $g['date'];
+			$a['time']       = $g['time'];
+			$a['stub_day']   = $g['stub_day'];
+			$a['stub_month'] = $g['stub_month'];
+		}
+		return $a;
+	}
 	$at = ew_claim_next_at( $a );
 	if ( $at && time() >= $at ) {
 		foreach ( ew_claim_next_fields( $a ) as $k => $v ) {
@@ -408,6 +425,26 @@ function ew_claim_shortcode( $atts, $content = null ) {
 			$nf['background'] = ew_claim_img( $nf['background'] );
 		}
 		$words['next'] = array( 'at' => $next_at * 1000, 'fields' => $nf );
+	}
+	if ( function_exists( 'ew_ng_follows' ) && ew_ng_follows( $a ) ) {
+		$cur  = ew_ng_next();
+		$then = ew_ng_game( ew_ng_next( 1 ) );
+		unset( $words['next'] );
+		if ( $cur && $then ) {
+			$words['next'] = array(
+				'at'     => ew_ng_switch_at( $cur ) * 1000,
+				'fields' => array(
+					'event'      => $then['event'],
+					'away'       => $then['away'],
+					'away_crest' => $then['white'],
+					'day'        => $then['day'],
+					'date'       => $then['date'],
+					'time'       => $then['time'],
+					'stub_day'   => $then['stub_day'],
+					'stub_month' => $then['stub_month'],
+				),
+			);
+		}
 	}
 
 	$h .= '<p class="ewc-big">' . esc_html( $a['stub_day'] ) . '</p><p class="ewc-month">' . esc_html( $a['stub_month'] ) . '</p>';

@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-/** slug => unix time the event counts as over (the end of its day, UK time). */
+/** slug => unix time the event counts as over (2am the morning after, UK time). */
 function ew_event_ends() {
 	static $out = null;
 	if ( null !== $out ) {
@@ -43,7 +43,7 @@ function ew_event_ends() {
 			continue;
 		}
 		try {
-			$end = new DateTimeImmutable( $date . ' 23:59:59', $tz );
+			$end = ( new DateTimeImmutable( $date . ' 02:00:00', $tz ) )->modify( '+1 day' ); // a night still going at midnight is not cut off
 		} catch ( Exception $e ) {
 			continue;
 		}

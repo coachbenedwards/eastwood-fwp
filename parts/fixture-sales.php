@@ -130,7 +130,7 @@ function ew_sales_state( $id, $kind = 'tix' ) {
 	$kind = 'hosp' === $kind ? 'hosp' : 'tix';
 	$row  = ew_sales_fixture( $id );
 	$set  = (string) ( $row[ $kind . '_state' ] ?? 'off' );
-	$set  = in_array( $set, array( 'off', 'soon', 'on', 'out' ), true ) ? $set : 'off';
+	$set  = in_array( $set, array( 'off', 'hold', 'soon', 'on', 'out' ), true ) ? $set : 'off';
 	$when = (int) ( $row[ $kind . '_when' ] ?? 0 );
 	$cap  = max( 0, (int) ( $row[ $kind . '_cap' ] ?? 0 ) );
 	$sold = 'tix' === $kind ? ew_sales_sold( $id ) : 0;
@@ -144,6 +144,15 @@ function ew_sales_state( $id, $kind = 'tix' ) {
 		} elseif ( $when <= current_time( 'timestamp' ) ) {
 			$set = 'on';
 		}
+	}
+
+	// Paid tickets for the next home game go on sale by themselves the moment
+	// the game before it reaches half time. "Held back" keeps them off.
+	if ( 'tix' === $kind && 'off' === $set && function_exists( 'ew_ng_is_next' ) && ew_ng_is_next( $id ) ) {
+		$set = 'on';
+	}
+	if ( 'hold' === $set ) {
+		$set = 'off';
 	}
 
 	// Counting closes the game whatever the switch says, so an oversell
@@ -734,7 +743,7 @@ function ew_sales_sanitise( $in ) {
 		$row = array();
 		foreach ( array( 'tix', 'hosp' ) as $kind ) {
 			$st = (string) ( $f[ $kind . '_state' ] ?? 'off' );
-			$row[ $kind . '_state' ] = in_array( $st, array( 'off', 'soon', 'on', 'out' ), true ) ? $st : 'off';
+			$row[ $kind . '_state' ] = in_array( $st, array( 'off', 'hold', 'soon', 'on', 'out' ), true ) ? $st : 'off';
 			$d = trim( (string) ( $f[ $kind . '_date' ] ?? '' ) );
 			$t = trim( (string) ( $f[ $kind . '_time' ] ?? '' ) );
 			if ( '' !== $d ) {
@@ -978,7 +987,8 @@ function ew_sales_state_fields( $id, $kind, $row ) {
 	$when = (int) ( $row[ $kind . '_when' ] ?? 0 );
 	$name = 'ew_sales[fixtures][' . (int) $id . '][' . $kind . '_state]';
 	$opts = array(
-		'off'  => 'Not announced',
+		'off'  => 'tix' === $kind ? 'Not announced (on sale by itself once it is the next home game)' : 'Not announced',
+		'hold' => 'Held back',
 		'soon' => 'Release on',
 		'on'   => 'On sale',
 		'out'  => 'hosp' === $kind ? 'Full' : 'Sold out',

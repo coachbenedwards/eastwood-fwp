@@ -87,6 +87,9 @@ function ew_mt_defaults() {
 		'travel_head'  => 'GETTING HERE',
 		'all_gone'     => "Sorry, today's tickets have all gone.",
 		'away_bg'      => plugins_url( 'assets/claim/ticket-bg-hucknall.jpg', dirname( __DIR__ ) . '/eastwood-fwp.php' ),
+		// "next": the away fans' heading, crest and colours come from the game in
+		// the link (fx), or the next home game; {away} and {AWAY} can be used in the words.
+		'follow'       => '',
 		'sponsor_label' => 'SPONSORED BY',
 		'sponsor_logo' => plugins_url( 'assets/email/solopress-white.png', dirname( __DIR__ ) . '/eastwood-fwp.php' ),
 	);
@@ -103,6 +106,18 @@ function ew_mt_shortcode( $atts ) {
 	$fx   = (int) ( $_GET['fx'] ?? 0 );           // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
 	$away = 'away' === ( $_GET['fan'] ?? '' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+	if ( $away && function_exists( 'ew_ng_follows' ) && ew_ng_follows( $a ) ) {
+		$g = $fx ? ew_ng_game( ew_ng_match( $fx ) ) : null;
+		$g = $g ? $g : ew_ng_now();
+		if ( $g ) {
+			$a['away_title']  = strtr( (string) $a['away_title'], array( '{AWAY}' => strtoupper( $g['away'] ), '{away}' => $g['away'] ) );
+			$a['away_badge']  = $g['white'];
+			$a['away_colour'] = $g['colour'];
+			$a['away_ink']    = $g['ink'];
+			$a['away_bg']     = plugins_url( 'assets/claim/ticket-bg.jpg', dirname( __DIR__ ) . '/eastwood-fwp.php' );
+			$a['away_text']   = str_replace( '{away}', $g['away'], (string) $a['away_text'] );
+		}
+	}
 	$h    = '<section class="ewmt' . ( $away ? ' is-away' : '' ) . '" id="tickets">';
 	if ( $away ) {
 		$h .= ew_mt_away_head( $a );

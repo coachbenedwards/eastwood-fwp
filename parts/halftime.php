@@ -24,6 +24,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 function ew_halftime_defaults() {
 	return array(
 		'event'       => 'Eastwood FC v Hucknall Town, Saturday 14 November 2026',
+		// "next": the game comes from the next home game, turning over at half time.
+		'follow'      => '',
 		// Step one: who is filling it in, and their email.
 		'form_title'  => 'Register your child',
 		'name_label'  => 'Your full name',
@@ -113,7 +115,7 @@ function ew_halftime_rewards( $a ) {
 }
 
 function ew_halftime_shortcode( $atts ) {
-	$a      = shortcode_atts( ew_halftime_defaults(), (array) $atts, 'eastwood_halftime' );
+	$a      = ew_halftime_live( shortcode_atts( ew_halftime_defaults(), (array) $atts, 'eastwood_halftime' ) );
 	$post   = get_post();
 	$max    = max( 1, min( 12, (int) $a['max'] ) );
 	$ticket = ew_halftime_ticket( $a );
@@ -242,7 +244,19 @@ function ew_halftime_block_on( $post ) {
 	if ( preg_match( '/\[eastwood_halftime([^\]]*)\]/', $found, $o ) ) {
 		$atts = (array) shortcode_parse_atts( $o[1] );
 	}
-	return shortcode_atts( ew_halftime_defaults(), $atts, 'eastwood_halftime' );
+	return ew_halftime_live( shortcode_atts( ew_halftime_defaults(), $atts, 'eastwood_halftime' ) );
+}
+
+/** The block as it reads now: the game typed in, or the next home game when it follows. */
+function ew_halftime_live( $a ) {
+	if ( function_exists( 'ew_ng_follows' ) && ew_ng_follows( $a ) ) {
+		$g = ew_ng_now();
+		if ( $g ) {
+			$a['event']       = $g['event'];
+			$a['ticket_time'] = $g['time'];
+		}
+	}
+	return $a;
 }
 
 add_action( 'rest_api_init', function () {
