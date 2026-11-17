@@ -187,6 +187,9 @@ function ew_halftime_shortcode( $atts ) {
 	// The last page: their place, in the app.
 	$h .= ew_inapp_panel( $a['app_title'], $ticket, '<p class="ewh-after" data-ewh-after></p>' );
 	$h .= '<script type="application/json" class="ewh-words">' . wp_json_encode( $words ) . '</script>';
+	if ( function_exists( 'ew_ng_follows' ) && ew_ng_follows( $a ) && ( $ng = ew_ng_now() ) ) {
+		$h .= ew_ng_guard( $ng['id'] );
+	}
 	return $h . '</section>';
 }
 add_shortcode( 'eastwood_halftime', 'ew_halftime_shortcode' );

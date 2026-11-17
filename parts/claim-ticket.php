@@ -447,6 +447,9 @@ function ew_claim_shortcode( $atts, $content = null ) {
 		}
 	}
 
+	if ( function_exists( 'ew_ng_follows' ) && ew_ng_follows( $a ) && ( $cur ?? null ) ) {
+		$h .= ew_ng_guard( (int) ( $cur['id'] ?? 0 ) );
+	}
 	$h .= '<p class="ewc-big">' . esc_html( $a['stub_day'] ) . '</p><p class="ewc-month">' . esc_html( $a['stub_month'] ) . '</p>';
 
 	/* Step 1: the email on its own, saved the moment the button is pressed. */

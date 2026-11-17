@@ -69,13 +69,13 @@ add_shortcode( 'eastwood_matchday_banner', function ( $atts ) {
 			$a[ $k ] = strtr( (string) $a[ $k ], $swap );
 		}
 		if ( time() < $from ) {
-			return '';
+			return ew_ng_guard( $g['id'] );
 		}
 	}
 
 	$until = strtotime( (string) $a['until'] . ' Europe/London' );
 	if ( $until && time() > $until ) {
-		return '';
+		return isset( $g['id'] ) ? ew_ng_guard( $g['id'] ) : '';
 	}
 	// The page can sit in the cache for days, so the browser checks the window too.
 	$win = '<script>(function(){var n=Date.now()/1000,f=' . (int) $from . ',u=' . (int) $until . ',s=document.currentScript;if((f&&n<f)||(u&&n>u)){var w=s&&s.previousElementSibling;if(w)w.style.display="none";}})();</script>';
@@ -95,5 +95,5 @@ add_shortcode( 'eastwood_matchday_banner', function ( $atts ) {
 		. '<div class="ewmb-wrap">' . ( '' !== trim( (string) $a['crowd'] . (string) $a['crowd2'] ) ? '<div class="ewmb-top">' . ( '' !== trim( (string) $a['crowd'] ) ? '<span style="display:block">' . esc_html( $a['crowd'] ) . '</span>' : '' ) . ( '' !== trim( (string) $a['crowd2'] ) ? '<span style="display:block">' . esc_html( $a['crowd2'] ) . '</span>' : '' ) . '</div>' : '' ) . '<div class="ewmb"><div class="ewmb-main"><div class="ewmb-k">' . esc_html( $a['kicker'] ) . '</div><h2>' . esc_html( $a['title'] ) . '</h2><div class="ewmb-w">' . esc_html( $a['when'] ) . '</div>'
 		. '<div class="ewmb-btns"><a class="ewmb-b ewmb-red" href="' . esc_url( $a['home_url'] ) . '">' . esc_html( $a['home_btn'] ) . '</a><a class="ewmb-b ewmb-line" href="' . esc_url( $a['travel_url'] ) . '">' . esc_html( $a['travel_btn'] ) . '</a></div></div>'
 		. '<div class="ewmb-away"><div class="t"><img src="' . esc_url( $a['away_badge'] ) . '" alt="">' . esc_html( $a['away_title'] ) . '</div><p>' . esc_html( $a['away_text'] ) . '</p>'
-		. '<a class="ewmb-b ewmb-aw" href="' . esc_url( $a['away_url'] ) . '">' . esc_html( $a['away_btn'] ) . '</a></div></div></div>' . $win;
+		. '<a class="ewmb-b ewmb-aw" href="' . esc_url( $a['away_url'] ) . '">' . esc_html( $a['away_btn'] ) . '</a></div></div></div>' . $win . ( isset( $g['id'] ) ? ew_ng_guard( $g['id'] ) : '' );
 } );

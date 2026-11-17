@@ -116,6 +116,9 @@ function ew_mt_shortcode( $atts ) {
 			$a['away_ink']    = $g['ink'];
 			$a['away_bg']     = plugins_url( 'assets/claim/ticket-bg.jpg', dirname( __DIR__ ) . '/eastwood-fwp.php' );
 			$a['away_text']   = str_replace( '{away}', $g['away'], (string) $a['away_text'] );
+			if ( ! $fx ) {
+				$guard = ew_ng_guard( $g['id'] );
+			}
 		}
 	}
 	$h    = '<section class="ewmt' . ( $away ? ' is-away' : '' ) . '" id="tickets">';
@@ -137,7 +140,7 @@ function ew_mt_shortcode( $atts ) {
 	if ( $away ) {
 		$h .= ew_mt_away_travel( $a );
 	}
-	return $h . '</section>';
+	return $h . '</section>' . ( $guard ?? '' );
 }
 add_shortcode( 'eastwood_match_tickets', 'ew_mt_shortcode' );
 

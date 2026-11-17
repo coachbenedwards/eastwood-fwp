@@ -206,23 +206,30 @@ function ew_ng_admin() {
 /* --- Keep these pages fresh in the CDN ---------------------------------- */
 
 /**
- * Cloudflare holds a page for thirty days, which would freeze the claim page,
- * the banner and the away fans page on whatever game they last showed. Pages
- * that carry one of these blocks are kept for ten minutes instead, so a turn
- * over at half time reaches everyone within ten minutes.
+ * Cloudflare holds a page for thirty days and ignores a shorter header from
+ * here, so a page that follows the next game checks it in the browser: it
+ * asks the site which game is next (the REST answer is never cached) and,
+ * when that is not the game it was drawn for, loads itself again with the
+ * game in the address. A new address is a fresh page, drawn for the new game.
  */
-add_action( 'template_redirect', function () {
-	if ( is_admin() || ! function_exists( 'ew_uses_shortcode' ) ) {
-		return;
+add_action( 'rest_api_init', function () {
+	register_rest_route( 'eastwood/v1', '/next-game', array(
+		'methods'             => 'GET',
+		'permission_callback' => '__return_true',
+		'callback'            => function () {
+			$g = ew_ng_now();
+			return new WP_REST_Response( array( 'id' => $g ? $g['id'] : 0 ), 200 );
+		},
+	) );
+} );
+
+/** The few lines a following block prints, once per page. */
+function ew_ng_guard( $id ) {
+	static $done = false;
+	if ( $done ) {
+		return '';
 	}
-	$post = is_front_page() ? get_post( (int) get_option( 'page_on_front' ) ) : ( is_singular() ? get_queried_object() : null );
-	if ( ! $post instanceof WP_Post ) {
-		return;
-	}
-	foreach ( array( 'eastwood_claim', 'eastwood_halftime', 'eastwood_matchday_banner', 'eastwood_match_tickets' ) as $tag ) {
-		if ( ew_uses_shortcode( $post, $tag ) ) {
-			header( 'Cache-Control: public, max-age=0, s-maxage=600' );
-			return;
-		}
-	}
-}, 99 );
+	$done = true;
+	$url  = esc_url_raw( rest_url( 'eastwood/v1/next-game' ) );
+	return '<script>(function(){var mine=' . (int) $id . ';fetch(' . wp_json_encode( $url ) . ',{cache:"no-store"}).then(function(r){return r.json()}).then(function(j){var id=+(j&&j.id)||0;if(!id||id===mine)return;var u=new URL(location.href);if(u.searchParams.get("ng")===String(id))return;u.searchParams.set("ng",id);location.replace(u.toString());}).catch(function(){});})();</script>';
+}
