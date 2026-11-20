@@ -129,6 +129,10 @@ function ew_padel_defaults() {
 		'event'        => 'Eastwood Padel Club waiting list',
 		'track'        => 'Padel waiting list',
 		'crm_hook'     => '',
+		// Who the confirmation email is from. The address must be a confirmed
+		// send-as on the website mailbox; until it is, the club address is used.
+		'mail_name'    => 'Eastwood Padel Club at Eastwood FC',
+		'mail_from'    => 'noreply@eastwoodpadelclub.com',
 	);
 }
 
@@ -439,3 +443,68 @@ add_action( 'wp_enqueue_scripts', function () {
 		wp_add_inline_script( 'ew-padel', ( function_exists( 'ew_optin_js' ) ? ew_optin_js() . ew_inapp_js() : '' ) . ew_padel_js() );
 	}
 }, 22 );
+
+/* ------------------------------------------------------------------ *
+ * The waiting-list emails. Their words are on the Eastwood FWP screen
+ * with the other order emails; who they are from is on the block.
+ * ------------------------------------------------------------------ */
+
+add_filter( 'ew_om_emails', function ( $emails ) {
+	$emails['padel_done']     = array(
+		'label'   => 'Padel waiting list – joined',
+		'subject' => "You’re on the list: Eastwood Padel Club",
+		'body'    => "Hi {first_name},\n\nYou’re on the waiting list for Eastwood Padel Club, the new padel courts at Eastwood FC.\n\nYou’ll be one of the first to hear when court bookings open, along with news on founding memberships.\n\nYour place on the list is saved in the Eastwood FC app. It’s the club’s app for everything at the ground: padel, match tickets and events.\n\nTo see it:\n1. Download the Eastwood FC app: {app_url}\n2. Sign in with this email address\n\nThat’s it. Your place is there, and it’s where bookings will open first.\n\nThanks,\nEastwood Padel Club at Eastwood FC",
+	);
+	$emails['padel_reminder'] = array(
+		'label'   => 'Padel waiting list – not finished (an hour later)',
+		'subject' => "Nearly on the list: Eastwood Padel Club",
+		'body'    => "{greeting},\n\nYou started joining the Eastwood Padel Club waiting list but didn’t quite finish.\n\nIt only takes a minute:\n{event_url}\n\nThanks,\nEastwood Padel Club at Eastwood FC",
+	);
+	return $emails;
+} );
+
+/** Is this booking from the padel waiting list. */
+function ew_padel_booking( $booking_id ) {
+	return 'padel' === (string) get_post_meta( $booking_id, '_ewt_form', true )
+		|| 'padel' === (string) get_post_meta( $booking_id, '_ewt_status', true );
+}
+
+/** The block a booking came from, for the sender name and address. */
+function ew_padel_booking_atts( $booking_id ) {
+	$page = get_post( (int) get_post_meta( $booking_id, '_ewt_page', true ) );
+	$a    = $page ? ew_padel_block_on( $page ) : null;
+	return $a ? $a : ew_padel_defaults();
+}
+
+add_filter( 'ew_om_key', function ( $key, $booking_id, $step ) {
+	if ( ! ew_padel_booking( $booking_id ) ) {
+		return $key;
+	}
+	$GLOBALS['ew_padel_mail'] = (int) $booking_id;
+	return 'reminder' === $step ? 'padel_reminder' : 'padel_done';
+}, 10, 3 );
+
+/** Sent as the padel club: its name always, its address once Google has confirmed it. */
+add_action( 'phpmailer_init', function ( $mail ) {
+	if ( empty( $GLOBALS['ew_padel_mail'] ) ) {
+		return;
+	}
+	$a    = ew_padel_booking_atts( (int) $GLOBALS['ew_padel_mail'] );
+	$name = trim( (string) $a['mail_name'] );
+	$from = sanitize_email( (string) $a['mail_from'] );
+	$ok   = function_exists( 'ew_eb_froms' ) ? array_map( 'strtolower', ew_eb_froms() ) : array();
+	if ( is_email( $from ) && in_array( strtolower( $from ), $ok, true ) ) {
+		$mail->setFrom( $from, $name, false );
+		$mail->clearReplyTos();
+		$mail->addReplyTo( $from, $name );
+	} else {
+		$mail->FromName = $name;
+	}
+}, 20 );
+
+add_action( 'wp_mail_succeeded', function () {
+	unset( $GLOBALS['ew_padel_mail'] );
+} );
+add_action( 'wp_mail_failed', function () {
+	unset( $GLOBALS['ew_padel_mail'] );
+} );

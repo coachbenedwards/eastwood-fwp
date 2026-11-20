@@ -23,7 +23,8 @@ defined( 'ABSPATH' ) || exit;
 
 /** The four emails: which kind of order, which step, and the default words. */
 function ew_om_emails() {
-	return array(
+	// Other parts add their own emails (the padel waiting list) through this filter.
+	return apply_filters( 'ew_om_emails', array(
 		'shop_paid'      => array(
 			'label'   => 'Shirt order – paid',
 			'subject' => 'Thanks for your order',
@@ -54,7 +55,7 @@ function ew_om_emails() {
 			'subject' => 'You were nearly in: {event}',
 			'body'    => "{greeting},\n\nYou started signing up for {event} but didn't quite finish.\n\nIt only takes a minute:\n{event_url}\n\nAny questions, just reply to this email.\n\nEastwood FC",
 		),
-	);
+	) );
 }
 
 function ew_om_on() {
@@ -118,7 +119,8 @@ add_action( 'ew_tix_step', function ( $booking_id, $step ) {
 	if ( ! is_email( $to ) ) {
 		return;
 	}
-	$key  = ew_om_kind( $booking_id ) . '_' . $step;
+	// A form with an email of its own (the padel waiting list) names its key here.
+	$key  = (string) apply_filters( 'ew_om_key', ew_om_kind( $booking_id ) . '_' . $step, $booking_id, $step );
 	$sent = '_ewt_mailed_' . $step;
 	if ( ! array_key_exists( $key, ew_om_emails() ) || get_post_meta( $booking_id, $sent, true ) ) {
 		return;
