@@ -453,7 +453,7 @@ add_filter( 'ew_om_emails', function ( $emails ) {
 	$emails['padel_done']     = array(
 		'label'   => 'Padel waiting list – joined',
 		'subject' => "You’re on the list: Eastwood Padel Club",
-		'body'    => "Hi {first_name},\n\nYou’re on the waiting list for Eastwood Padel Club, the new padel courts at Eastwood FC.\n\nYou’ll be one of the first to hear when court bookings open, along with news on founding memberships.\n\nYour place on the list is saved in the Eastwood FC app. It’s the club’s app for everything at the ground: padel, match tickets and events.\n\nTo see it:\n1. Download the Eastwood FC app: {app_url}\n2. Sign in with this email address\n\nThat’s it. Your place is there, and it’s where bookings will open first.\n\nThanks,\nEastwood Padel Club at Eastwood FC",
+		'body'    => "Hi {first_name},\n\nYou’re on the waiting list for Eastwood Padel Club, the new padel courts at Eastwood Football Club.\n\nYou’ll be one of the first to hear when court bookings open, along with news on founding memberships.\n\nYour place on the list is saved in the Eastwood FC app. It’s the club’s app for everything at the ground: padel, match tickets and events.\n\nTo see it:\n1. Download the Eastwood FC app: {app_url}\n2. Sign in with this email address\n\nThat’s it. Your place is there, and it’s where bookings will open first.\n\nThanks,\nEastwood Padel Club at Eastwood FC",
 	);
 	$emails['padel_reminder'] = array(
 		'label'   => 'Padel waiting list – not finished (an hour later)',
