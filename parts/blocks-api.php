@@ -149,6 +149,16 @@ function ew_blocks_build( $block, $fields, $lines = '' ) {
  *   { "block":  "eastwood_gate" }
  */
 function ew_blocks_widget( $spec ) {
+	$w = ew_blocks_widget_inner( $spec );
+	// A class on the widget, for layouts that place each widget themselves.
+	if ( $w && ! empty( $spec['class'] ) ) {
+		$w['settings']['_css_classes'] = sanitize_text_field( (string) $spec['class'] );
+	}
+	return $w;
+}
+
+/** The widget itself, before any class is put on it. */
+function ew_blocks_widget_inner( $spec ) {
 	$id = substr( md5( wp_json_encode( $spec ) . wp_rand() ), 0, 7 );
 
 	if ( ! empty( $spec['block'] ) ) {
@@ -188,6 +198,23 @@ function ew_blocks_widget( $spec ) {
 			'elType'     => 'widget',
 			'widgetType' => 'text-editor',
 			'settings'   => array( 'editor' => (string) ( $fields['editor'] ?? '' ) ),
+		);
+	}
+
+	// A picture, as Elementor's own image widget, so it is swapped in the builder.
+	if ( 'image' === $kind ) {
+		return array(
+			'id'         => $id,
+			'elType'     => 'widget',
+			'widgetType' => 'image',
+			'settings'   => array(
+				'image'      => array(
+					'url' => esc_url_raw( (string) ( $fields['url'] ?? '' ) ),
+					'id'  => (int) ( $fields['id'] ?? 0 ),
+					'alt' => (string) ( $fields['alt'] ?? '' ),
+				),
+				'image_size' => 'full',
+			),
 		);
 	}
 
