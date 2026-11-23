@@ -989,7 +989,8 @@ function ew_claim_js() {
    list.innerHTML = h; list.hidden = false; box.classList.add('open'); input.setAttribute('aria-expanded','true');
  }
  input.addEventListener('input', function(){ school = ''; show(); });
- input.addEventListener('focus', show);
+ /* A school already picked (or filled from a claim link) doesn't reopen the list on focus; typing does. */
+ input.addEventListener('focus', function(){ if(!school) show(); });
  document.addEventListener('click', function(e){ if(!box.contains(e.target)) close(); });
  list.addEventListener('click', function(e){
    var b = e.target.closest('button'); if(!b) return;
