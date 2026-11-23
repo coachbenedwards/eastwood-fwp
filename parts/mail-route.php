@@ -118,7 +118,7 @@ add_action( 'ew_fwp_after_settings', function () {
 	$last = get_option( 'ew_mail_last' );
 	if ( is_array( $last ) && ! empty( $last['at'] ) ) {
 		echo '<p>Last sent: ' . esc_html( wp_date( 'j M Y, g:ia', (int) $last['at'] ) ) . ' to ' . esc_html( $last['to'] ) . ' &mdash; '
-			. ( $last['code'] >= 200 && $last['code'] < 300 ? 'handed to GoHighLevel' : 'failed (' . esc_html( $last['code'] . ' ' . $last['error'] ) . ')' ) . '</p>';
+			. ( $last['code'] >= 200 && $last['code'] < 300 ? ( 'google' === ( $last['via'] ?? '' ) ? 'sent through Google' : 'handed to GoHighLevel' ) : 'failed (' . esc_html( $last['code'] . ' ' . $last['error'] ) . ')' ) . '</p>';
 	}
 } );
 
