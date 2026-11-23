@@ -384,7 +384,9 @@ function ew_inapp_phone() {
 	$hm = $d['home'] ?? null;
 	if ( $hm ) {
 		$ts   = strtotime( (string) $hm['date'] . ' ' . (string) ( $hm['time'] ?? '15:00' ) );
-		$h   .= '<div class="ewi-tix" style="background-image:url(' . esc_url( $base . 'claim/ticket-bg.jpg' ) . ')"><div>';
+		$look = function_exists( 'ew_ng_club' ) ? ew_ng_club( (int) ( $hm['away-team']['id'] ?? 0 ) ) : array();
+		$tbg  = '' !== (string) ( $look['bg'] ?? '' ) ? $look['bg'] : $base . 'claim/ticket-bg.jpg';
+		$h   .= '<div class="ewi-tix" style="background-image:url(' . esc_url( $tbg ) . ')"><div>';
 		$h   .= '<p class="ewi-k">Next home game</p>';
 		$h   .= '<p class="ewi-t">' . esc_html( strtoupper( 'Eastwood FC v ' . (string) ( $hm['away-team']['name'] ?? '' ) ) ) . '</p>';
 		$h   .= '<p class="ewi-s">' . esc_html( strtoupper( date_i18n( 'D j M', $ts ) ) . ' · ' . (string) ( $hm['time'] ?? '' ) . ' · ' . (string) ( $hm['venue'] ?? '' ) ) . '</p>';
@@ -413,7 +415,9 @@ function ew_inapp_phone() {
  */
 function ew_inapp_ticket( $t ) {
 	$base = plugins_url( 'assets/', dirname( __FILE__ ) . '/eastwood-fwp.php' );
-	$h    = '<div class="ewi-ticket"><div class="ewi-tk" style="background-image:url(' . esc_url( $base . 'claim/ticket-bg.jpg' ) . ')"><div>';
+	// The game's own ticket photo when the funnel passes one (Club colours), otherwise the standard one.
+	$tbg  = '' !== (string) ( $t['bg'] ?? '' ) ? (string) $t['bg'] : $base . 'claim/ticket-bg.jpg';
+	$h    = '<div class="ewi-ticket"><div class="ewi-tk" style="background-image:url(' . esc_url( $tbg ) . ')"><div>';
 	$h   .= '<img class="ewi-tkc" src="' . esc_url( ew_inapp_crest( EW_TEAM ) ) . '" alt="">';
 	$h   .= '<p class="ewi-tkt">' . esc_html( (string) $t['title'] ) . '</p>';
 	if ( '' !== (string) ( $t['sub'] ?? '' ) ) {

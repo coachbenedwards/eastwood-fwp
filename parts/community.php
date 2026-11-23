@@ -480,6 +480,7 @@ function ew_cm_ticket( $m, $a ) {
 		'time'  => strtoupper( $v['{time}'] ),
 		'stub'  => $ts ? wp_date( 'jS', $ts ) : '',
 		'stub2' => $ts ? strtoupper( wp_date( 'F Y', $ts ) ) : '',
+		'bg'    => function_exists( 'ew_ng_club' ) ? (string) ew_ng_club( (int) ( $m['away-team']['id'] ?? 0 ) )['bg'] : '',
 	);
 }
 

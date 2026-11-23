@@ -43,6 +43,7 @@ function ew_mt_defaults() {
 		'out'        => 'Sold out',
 		'left'       => '{n} left',
 		'back'       => 'All games',
+		'all_games'  => 'See all games',
 		'who'        => "Who's coming?",
 		'free'       => 'Free',
 		'none'       => 'Nobody yet',
@@ -91,7 +92,8 @@ function ew_mt_defaults() {
 		// the link (fx), or the next home game; {away} and {AWAY} can be used in the words.
 		'follow'       => '',
 		'sponsor_label' => 'SPONSORED BY',
-		'sponsor_logo' => plugins_url( 'assets/email/solopress-white.png', dirname( __DIR__ ) . '/eastwood-fwp.php' ),
+		// A logo here shows on every game's tickets; leave it blank and each game's sponsor comes from Club colours.
+		'sponsor_logo' => '',
 	);
 }
 
@@ -159,8 +161,6 @@ function ew_mt_away_head( $a ) {
 		. '.ewmt-away .t{font-family:Anton,Impact,sans-serif;font-size:30px;line-height:1.05;color:' . esc_attr( $col ) . ';margin:4px 0}'
 		. '.ewmt-away .x{font-size:15px;line-height:1.45;color:#ededf0;margin:0}'
 		. '.ewmt.is-away .ewmt-tie em{color:' . esc_attr( $col ) . '}'
-		. ( '' !== trim( (string) $a['away_bg'] ) ? '.ewmt.is-away .ewmt-tkMatch{background:linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,.72)),url(' . esc_url( $a['away_bg'] ) . ') left center/cover no-repeat}' : '' )
-		. '.ewmt-spons{display:flex;align-items:center;gap:10px;margin:4px 0 0}.ewmt-spons span{font-family:Anton,Impact,sans-serif;font-size:13px;letter-spacing:1px;color:#c9c9cf}.ewmt-spons img{height:20px;width:auto;display:block}'
 		. '.ewmt.is-away .ewmt-go,.ewmt.is-away .ewmt-go:hover{background:' . esc_attr( $col ) . ';border-color:' . esc_attr( $col ) . ';color:' . esc_attr( $ink ) . '}'
 		. '.ewmt-travel{margin:28px 0 8px}.ewmt-travel h2{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:26px;margin:0 0 6px;color:#121417;background:none;padding:0}'
 		. '.ewmt-travel .a{font-size:15px;color:#3a3f46;margin:0 0 8px}.ewmt-travel .r{border-top:1px solid #e4e5e8;padding:12px 0}.ewmt-travel .r b{display:block;font-size:15px;color:#121417}.ewmt-travel .r span{display:block;font-size:15px;line-height:1.5;color:#3a3f46;margin-top:2px}'
@@ -341,8 +341,7 @@ function ew_mt_one( $m, $a ) {
 	$want = ew_mt_wanted();
 
 	$is_away = 'away' === ( $_GET['fan'] ?? '' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-	$h       = $is_away ? '' : '<p class="ewmt-back"><a href="' . esc_url( remove_query_arg( array( 'fx', 'q', 'fan' ) ) ) . '">'
-		. '&larr; ' . esc_html( $a['back'] ) . '</a></p>';
+	$h       = '';
 
 	$h .= '<div class="ewmt-tk" data-fx="' . $id . '" data-page="' . (int) get_the_ID() . '"'
 		. ' data-rest="' . esc_url( rest_url( 'eastwood/v1/tickets/match' ) ) . '"'
@@ -356,14 +355,18 @@ function ew_mt_one( $m, $a ) {
 		. ' data-adult="' . esc_attr( $a['need_adult'] ) . '"'
 		. ' data-none="' . esc_attr( $a['none'] ) . '">';
 
-	$h .= '<div class="ewmt-tkMatch">';
+	// The game's own ticket photo and sponsor (Club colours), the same on home and away tickets.
+	$look  = function_exists( 'ew_ng_club' ) ? ew_ng_club( (int) ( $away['id'] ?? 0 ) ) : array();
+	$tbg   = '' !== (string) ( $look['bg'] ?? '' ) ? $look['bg'] : plugins_url( 'assets/claim/ticket-bg.jpg', dirname( __DIR__ ) . '/eastwood-fwp.php' );
+	$spons = '' !== trim( (string) $a['sponsor_logo'] ) ? $a['sponsor_logo'] : (string) ( $look['sponsor'] ?? '' );
+	$h .= '<div class="ewmt-tkMatch" style="background:linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,.72)),url(' . esc_url( $tbg ) . ') left center/cover no-repeat">';
 	$h .= '<p class="ewmt-tie"><span>' . esc_html( (string) ( $home['name'] ?? '' ) ) . '</span>'
 		. '<em>' . esc_html( $a['v'] ) . '</em><span>' . esc_html( (string) ( $away['name'] ?? '' ) ) . '</span></p>';
 	$h .= '<p class="ewmt-tkWhen"><b>' . esc_html( $ts ? date_i18n( 'l j F Y', $ts ) : '' ) . '</b>'
 		. '<i>' . esc_html( $ts ? date_i18n( 'H:i', $ts ) : '' ) . '</i></p>';
 	$h .= '<p class="ewmt-tkAt">Coronation Park, Chewton Street, Eastwood NG16 3HB</p>';
-	if ( $is_away && '' !== trim( (string) $a['sponsor_logo'] ) ) {
-		$h .= '<p class="ewmt-spons"><span>' . esc_html( $a['sponsor_label'] ) . '</span><img src="' . esc_url( $a['sponsor_logo'] ) . '" alt=""></p>';
+	if ( '' !== trim( $spons ) ) {
+		$h .= '<p class="ewmt-spons"><span>' . esc_html( $a['sponsor_label'] ) . '</span><img src="' . esc_url( $spons ) . '" alt=""></p>';
 	}
 	if ( $st['cap'] ) {
 		$h .= '<p class="ewmt-tkLeft">' . esc_html( str_replace( '{n}', number_format_i18n( $st['left'] ), $a['left'] ) ) . '</p>';
@@ -406,6 +409,10 @@ function ew_mt_one( $m, $a ) {
 	$h .= '<div class="ewmt-mount" data-ewmt-mount></div>';
 	$h .= '</div>';
 
+	// The way back to every game sits under the ticket, as a button, so the ticket comes first.
+	if ( ! $is_away ) {
+		$h .= '<p class="ewmt-moreWrap ewmt-allWrap"><a class="ewmt-more" href="' . esc_url( remove_query_arg( array( 'fx', 'q', 'fan' ) ) ) . '">' . esc_html( $a['all_games'] ) . '</a></p>';
+	}
 	return $h . ( $is_away ? '' : ew_mt_hosp( $a ) );
 }
 
@@ -803,6 +810,7 @@ function ew_mt_css() {
 .ewmt a.ewmt-fxBtn.is-line:hover{background:#CC0000;color:#fff}
 .ewmt-fxFoot{display:flex;align-items:center;justify-content:center;min-height:49px;padding:10px 16px;background:#fafafa;border-top:1px solid rgba(200,200,200,.3);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#8a8a8a}
 .ewmt-moreWrap{margin:18px 0 0!important;text-align:center}
+.ewmt-allWrap{margin:24px 0 0!important}.ewmt-allWrap .ewmt-more{text-decoration:none}
 .ewmt-more{display:inline-flex;align-items:center;gap:9px;min-height:50px;padding:12px 26px;background:#fff;border:1px solid #d9d9dd;border-radius:8px;cursor:pointer;font-family:"Instrument Sans",system-ui,sans-serif;font-size:15px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:#101010}
 .ewmt-more:hover{border-color:#CC0000;color:#CC0000}
 .ewmt-more b{font-weight:700;color:#8a8a8a}
@@ -815,6 +823,7 @@ function ew_mt_css() {
 .ewmt-tk{display:grid;grid-template-columns:minmax(0,1fr) 420px;background:#101010;color:#fff;
  border-radius:8px;overflow:hidden}
 .ewmt-tkMatch{padding:34px 36px;display:flex;flex-direction:column;justify-content:center;gap:18px}
+.ewmt-spons{display:flex;align-items:center;gap:10px;margin:4px 0 0}.ewmt-spons span{font-family:Anton,Impact,sans-serif;font-size:13px;letter-spacing:1px;color:#c9c9cf}.ewmt-spons img{height:20px;width:auto;display:block}
 .ewmt-tie{display:flex;flex-direction:column;gap:4px;font-family:Anton,Impact,sans-serif;
  font-weight:400;font-size:52px;line-height:.98;text-transform:uppercase;letter-spacing:.5px}
 .ewmt-tie em{font-family:Anton,Impact,sans-serif;font-style:normal;font-size:30px;color:#CC0000;line-height:1}

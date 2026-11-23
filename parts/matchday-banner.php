@@ -35,7 +35,8 @@ add_shortcode( 'eastwood_matchday_banner', function ( $atts ) {
 		'away_colour' => '#FFD200',
 		'away_ink'    => '#111111',
 		'away_head'   => '#ffffff',
-		'away_btn_ink' => '#ffffff',
+		'away_btn'    => '#ffffff',
+		'away_btn_ink' => '#111111',
 		// A photo behind the banner (an address, or a file in the plugin's assets); empty for plain black.
 		'bg'          => '',
 		// "next": the game, the away fans' crest, colours and links come from
@@ -91,7 +92,8 @@ add_shortcode( 'eastwood_matchday_banner', function ( $atts ) {
 	$bgcss = '' !== $bg ? '.ewmb-stage{background:linear-gradient(rgba(10,10,11,.35),rgba(10,10,11,.55)),url(' . esc_url( $bg ) . ') center/cover no-repeat;padding:56px 24px}.ewmb-stage .ewmb-wrap{margin:0 auto}@media(max-width:820px){.ewmb-stage{padding:28px 16px}.ewmb-stage .ewmb-wrap{margin:0}}' : '';
 	$ink  = sanitize_hex_color( $a['away_ink'] ) ? $a['away_ink'] : '#111111';
 	$head = sanitize_hex_color( $a['away_head'] ) ? $a['away_head'] : '#ffffff';
-	$bink = sanitize_hex_color( $a['away_btn_ink'] ) ? $a['away_btn_ink'] : '#ffffff';
+	$bbg  = sanitize_hex_color( $a['away_btn'] ) ? $a['away_btn'] : '#ffffff';
+	$bink = sanitize_hex_color( $a['away_btn_ink'] ) ? $a['away_btn_ink'] : '#111111';
 
 	return '<style>.ewmb-wrap{max-width:1200px;margin:16px auto;border-radius:14px;overflow:hidden;font-family:"Instrument Sans",system-ui,sans-serif}.ewmb-top{background:#CC0000;color:#fff;padding:14px 24px;text-align:center;font-family:Anton,Impact,sans-serif;font-size:24px;line-height:1.15;letter-spacing:.5px;text-transform:uppercase}.ewmb{background:#111;color:#fff;display:grid;grid-template-columns:1fr 360px}'
 		. '.ewmb-main{padding:22px 24px}.ewmb-k{font-size:12px;font-weight:700;letter-spacing:2px;color:#ff4d4d}'
@@ -101,7 +103,7 @@ add_shortcode( 'eastwood_matchday_banner', function ( $atts ) {
 		. '.ewmb a.ewmb-red{background:#CC0000;color:#fff}.ewmb a.ewmb-line{border:1px solid rgba(255,255,255,.4);color:#fff}'
 		. '.ewmb-away{padding:22px 24px;display:flex;flex-direction:column;justify-content:center;gap:10px;background:' . esc_attr( $col ) . '}'
 		. '.ewmb-away .t{display:flex;align-items:center;gap:12px;font-family:Anton,Impact,sans-serif;font-size:24px;line-height:1.1;color:' . esc_attr( $head ) . '}.ewmb-away img{width:48px;height:48px;object-fit:contain}'
-		. '.ewmb-away p{margin:0;font-size:15px;color:' . esc_attr( $head ) . '}.ewmb a.ewmb-aw{background:' . esc_attr( $ink ) . ';color:' . esc_attr( $bink ) . ';height:52px}'
+		. '.ewmb-away p{margin:0;font-size:15px;color:' . esc_attr( $head ) . '}.ewmb a.ewmb-aw{background:' . esc_attr( $bbg ) . ';color:' . esc_attr( $bink ) . ';height:52px}'
 		. $bgcss
 		. '@media(max-width:820px){.ewmb-wrap{margin:12px 16px}.ewmb-top{font-size:19px;padding:12px 18px}.ewmb-top span+span{margin-top:8px}.ewmb{grid-template-columns:1fr}.ewmb h2{font-size:28px}.ewmb-away{border-left:0;border-top:6px solid ' . esc_attr( $col ) . '}.ewmb-btns a.ewmb-b{flex:1}.ewmb-away a.ewmb-b{flex:none}}</style>'
 		. ( '' !== $bg ? '<div class="ewmb-stage">' : '' ) . '<div class="ewmb-wrap">' . ( '' !== trim( (string) $a['crowd'] . (string) $a['crowd2'] ) ? '<div class="ewmb-top">' . ( '' !== trim( (string) $a['crowd'] ) ? '<span style="display:block">' . esc_html( $a['crowd'] ) . '</span>' : '' ) . ( '' !== trim( (string) $a['crowd2'] ) ? '<span style="display:block">' . esc_html( $a['crowd2'] ) . '</span>' : '' ) . '</div>' : '' ) . '<div class="ewmb"><div class="ewmb-main"><div class="ewmb-k">' . esc_html( $a['kicker'] ) . '</div><h2>' . esc_html( $a['title'] ) . '</h2><div class="ewmb-w">' . esc_html( $a['when'] ) . '</div>'

@@ -41,6 +41,8 @@ function ew_claim_defaults() {
 		'home_crest'    => 'claim/eastwood-white.png',
 		'away_crest'    => 'claim/deeping-rangers-white.png',
 		'background'    => 'claim/ticket-bg.jpg',
+		'sponsor'       => '',
+		'sponsor_label' => 'SPONSORED BY',
 		'day'           => 'Saturday',
 		'date'          => '24 October 2026',
 		'time'          => '3PM',
@@ -217,6 +219,9 @@ function ew_claim_live( $a ) {
 			if ( '' !== (string) ( $g['bg'] ?? '' ) ) {
 				$a['background'] = $g['bg'];
 			}
+			if ( '' === trim( (string) $a['sponsor'] ) ) {
+				$a['sponsor'] = (string) ( $g['sponsor'] ?? '' );
+			}
 		}
 		return $a;
 	}
@@ -319,6 +324,9 @@ function ew_claim_match_html( $a ) {
 	$h .= '</div></div>';
 	$h .= '<div class="ewc-when"><div><p class="ewc-day">' . esc_html( $a['day'] ) . '</p><p class="ewc-date">' . esc_html( $a['date'] ) . '</p></div>';
 	$h .= '<p class="ewc-time">' . esc_html( $a['time'] ) . '</p></div>';
+	if ( '' !== trim( (string) $a['sponsor'] ) ) {
+		$h .= '<p class="ewc-spons"><span>' . esc_html( $a['sponsor_label'] ) . '</span><img src="' . esc_url( ew_claim_img( $a['sponsor'] ) ) . '" alt=""></p>';
+	}
 	$h .= '</div>';
 	return $h;
 }
@@ -604,6 +612,7 @@ function ew_claim_ticket( $a ) {
 		'time'  => strtoupper( (string) $a['time'] ),
 		'stub'  => (string) $a['stub_day'],
 		'stub2' => strtoupper( (string) $a['stub_month'] ),
+		'bg'    => ew_claim_img( $a['background'] ),
 	);
 }
 
@@ -850,6 +859,7 @@ function ew_claim_css() {
 .ewc .ewc-day{margin:0 0 4px;font-size:18px;font-weight:700;letter-spacing:.4em;text-transform:uppercase;color:#e01b1b}
 .ewc .ewc-date{margin:0;font-size:34px;text-transform:uppercase;color:#fff}
 .ewc .ewc-time{margin:0;font-family:Anton,Impact,sans-serif;font-size:72px;line-height:1;color:#fff}
+.ewc .ewc-spons{display:flex;align-items:center;gap:10px;margin:14px 0 0}.ewc .ewc-spons span{font-family:Anton,Impact,sans-serif;font-size:13px;letter-spacing:1px;color:#c9c9cf}.ewc .ewc-spons img{height:20px;width:auto;display:block}
 .ewc-stub{background:rgba(0,0,0,.8);border-left:3px dashed rgba(255,255,255,.85);padding:40px 44px;display:flex;flex-direction:column}
 .ewc .ewc-big{margin:0;font-family:Anton,Impact,sans-serif;font-size:72px;line-height:1;text-align:center;color:#fff}
 .ewc .ewc-month{margin:0 0 18px;font-family:Anton,Impact,sans-serif;font-size:26px;color:#e01b1b;text-align:center;text-transform:uppercase}
