@@ -96,6 +96,8 @@ function ew_ng_club( $id ) {
 	$col   = sanitize_hex_color( (string) ( $row['colour'] ?? '' ) );
 	$ink   = sanitize_hex_color( (string) ( $row['ink'] ?? '' ) );
 	return array(
+		// The ticket picture for the game against this club (empty: the standard one).
+		'bg'     => trim( (string) ( $row['bg'] ?? '' ) ),
 		'crest'  => $crest,
 		'white'  => '' !== $white ? $white : $crest,
 		'colour' => $col ? $col : '#CC0000',
@@ -133,6 +135,7 @@ function ew_ng_game( $m ) {
 		'white'      => $club['white'],
 		'colour'     => $club['colour'],
 		'ink'        => $club['ink'],
+		'bg'         => $club['bg'],
 	);
 }
 
@@ -164,8 +167,9 @@ function ew_ng_admin() {
 			$w  = esc_url_raw( trim( (string) ( $r['white'] ?? '' ) ) );
 			$c  = sanitize_hex_color( trim( (string) ( $r['colour'] ?? '' ) ) );
 			$k  = sanitize_hex_color( trim( (string) ( $r['ink'] ?? '' ) ) );
-			if ( $id && ( $w || $c || $k ) ) {
-				$all[ $id ] = array( 'white' => $w, 'colour' => (string) $c, 'ink' => (string) $k );
+			$b  = esc_url_raw( trim( (string) ( $r['bg'] ?? '' ) ) );
+			if ( $id && ( $w || $c || $k || $b ) ) {
+				$all[ $id ] = array( 'white' => $w, 'colour' => (string) $c, 'ink' => (string) $k, 'bg' => $b );
 			}
 		}
 		update_option( 'ew_club_style', $all, false );
@@ -176,7 +180,7 @@ function ew_ng_admin() {
 	echo '<p>Next home game: <strong>' . esc_html( $next ? $next['event'] : 'none fixed' ) . '</strong></p>';
 	echo '<form method="post">';
 	wp_nonce_field( 'ew_cc' );
-	echo '<table class="widefat striped" style="max-width:1100px"><thead><tr><th>Date</th><th>Club</th><th>Crest</th><th>White crest (address)</th><th>Colour</th><th>Text on colour</th></tr></thead><tbody>';
+	echo '<table class="widefat striped" style="max-width:1100px"><thead><tr><th>Date</th><th>Club</th><th>Crest</th><th>White crest (address)</th><th>Colour</th><th>Text on colour</th><th>Ticket picture (address)</th></tr></thead><tbody>';
 	$seen = array();
 	foreach ( ew_ng_home_games() as $m ) {
 		$g = ew_ng_game( $m );
@@ -189,7 +193,8 @@ function ew_ng_admin() {
 			'<tr><td>%1$s</td><td>%2$s</td><td><span style="display:inline-block;background:%7$s;padding:4px;border-radius:4px"><img src="%3$s" style="height:36px;width:auto;display:block"></span></td>'
 			. '<td><input type="url" name="ew_cc[%4$d][white]" value="%5$s" style="width:100%%"></td>'
 			. '<td><input type="text" name="ew_cc[%4$d][colour]" value="%6$s" placeholder="#CC0000" size="9"></td>'
-			. '<td><input type="text" name="ew_cc[%4$d][ink]" value="%8$s" placeholder="#FFFFFF" size="9"></td></tr>',
+			. '<td><input type="text" name="ew_cc[%4$d][ink]" value="%8$s" placeholder="#FFFFFF" size="9"></td>'
+			. '<td><input type="url" name="ew_cc[%4$d][bg]" value="%9$s" style="width:100%%"></td></tr>',
 			esc_html( $g['short'] ),
 			esc_html( $g['away'] ),
 			esc_url( $g['white'] ),
@@ -197,7 +202,8 @@ function ew_ng_admin() {
 			esc_attr( (string) ( $r['white'] ?? '' ) ),
 			esc_attr( (string) ( $r['colour'] ?? '' ) ),
 			esc_attr( $g['colour'] ),
-			esc_attr( (string) ( $r['ink'] ?? '' ) )
+			esc_attr( (string) ( $r['ink'] ?? '' ) ),
+			esc_attr( (string) ( $r['bg'] ?? '' ) )
 		);
 	}
 	echo '</tbody></table><p><button class="button button-primary">Save</button></p></form></div>';

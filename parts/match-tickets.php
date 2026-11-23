@@ -114,7 +114,7 @@ function ew_mt_shortcode( $atts ) {
 			$a['away_badge']  = $g['white'];
 			$a['away_colour'] = $g['colour'];
 			$a['away_ink']    = $g['ink'];
-			$a['away_bg']     = plugins_url( 'assets/claim/ticket-bg.jpg', dirname( __DIR__ ) . '/eastwood-fwp.php' );
+			$a['away_bg']     = '' !== (string) ( $g['bg'] ?? '' ) ? $g['bg'] : plugins_url( 'assets/claim/ticket-bg.jpg', dirname( __DIR__ ) . '/eastwood-fwp.php' );
 			$a['away_text']   = str_replace( '{away}', $g['away'], (string) $a['away_text'] );
 			if ( ! $fx ) {
 				$guard = ew_ng_guard( $g['id'] );

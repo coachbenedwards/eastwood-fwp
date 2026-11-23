@@ -207,6 +207,9 @@ function ew_claim_live( $a ) {
 			$a['time']       = $g['time'];
 			$a['stub_day']   = $g['stub_day'];
 			$a['stub_month'] = $g['stub_month'];
+			if ( '' !== (string) ( $g['bg'] ?? '' ) ) {
+				$a['background'] = $g['bg'];
+			}
 		}
 		return $a;
 	}
@@ -449,6 +452,7 @@ function ew_claim_shortcode( $atts, $content = null ) {
 					'event'      => $then['event'],
 					'away'       => $then['away'],
 					'away_crest' => $then['white'],
+					'background' => '' !== (string) ( $then['bg'] ?? '' ) ? $then['bg'] : ew_claim_img( 'claim/ticket-bg.jpg' ),
 					'day'        => $then['day'],
 					'date'       => $then['date'],
 					'time'       => $then['time'],
