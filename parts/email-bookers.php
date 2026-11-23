@@ -458,6 +458,17 @@ function ew_eb_drip_run() {
 		$phpmailer->smtpClose();
 	}
 	$d['last'] = time();
+	// Pause or Stop may have been pressed while this batch was sending: those win.
+	wp_cache_delete( 'ew_eb_drip', 'options' );
+	wp_cache_delete( 'alloptions', 'options' );
+	$now = (array) get_option( 'ew_eb_drip', array() );
+	if ( ! $now ) {
+		delete_transient( 'ew_eb_drip_lock' );
+		return;
+	}
+	if ( ! empty( $now['paused'] ) ) {
+		$d['paused'] = 1;
+	}
 	update_option( 'ew_eb_drip', $d, false );
 	delete_transient( 'ew_eb_drip_lock' );
 	if ( $d['queue'] && empty( $d['paused'] ) ) {
