@@ -137,6 +137,8 @@ function ew_eb_page() {
 	$step   = sanitize_key( $_POST['step'] ?? '' );
 	$who    = sanitize_key( $_POST['who'] ?? '' );
 	$look   = 'club' === ( $_POST['look'] ?? 'plain' ) ? 'club' : 'plain';
+	$fname  = sanitize_text_field( wp_unslash( $_POST['fname'] ?? 'Eastwood FC' ) );
+	$fname  = '' !== $fname ? $fname : 'Eastwood FC';
 	$per    = max( 1, min( 100, (int) ( $_POST['per'] ?? 20 ) ) );
 	$every  = max( 1, min( 120, (int) ( $_POST['every'] ?? 10 ) ) );
 	if ( isset( $_POST['step_send'] ) ) {
@@ -183,7 +185,7 @@ function ew_eb_page() {
 				}
 			}
 			update_option( 'ew_eb_drip', array(
-				'event' => $event, 'from' => $from, 'subj' => $subj, 'body' => $body, 'who' => $who, 'look' => $look,
+				'event' => $event, 'from' => $from, 'fname' => $fname, 'subj' => $subj, 'body' => $body, 'who' => $who, 'look' => $look,
 				'per' => $per, 'every' => $every, 'queue' => $q, 'total' => count( $q ),
 				'sent' => 0, 'skip' => 0, 'nocode' => 0, 'fail' => array(), 'started' => time(), 'paused' => 0, 'stopped' => '', 'last' => 0,
 			), false );
@@ -232,7 +234,7 @@ function ew_eb_page() {
 				$nocode++;
 				continue;
 			}
-			$ok = ew_eb_send_one( array( 'from' => $from, 'subj' => $subj, 'body' => $body, 'look' => $look, 'keys' => $keys ), $em, $p, $cc );
+			$ok = ew_eb_send_one( array( 'from' => $from, 'fname' => $fname, 'subj' => $subj, 'body' => $body, 'look' => $look, 'keys' => $keys ), $em, $p, $cc );
 			if ( $ok ) {
 				$done[ $em ] = time();
 				$sent++;
@@ -262,7 +264,7 @@ function ew_eb_page() {
 			echo '<p><strong>' . (int) $more . ' still to send. Carrying on, keep this page open.</strong></p>';
 			echo '<form method="post" id="ewEbMore">';
 			wp_nonce_field( 'ew_eb_send' );
-			foreach ( array( 'event' => $event, 'from' => $from, 'subject' => $subj, 'body' => $body, 'who' => $who, 'look' => $look, 'step' => 'send' ) as $k => $v ) {
+			foreach ( array( 'event' => $event, 'from' => $from, 'subject' => $subj, 'body' => $body, 'who' => $who, 'look' => $look, 'fname' => $fname, 'step' => 'send' ) as $k => $v ) {
 				echo '<input type="hidden" name="' . esc_attr( $k ) . '" value="' . esc_attr( $v ) . '">';
 			}
 			foreach ( $pick as $em ) {
@@ -297,7 +299,7 @@ function ew_eb_page() {
 				$mail->AltBody = $msg['text'];
 			};
 			add_action( 'phpmailer_init', $alt, 99 );
-			$ok = wp_mail( $to, '[Test] ' . ew_eb_fill( $subj, $first['name'], '' !== $tcc ? $tcc : 'XX-TEST', $tref ), $msg['html'], array( 'From: Eastwood FC <' . $from . '>', 'Content-Type: text/html; charset=UTF-8' ) );
+			$ok = wp_mail( $to, '[Test] ' . ew_eb_fill( $subj, $first['name'], '' !== $tcc ? $tcc : 'XX-TEST', $tref ), $msg['html'], array( 'From: ' . str_replace( array( '<', '>', '"', "\r", "\n" ), '', $fname ) . ' <' . $from . '>', 'Content-Type: text/html; charset=UTF-8' ) );
 			remove_action( 'phpmailer_init', $alt, 99 );
 			echo '<div class="notice notice-' . ( $ok ? 'success' : 'error' ) . '"><p>' . ( $ok ? 'Test sent to ' . esc_html( $to ) . ', written as ' . esc_html( $first['name'] ? $first['name'] : 'someone with no name' ) . ' would get it ("' . esc_html( $as ) . '").' : 'The test could not be sent.' ) . '</p></div>';
 		} else {
@@ -322,6 +324,7 @@ function ew_eb_page() {
 		echo '<option' . selected( $f, $from, false ) . '>' . esc_html( $f ) . '</option>';
 	}
 	echo '</select></td></tr>';
+	echo '<tr><th>From name</th><td><input type="text" name="fname" class="regular-text" value="' . esc_attr( $fname ) . '"><p class="description">The name people see the email is from, e.g. a person at the club.</p></td></tr>';
 	echo '<tr><th>Look</th><td><select name="look">';
 	foreach ( array( 'plain' => 'Plain, like an email typed in Gmail (black text, links not tracked)', 'club' => 'Club (red links, every eastwoodfc.com link tracked)' ) as $k => $label ) {
 		echo '<option value="' . esc_attr( $k ) . '"' . selected( $k, $look, false ) . '>' . esc_html( $label ) . '</option>';
@@ -386,7 +389,7 @@ function ew_eb_send_one( $job, $em, $p, $cc ) {
 		$mail->AltBody = $msg['text'];
 	};
 	add_action( 'phpmailer_init', $alt, 99 );
-	$ok = wp_mail( $em, ew_eb_fill( $job['subj'], $p['name'], $cc, $ref ), $msg['html'], array( 'From: Eastwood FC <' . $job['from'] . '>', 'Content-Type: text/html; charset=UTF-8' ) );
+	$ok = wp_mail( $em, ew_eb_fill( $job['subj'], $p['name'], $cc, $ref ), $msg['html'], array( 'From: ' . str_replace( array( '<', '>', '"', "\r", "\n" ), '', (string) ( $job['fname'] ?? 'Eastwood FC' ) ) . ' <' . $job['from'] . '>', 'Content-Type: text/html; charset=UTF-8' ) );
 	remove_action( 'phpmailer_init', $alt, 99 );
 	if ( $ok ) {
 		update_post_meta( $p['ids'][0], $job['keys'][0], time() );
@@ -413,7 +416,7 @@ function ew_eb_drip_run() {
 	$people = ew_eb_people( $d['event'], $d['who'] );
 	$keys   = ew_eb_keys( $d['event'], $d['subj'] );
 	$done   = ew_eb_done( $keys );
-	$job    = array( 'from' => $d['from'], 'subj' => $d['subj'], 'body' => $d['body'], 'look' => $d['look'], 'keys' => $keys );
+	$job    = array( 'from' => $d['from'], 'fname' => $d['fname'] ?? 'Eastwood FC', 'subj' => $d['subj'], 'body' => $d['body'], 'look' => $d['look'], 'keys' => $keys );
 	$keep   = function ( $mail ) {
 		$mail->SMTPKeepAlive = true; // one Google sign-in per batch, not one per email
 	};
