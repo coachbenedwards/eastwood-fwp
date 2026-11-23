@@ -50,7 +50,7 @@ function ew_eb_events() {
 }
 
 /** One row per email address for an event, claimed or paid only, club addresses left off. */
-function ew_eb_people( $event ) {
+function ew_eb_people( $event, $who = '' ) {
 	$q   = new WP_Query( array(
 		'post_type'      => 'ewt_booking',
 		'post_status'    => 'any',
@@ -75,7 +75,36 @@ function ew_eb_people( $event ) {
 		}
 		$out[ $em ]['ids'][] = $id;
 	}
+	// Who: 'in' = scanned in at the gate on any of their bookings, 'out' = never scanned in.
+	if ( 'in' === $who || 'out' === $who ) {
+		foreach ( $out as $em => $p ) {
+			$in = false;
+			foreach ( $p['ids'] as $id ) {
+				if ( '' !== (string) get_post_meta( $id, '_ewt_in', true ) ) {
+					$in = true;
+					break;
+				}
+			}
+			if ( ( 'in' === $who ) !== $in ) {
+				unset( $out[ $em ] );
+			}
+		}
+	}
 	return $out;
+}
+
+/** {first_name}, {code} and {claim_link} filled for one person. '' code when they have none. */
+function ew_eb_fill( $body, $name, $code ) {
+	return str_replace(
+		array( '{first_name}', '{code}', '{claim_link}' ),
+		array( ew_eb_first( $name ), $code, '' !== $code && function_exists( 'ew_cc_link' ) ? ew_cc_link( $code ) : '' ),
+		$body
+	);
+}
+
+/** Does the message use a personal claim code? */
+function ew_eb_wants_code( $body ) {
+	return false !== strpos( $body, '{code}' ) || false !== strpos( $body, '{claim_link}' );
 }
 
 function ew_eb_first( $name ) {
@@ -91,6 +120,7 @@ function ew_eb_page() {
 	$subj   = sanitize_text_field( wp_unslash( $_POST['subject'] ?? '' ) );
 	$body   = sanitize_textarea_field( wp_unslash( $_POST['body'] ?? '' ) );
 	$step   = sanitize_key( $_POST['step'] ?? '' );
+	$who    = sanitize_key( $_POST['who'] ?? '' );
 	if ( isset( $_POST['step_send'] ) ) {
 		$step = 'send';
 	}
@@ -101,8 +131,11 @@ function ew_eb_page() {
 	echo '<div class="wrap"><h1>Email bookers</h1>';
 
 	if ( 'send' === $step && check_admin_referer( 'ew_eb_send' ) && $event && $subj && $body ) {
-		$people = ew_eb_people( $event );
+		$people = ew_eb_people( $event, $who );
 		$pick   = array_map( 'strtolower', (array) wp_unslash( $_POST['to'] ?? array() ) );
+		$start  = time();
+		$more   = 0;
+		$nocode = 0;
 		$keys   = ew_eb_keys( $event, $subj );
 		$done   = ew_eb_done( $keys );
 		$sent   = 0;
@@ -116,8 +149,18 @@ function ew_eb_page() {
 				$skip++;
 				continue;
 			}
+			// Sends in turns of about 40 seconds so a long list never times out; the page carries on by itself.
+			if ( time() - $start > 40 ) {
+				$more++;
+				continue;
+			}
+			$cc = function_exists( 'ew_cc_for_ids' ) ? ew_cc_for_ids( $p['ids'] ) : '';
+			if ( ew_eb_wants_code( $body ) && '' === $cc ) {
+				$nocode++;
+				continue;
+			}
 			$code = ew_eb_code();
-			$msg  = ew_eb_render( str_replace( '{first_name}', ew_eb_first( $p['name'] ), $body ), $code );
+			$msg  = ew_eb_render( ew_eb_fill( $body, $p['name'], $cc ), $code );
 			$alt  = function ( $mail ) use ( $msg ) {
 				$mail->AltBody = $msg['text'];
 			};
@@ -138,7 +181,22 @@ function ew_eb_page() {
 		}
 		echo '<div class="notice notice-' . ( $fail ? 'warning' : 'success' ) . '"><p>Sent ' . (int) $sent . ' from ' . esc_html( $from ) . '.'
 			. ( $skip ? ' ' . (int) $skip . ' already had this email, so were skipped.' : '' )
+			. ( $nocode ? ' ' . (int) $nocode . ' have no claim code, so were not sent it.' : '' )
 			. ( $fail ? ' Could not send to: ' . esc_html( implode( ', ', $fail ) ) . '.' : '' ) . '</p></div>';
+		if ( $more ) {
+			// Carry on: the same send again; everyone already sent is skipped.
+			echo '<p><strong>' . (int) $more . ' still to send. Carrying on, keep this page open.</strong></p>';
+			echo '<form method="post" id="ewEbMore">';
+			wp_nonce_field( 'ew_eb_send' );
+			foreach ( array( 'event' => $event, 'from' => $from, 'subject' => $subj, 'body' => $body, 'who' => $who, 'step' => 'send' ) as $k => $v ) {
+				echo '<input type="hidden" name="' . esc_attr( $k ) . '" value="' . esc_attr( $v ) . '">';
+			}
+			foreach ( $pick as $em ) {
+				echo '<input type="hidden" name="to[]" value="' . esc_attr( $em ) . '">';
+			}
+			echo '<button class="button">Carry on</button></form><script>setTimeout(function(){document.getElementById("ewEbMore").submit();},1500);</script></div>';
+			return;
+		}
 		$step = '';
 	}
 
@@ -147,11 +205,18 @@ function ew_eb_page() {
 	// that is stored nowhere, so it opens the page but counts as no one's click.
 	if ( 'test' === $step && check_admin_referer( 'ew_eb_send' ) && $event && $subj && $body ) {
 		$to     = sanitize_email( wp_unslash( $_POST['test_to'] ?? '' ) );
-		$people = ew_eb_people( $event );
-		$first  = $people ? reset( $people ) : array( 'name' => '' );
+		$people = ew_eb_people( $event, $who );
+		$first  = $people ? reset( $people ) : array( 'name' => '', 'ids' => array() );
 		$as     = ew_eb_first( $first['name'] );
+		// The test carries the test address's own claim code if it has one (so the link can be tried
+		// end to end without using up someone else's), otherwise a dummy one.
+		$tcc = '';
+		if ( function_exists( 'ew_cc_for_ids' ) ) {
+			$tids = get_posts( array( 'post_type' => 'ewt_booking', 'post_status' => 'any', 'posts_per_page' => -1, 'fields' => 'ids', 'meta_key' => '_ewt_email', 'meta_value' => $to ) ); // phpcs:ignore WordPress.DB.SlowDBQuery
+			$tcc  = ew_cc_for_ids( $tids );
+		}
 		if ( is_email( $to ) ) {
-			$msg = ew_eb_render( str_replace( '{first_name}', $as, $body ), 'testtest' );
+			$msg = ew_eb_render( ew_eb_fill( $body, $first['name'], '' !== $tcc ? $tcc : 'XX-TEST' ), 'testtest' );
 			$alt = function ( $mail ) use ( $msg ) {
 				$mail->AltBody = $msg['text'];
 			};
@@ -171,17 +236,22 @@ function ew_eb_page() {
 		echo '<option value="' . esc_attr( $ev ) . '"' . selected( $ev, $event, false ) . '>' . esc_html( $ev ) . '</option>';
 	}
 	echo '</select></td></tr>';
+	echo '<tr><th>Who</th><td><select name="who">';
+	foreach ( array( '' => 'Everyone', 'in' => 'Scanned in at the gate', 'out' => 'Not scanned in' ) as $k => $label ) {
+		echo '<option value="' . esc_attr( $k ) . '"' . selected( $k, $who, false ) . '>' . esc_html( $label ) . '</option>';
+	}
+	echo '</select></td></tr>';
 	echo '<tr><th>From</th><td><select name="from">';
 	foreach ( $froms as $f ) {
 		echo '<option' . selected( $f, $from, false ) . '>' . esc_html( $f ) . '</option>';
 	}
 	echo '</select></td></tr>';
 	echo '<tr><th>Subject</th><td><input type="text" name="subject" class="large-text" value="' . esc_attr( $subj ) . '"></td></tr>';
-	echo '<tr><th>Message</th><td><textarea name="body" rows="14" class="large-text">' . esc_textarea( $body ) . '</textarea><p class="description">{first_name} is replaced with each person\'s first name. [Book your tickets](https://eastwoodfc.com/...) shows the words as a link. Every eastwoodfc.com link is tracked for each person.</p></td></tr></table>';
+	echo '<tr><th>Message</th><td><textarea name="body" rows="14" class="large-text">' . esc_textarea( $body ) . '</textarea><p class="description">{first_name} is replaced with each person\'s first name. {code} is their personal claim code and {claim_link} their own link to claim with it; anyone without a code is not sent a message that uses them. [Book your tickets](https://eastwoodfc.com/...) shows the words as a link. Every eastwoodfc.com link is tracked for each person.</p></td></tr></table>';
 
 	if ( 'preview' === $step && $event ) {
 		wp_nonce_field( 'ew_eb_send' );
-		$people = ew_eb_people( $event );
+		$people = ew_eb_people( $event, $who );
 		$keys   = ew_eb_keys( $event, $subj );
 		$done   = ew_eb_done( $keys );
 		$rows   = '';

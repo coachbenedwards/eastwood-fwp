@@ -58,6 +58,9 @@ function ew_claim_defaults() {
 		'need_school'   => 'Pick your school, or add it.',
 		'need_people'   => 'Add at least one person.',
 		'all_gone'      => "Sorry, today's tickets have all gone.",
+		/* A personal claim link (?c=CODE, parts/claim-codes.php). */
+		'cc_used'       => "You've already claimed your tickets with this link. They're in the Eastwood app.",
+		'cc_expired'    => "This link has run out, but you can still claim below.",
 		'details_title' => 'Your details',
 		'name_label'    => 'Your Full Name',
 		'email_label'   => 'Your email',
@@ -415,6 +418,15 @@ function ew_claim_shortcode( $atts, $content = null ) {
 			'wrong_pw' => $a['wrong_pw'],
 		),
 	) + ( function_exists( 'ew_optin_words' ) ? ew_optin_words( 'school', $a ) : array() );
+	/* A personal claim link: fill the form from the earlier claim, or say why not. */
+	$cc = ( isset( $_GET['c'] ) && function_exists( 'ew_cc_state' ) ) ? ew_cc_state( wp_unslash( $_GET['c'] ) ) : null; // phpcs:ignore WordPress.Security.NonceVerification,WordPress.Security.ValidatedSanitizedInput
+	if ( $cc && 'used' === $cc['state'] ) {
+		$h .= '<p class="ewc-small">' . esc_html( $a['cc_used'] ) . '</p></div></div>';
+		return $h . '</section>';
+	}
+	if ( $cc && 'ok' === $cc['state'] ) {
+		$words['invite'] = $cc['fill'];
+	}
 	$next_at = ew_claim_next_at( $a );
 	if ( $next_at && time() < $next_at ) {
 		$nf = ew_claim_next_fields( $a );
@@ -449,6 +461,9 @@ function ew_claim_shortcode( $atts, $content = null ) {
 
 	if ( function_exists( 'ew_ng_follows' ) && ew_ng_follows( $a ) && ( $cur ?? null ) ) {
 		$h .= ew_ng_guard( (int) ( $cur['id'] ?? 0 ) );
+	}
+	if ( $cc && 'expired' === $cc['state'] ) {
+		$h .= '<p class="ewc-small">' . esc_html( $a['cc_expired'] ) . '</p>';
 	}
 	$h .= '<p class="ewc-big">' . esc_html( $a['stub_day'] ) . '</p><p class="ewc-month">' . esc_html( $a['stub_month'] ) . '</p>';
 
@@ -665,6 +680,19 @@ add_action( 'rest_api_init', function () {
 			if ( ! is_email( $email ) ) {
 				return new WP_REST_Response( array( 'message' => $a['need_email'] ), 400 );
 			}
+			// A personal claim link: one claim per code, and it fills the school if left empty.
+			$cc = null;
+			if ( '' !== (string) $req->get_param( 'invite' ) && function_exists( 'ew_cc_state' ) ) {
+				$cc = ew_cc_state( (string) $req->get_param( 'invite' ) );
+				if ( 'used' === $cc['state'] ) {
+					return new WP_REST_Response( array( 'message' => $a['cc_used'] ), 400 );
+				}
+				if ( 'ok' !== $cc['state'] ) {
+					$cc = null;
+				} elseif ( '' === $school ) {
+					$school = (string) $cc['fill']['school'];
+				}
+			}
 			if ( '' === $school ) {
 				return new WP_REST_Response( array( 'message' => $a['need_school'] ), 400 );
 			}
@@ -712,6 +740,10 @@ add_action( 'rest_api_init', function () {
 				'hook'     => (string) $a['crm_hook'],
 			) as $k => $v ) {
 				update_post_meta( $id, '_ewt_' . $k, $v );
+			}
+			if ( $cc ) {
+				update_post_meta( $cc['id'], '_ewt_cc_used', $id );
+				update_post_meta( $id, '_ewt_cc_from', $cc['fill']['code'] );
 			}
 			if ( function_exists( 'ew_tix_crm' ) ) {
 				ew_tix_crm( (string) $a['crm_hook'], $id, 'claimed' );
@@ -908,6 +940,20 @@ function ew_claim_js() {
  var school = '', schools = W.schools || [];
  var count = {adults: 1, children: 0};
 
+ /* A personal claim link: their email in step one; step two filled from last time. */
+ if(W.invite){
+   var I = W.invite, em = root.querySelector('[data-ewo-email]');
+   if(em && !em.value) em.value = I.email || '';
+   if(I.school){ school = I.school; input.value = I.school; }
+   ['adults','children'].forEach(function(k){
+     if(typeof I[k] !== 'number') return;
+     count[k] = I[k];
+     var o = root.querySelector('.ewc-count[data-k="' + k + '"] output'); if(o) o.textContent = I[k];
+   });
+   if(count.adults + count.children < 1) { count.adults = 1; var oa = root.querySelector('.ewc-count[data-k="adults"] output'); if(oa) oa.textContent = 1; }
+   var nm = root.querySelector('#ewcName'); if(nm && !nm.value && I.name) nm.value = I.name;
+ }
+
  /* The next game: once its time comes the ticket turns over, cached page or not. */
  if(W.next && W.next.at){
    var turned = false;
@@ -1045,7 +1091,7 @@ function ew_claim_js() {
    var go = s2.querySelector('button[type="submit"]'); go.disabled = true;
    fetch(W.rest, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
      page: page, bid: O.bid, key: O.key, email: O.email, school: school, adults: count.adults, children: count.children,
-     name: name, phone: phone, consent: root.querySelector('#ewcConsent').checked})})
+     name: name, phone: phone, consent: root.querySelector('#ewcConsent').checked, invite: W.invite ? W.invite.code : ''})})
    .then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); })
    .then(function(res){
      if(!res.ok || !res.j || !(res.j.ok || res.j.html)){ err(s2, (res.j && res.j.message) || W.failed); go.disabled = false; return; }
