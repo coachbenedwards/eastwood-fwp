@@ -61,6 +61,13 @@ function ew_claim_defaults() {
 		/* A personal claim link (?c=CODE, parts/claim-codes.php). */
 		'cc_used'       => "You've already claimed your tickets with this link. They're in the Eastwood app.",
 		'cc_expired'    => "This link has run out, but you can still claim below.",
+		'cc_q'          => 'Got a code from us?',
+		'cc_link'       => 'Enter your code',
+		'cc_label'      => 'Your code',
+		'cc_go'         => 'Use code',
+		'cc_bad'        => "We can't find that code. Check it and try again.",
+		'cc_back_q'     => 'No code?',
+		'cc_back'       => 'Use your email instead',
 		'details_title' => 'Your details',
 		'name_label'    => 'Your Full Name',
 		'email_label'   => 'Your email',
@@ -471,9 +478,20 @@ function ew_claim_shortcode( $atts, $content = null ) {
 	}
 	$h .= '<p class="ewc-big">' . esc_html( $a['stub_day'] ) . '</p><p class="ewc-month">' . esc_html( $a['stub_month'] ) . '</p>';
 
-	/* Step 1: the email on its own, saved the moment the button is pressed. */
-	$h .= '<form class="ewc-step" novalidate>';
-	$h .= ew_optin_step_one( 'ewc', array_merge( $a, array( 'form_title' => $a['details_title'], 'send' => $a['continue'] ) ) );
+	/* Step 1: the email on its own, saved the moment the button is pressed. A code from one of our
+	   emails is the other way in: "Enter your code" swaps the email box for the code box, never both. */
+	$bad = $cc && 'none' === $cc['state'];
+	$h  .= '<form class="ewc-step' . ( $bad ? ' ewc-usecode' : '' ) . '" novalidate>';
+	$h  .= ew_optin_step_one( 'ewc', array_merge( $a, array( 'form_title' => $a['details_title'], 'send' => $a['continue'] ) ) );
+	$h  .= '<div class="ewc-cc" data-ewc-code>';
+	$h  .= '<div class="ewc-ccq" data-ewc-ccq' . ( $bad ? ' hidden' : '' ) . '><p class="ewc-codeq">' . esc_html( $a['cc_q'] ) . '</p>';
+	$h  .= '<p class="ewc-codeq"><button type="button" class="ewc-codelink" data-ewc-codeopen>' . esc_html( $a['cc_link'] ) . '</button></p></div>';
+	$h  .= '<div class="ewc-codebox"' . ( $bad ? '' : ' hidden' ) . '><label class="ewc-lab" for="ewcCode">' . esc_html( $a['cc_label'] ) . '</label>';
+	$h  .= '<input class="ewc-in" id="ewcCode" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" value="' . esc_attr( $bad ? ew_cc_clean( wp_unslash( $_GET['c'] ) ) : '' ) . '">'; // phpcs:ignore WordPress.Security.NonceVerification,WordPress.Security.ValidatedSanitizedInput
+	$h  .= '<p class="ewc-err" role="alert">' . ( $bad ? esc_html( $a['cc_bad'] ) : '' ) . '</p>';
+	$h  .= '<button type="button" class="ewc-btn" data-ewc-codego>' . esc_html( $a['cc_go'] ) . '</button>';
+	$h  .= '<div class="ewc-ccq"><p class="ewc-codeq">' . esc_html( $a['cc_back_q'] ) . '</p><p class="ewc-codeq"><button type="button" class="ewc-codelink" data-ewc-codeback>' . esc_html( $a['cc_back'] ) . '</button></p></div></div>';
+	$h  .= '</div>';
 
 	/* Step 2: the rest on the same stub, each box saved as they leave it. The mobile is asked for in the app. */
 	$h .= '<div class="ewc-step" data-step="2" data-ewo-two hidden>';
@@ -880,6 +898,9 @@ function ew_claim_css() {
 .ewc .ewc-arrived{margin:12px 0 0;text-align:center;font-weight:700;color:#7fe3a0}
 .ewc-letin{margin-top:16px}
 .ewc-grow{flex:1 1 auto;min-height:16px}
+.ewc-cc{margin-top:18px;text-align:center}.ewc .ewc-codeq{margin:0;font-family:\'Instrument Sans\',system-ui,sans-serif;font-size:14px;font-weight:400;letter-spacing:0;text-transform:none;line-height:1.8;color:#e6e6e6}.ewc-cc .ewc-in{font-family:\'Instrument Sans\',system-ui,sans-serif;letter-spacing:.5px}
+.ewc-codelink{background:none;border:0;padding:0;font:inherit;color:#fff;text-decoration:underline;cursor:pointer}
+.ewc-codebox{text-align:left}.ewc-codebox .ewc-ccq{margin-top:14px;text-align:center}.ewc-usecode [data-ewo-one]>:not(.ewc-head){display:none!important}.ewc-usecode .ewc-cc{margin-top:0}.ewc-btn2{background:transparent;border:1px solid rgba(255,255,255,.6)}
 .ewc .ewc-small{margin:0;font-size:15px;line-height:1.5;color:#e6e6e6;text-align:center}
 .ewc-extras{margin-top:28px}
 .ewc-extras h2{font-family:Anton,Impact,sans-serif;font-weight:400;font-size:26px;letter-spacing:.5px;text-transform:uppercase;margin:0 0 14px;color:#101010;background:none;padding:0}
@@ -945,6 +966,28 @@ function ew_claim_js() {
  var input = root.querySelector('#ewcSchool'), list = root.querySelector('#ewcList'), box = root.querySelector('.ewc-search');
  var school = '', schools = W.schools || [];
  var count = {adults: 1, children: 0};
+
+ /* "Got a code?": open the box, and a code typed in opens the same claim as its link. */
+ var codeEl = root.querySelector('[data-ewc-code]');
+ if(codeEl){
+   var one = root.querySelector('[data-ewo-one]');
+   var hideCode = function(){ if(one && one.hidden) codeEl.hidden = true; };
+   if(one && window.MutationObserver) new MutationObserver(hideCode).observe(one, {attributes: true, attributeFilter: ['hidden']});
+   if(W.invite) codeEl.hidden = true;
+   var cin = codeEl.querySelector('#ewcCode'), form = codeEl.closest('form');
+   var mode = function(code){
+     if(form) form.classList.toggle('ewc-usecode', code);
+     codeEl.querySelector('[data-ewc-ccq]').hidden = code;
+     codeEl.querySelector('.ewc-codebox').hidden = !code;
+     var f = code ? cin : root.querySelector('[data-ewo-email]'); if(f) f.focus();
+   };
+   codeEl.addEventListener('click', function(e){
+     if(e.target.closest('[data-ewc-codeopen]')){ mode(true); return; }
+     if(e.target.closest('[data-ewc-codeback]')){ mode(false); return; }
+     if(e.target.closest('[data-ewc-codego]')){ var v = cin.value.trim().toUpperCase().replace(/[^A-Z0-9-]/g, ''); if(!v){ cin.focus(); return; } location.href = location.pathname + '?c=' + encodeURIComponent(v); }
+   });
+   cin.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); codeEl.querySelector('[data-ewc-codego]').click(); } });
+ }
 
  /* A personal claim link: their email in step one; step two filled from last time. */
  if(W.invite){

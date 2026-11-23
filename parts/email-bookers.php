@@ -93,13 +93,21 @@ function ew_eb_people( $event, $who = '' ) {
 	return $out;
 }
 
-/** {first_name}, {code} and {claim_link} filled for one person. '' code when they have none. */
-function ew_eb_fill( $body, $name, $code ) {
+/** {first_name}, {code}, {claim_link} and {ref} filled for one person. '' code when they have none. */
+function ew_eb_fill( $body, $name, $code, $ref = '' ) {
 	return str_replace(
-		array( '{first_name}', '{code}', '{claim_link}' ),
-		array( ew_eb_first( $name ), $code, '' !== $code && function_exists( 'ew_cc_link' ) ? ew_cc_link( $code ) : '' ),
+		array( '{first_name}', '{code}', '{claim_link}', '{ref}' ),
+		array( ew_eb_first( $name ), $code, '' !== $code && function_exists( 'ew_cc_link' ) ? ew_cc_link( $code ) : '', $ref ),
 		$body
 	);
+}
+
+/** Their booking reference (the one in their confirmation email), from their first booking on the list. */
+function ew_eb_ref( $ids ) {
+	if ( ! $ids ) {
+		return '';
+	}
+	return function_exists( 'ew_booking_code' ) ? ew_booking_code( (int) $ids[0] ) : (string) get_post_meta( (int) $ids[0], '_ewt_code', true );
 }
 
 /** Does the message use a personal claim code? */
@@ -168,12 +176,13 @@ function ew_eb_page() {
 				continue;
 			}
 			$code = ew_eb_code();
-			$msg  = ew_eb_render( ew_eb_fill( $body, $p['name'], $cc ), $code );
+			$ref  = ew_eb_ref( $p['ids'] );
+			$msg  = ew_eb_render( ew_eb_fill( $body, $p['name'], $cc, $ref ), $code );
 			$alt  = function ( $mail ) use ( $msg ) {
 				$mail->AltBody = $msg['text'];
 			};
 			add_action( 'phpmailer_init', $alt, 99 );
-			$ok = wp_mail( $em, $subj, $msg['html'], array( 'From: Eastwood FC <' . $from . '>', 'Content-Type: text/html; charset=UTF-8' ) );
+			$ok = wp_mail( $em, ew_eb_fill( $subj, $p['name'], $cc, $ref ), $msg['html'], array( 'From: Eastwood FC <' . $from . '>', 'Content-Type: text/html; charset=UTF-8' ) );
 			remove_action( 'phpmailer_init', $alt, 99 );
 			if ( $ok ) {
 				update_post_meta( $p['ids'][0], $keys[0], time() );
@@ -237,12 +246,14 @@ function ew_eb_page() {
 			$tcc  = ew_cc_for_ids( $tids );
 		}
 		if ( is_email( $to ) ) {
-			$msg = ew_eb_render( ew_eb_fill( $body, $first['name'], '' !== $tcc ? $tcc : 'XX-TEST' ), 'testtest' );
+			$tref = ew_eb_ref( $tids ?? array() );
+			$tref = '' !== $tref ? $tref : 'EFC-0000';
+			$msg  = ew_eb_render( ew_eb_fill( $body, $first['name'], '' !== $tcc ? $tcc : 'XX-TEST', $tref ), 'testtest' );
 			$alt = function ( $mail ) use ( $msg ) {
 				$mail->AltBody = $msg['text'];
 			};
 			add_action( 'phpmailer_init', $alt, 99 );
-			$ok = wp_mail( $to, '[Test] ' . $subj, $msg['html'], array( 'From: Eastwood FC <' . $from . '>', 'Content-Type: text/html; charset=UTF-8' ) );
+			$ok = wp_mail( $to, '[Test] ' . ew_eb_fill( $subj, $first['name'], '' !== $tcc ? $tcc : 'XX-TEST', $tref ), $msg['html'], array( 'From: Eastwood FC <' . $from . '>', 'Content-Type: text/html; charset=UTF-8' ) );
 			remove_action( 'phpmailer_init', $alt, 99 );
 			echo '<div class="notice notice-' . ( $ok ? 'success' : 'error' ) . '"><p>' . ( $ok ? 'Test sent to ' . esc_html( $to ) . ', written as ' . esc_html( $first['name'] ? $first['name'] : 'someone with no name' ) . ' would get it ("' . esc_html( $as ) . '").' : 'The test could not be sent.' ) . '</p></div>';
 		} else {
@@ -267,7 +278,7 @@ function ew_eb_page() {
 		echo '<option' . selected( $f, $from, false ) . '>' . esc_html( $f ) . '</option>';
 	}
 	echo '</select></td></tr>';
-	echo '<tr><th>Subject</th><td><input type="text" name="subject" class="large-text" value="' . esc_attr( $subj ) . '"></td></tr>';
+	echo '<tr><th>Subject</th><td><input type="text" name="subject" class="large-text" value="' . esc_attr( $subj ) . '"><p class="description">{ref} is replaced with each person\'s own booking reference, the one in their confirmation email. {first_name} works here too.</p></td></tr>';
 	echo '<tr><th>Message</th><td><textarea name="body" rows="14" class="large-text">' . esc_textarea( $body ) . '</textarea><p class="description">{first_name} is replaced with each person\'s first name. {code} is their personal claim code and {claim_link} their own link to claim with it; anyone without a code is not sent a message that uses them. [Book your tickets](https://eastwoodfc.com/...) shows the words as a link. Every eastwoodfc.com link is tracked for each person.</p></td></tr></table>';
 
 	if ( 'preview' === $step && $event ) {
