@@ -490,7 +490,9 @@ function ew_claim_shortcode( $atts, $content = null ) {
 	$h .= '</form>';
 
 	if ( 'app' === $a['ending'] ) {
-		/* The last page: their tickets, in the app. */
+		/* The last page: a new supporter makes their password first (someone whose
+		   email already has an account is not asked), then their tickets, in the app. */
+		$h .= ew_claim_account_html( $a );
 		$h .= ew_inapp_panel( $a['app_title'], ew_claim_ticket( $a ) );
 	} else {
 		/* The last page: make (or enter) the MyEastwood password, then their account. */
@@ -952,6 +954,8 @@ function ew_claim_js() {
    });
    if(count.adults + count.children < 1) { count.adults = 1; var oa = root.querySelector('.ewc-count[data-k="adults"] output'); if(oa) oa.textContent = 1; }
    var nm = root.querySelector('#ewcName'); if(nm && !nm.value && I.name) nm.value = I.name;
+   /* The code says who they are: no need to ask for the email, carry straight on to step two. */
+   var nx = root.querySelector('[data-ewo-next]'); if(nx && em && em.value && !O.bid) setTimeout(function(){ nx.click(); }, 0);
  }
 
  /* The next game: once its time comes the ticket turns over, cached page or not. */
@@ -1025,20 +1029,22 @@ function ew_claim_js() {
  /* The last page: make or enter the MyEastwood password, then the account. */
  function account(claim){
    var acc = root.querySelector('[data-acc]'); if(!acc) return;
-   var A = W.acc || {}, sb = null, email = O.email || '';
+   var A = W.acc || {}, sb = null, email = O.email || '', toApp = W.ending === 'app';
+   /* The tickets are in the app: the last panel, nothing more to fill in. */
+   function done(){ acc.hidden = true; if(window.ewInapp) ewInapp(root, claim); }
    acc.querySelector('[data-acc-party]').textContent = party() + (W.when ? ' \u00b7 ' + W.when : '');
    acc.hidden = false;
    function view(n){ acc.querySelectorAll('[data-view]').forEach(function(v){ v.hidden = v.getAttribute('data-view') !== n; }); var f = acc.querySelector('[data-view="' + n + '"] input'); if(f) f.focus(); }
    function msg(n, t){ var e = acc.querySelector('[data-view="' + n + '"] .ewc-err'); if(e) e.textContent = t || ''; }
    function client(){ if(!sb && window.supabase && A.supabase) sb = window.supabase.createClient(A.supabase, A.anon, {auth: {persistSession: true, autoRefreshToken: true}}); return sb; }
    fetch(W.api + 'claim/account', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({claim: claim})})
-     .then(function(r){ return r.json(); }).then(function(j){ if(j && j.email) email = j.email; view(j && j.exists === true ? 'has' : 'new'); })
+     .then(function(r){ return r.json(); }).then(function(j){ if(j && j.email) email = j.email; if(j && j.exists === true && toApp){ done(); return; } view(j && j.exists === true ? 'has' : 'new'); })
      .catch(function(){ view('new'); });
    /* Signed in: the booking joins the account, then off to it. */
    function finish(session){
      var t = session && session.access_token;
      fetch(W.api + 'app/claim', {method:'POST', headers:{'Content-Type':'application/json', 'X-Eastwood-Fan': t || ''}, body: JSON.stringify({claim: claim})})
-       .catch(function(){}).then(function(){ location.href = A.go || '/my-tickets/'; });
+       .catch(function(){}).then(function(){ if(toApp) done(); else location.href = A.go || '/my-tickets/'; });
    }
    /* Tell the club a sign-in failed (email and reason only, never the password). */
    function logFail(em, err, where){ try { fetch(W.api + 'auth/failed', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({email: String(em||'').toLowerCase(), reason: (err && (err.message || err.code)) || '', where: where, method: 'password'}), keepalive: true}); } catch(x){} }
@@ -1052,7 +1058,7 @@ function ew_claim_js() {
        var pw = acc.querySelector('#ewcPwNew').value; if(pw.length < 8) throw new Error(A.short_pw);
        if(!client()) throw new Error(W.failed);
        return sb.auth.signUp({email: email.toLowerCase(), password: pw}).then(function(r){
-         if(r.error && /registered|exists/i.test(r.error.message)){ view('has'); return null; }
+         if(r.error && /registered|exists/i.test(r.error.message)){ if(toApp){ done(); return null; } view('has'); return null; }
          if(r.error) throw r.error; return r.data.session;
        });
      }); },
@@ -1099,8 +1105,7 @@ function ew_claim_js() {
      root.querySelector('.ewc-big').hidden = true; root.querySelector('.ewc-month').hidden = true;
      form.hidden = true;
      if(O.done) O.done();
-     if(W.ending === 'app'){ if(window.ewInapp) ewInapp(root, res.j.claim || ''); }
-     else account(res.j.claim || '');
+     account(res.j.claim || '');
    })
    .catch(function(){ err(s2, W.failed); go.disabled = false; });
  });

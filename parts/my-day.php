@@ -55,6 +55,15 @@ function ew_day_defaults() {
 		'no_ticket'     => 'You have no ticket for a home game yet.',
 		'buy'           => 'Get tickets for the next home game',
 		'buy_url'       => '/tickets/',
+		/* qr "off": the ticket is in the app, so the box shows "Open in the app" and the store links instead of the QR. */
+		'qr'            => 'on',
+		'show_app'      => 'Open in the app',
+		'app_url'       => '/app/',
+		'no_app'        => 'No app yet? Get it, then sign in with this same email and password.',
+		'ios_label'     => 'App Store',
+		'ios_url'       => 'https://apps.apple.com/gb/app/eastwood-fc/id6820880105',
+		'android_label' => 'Google Play',
+		'android_url'   => 'https://play.google.com/store/apps/details?id=com.eastwoodfc.team',
 		'tickets_link'  => 'See all my tickets',
 		'tickets_url'   => '/my-tickets/',
 		'signed_as'     => 'Signed in as',
@@ -262,6 +271,8 @@ function ew_day_css() {
 .ewday-fine a,.ewday-link{color:#121417 !important;font-weight:600;text-decoration:underline;cursor:pointer;background:none;border:0;padding:0;font:inherit}
 .ewday-none{display:grid;gap:14px}
 .ewday-none .ln{font-size:16px;line-height:1.5;color:#565c64}
+.ewday-noapp{margin:14px 0 10px;font-size:14px;line-height:1.5;opacity:.8}
+.ewday-stores{display:flex;gap:10px}.ewday-stores a{flex:1;display:flex;align-items:center;justify-content:center;height:44px;border-radius:10px;border:1px solid rgba(255,255,255,.35);color:inherit !important;font-weight:700;font-size:14px;text-decoration:none !important}
 .ewday-btn{display:flex;align-items:center;justify-content:center;gap:10px;height:54px;border-radius:10px;border:0;background:#CC0000;color:#fff !important;font-size:17px;font-weight:700;font-family:inherit;cursor:pointer;text-decoration:none !important;width:100%}
 .ewday-btn[disabled]{opacity:.6}
 .ewday-in{max-width:560px;margin:0 auto;background:#fff;border:1px solid #e4e5e8;border-radius:14px;padding:32px;display:flex;flex-direction:column;gap:14px}
@@ -367,7 +378,11 @@ function ew_day_js() {
       left += '<div class="ewday-upslot"></div>';
       right += '<div class="ewday-tk"><p class="ewday-k">' + e(W.ticket_label) + '</p>'
         + (i.gate && i.gate.entrance ? '<div class="gt"><span class="gk">' + e(W.entrance_label) + '</span><span class="gn">' + e(i.gate.entrance) + (i.gate.queue ? ' · ' + e(W.queue_label) + ' ' + e(i.gate.queue) : '') + '</span><span class="ge">' + e(i.gate.end || '') + '</span></div>' : '')
-        + (i.qr_rows && i.qr_rows.length ? '<div class="q"><span class="qr">' + qrSvg(i.qr_rows) + '</span><span><span class="c">' + e(i.code) + '</span><span class="g">' + e(W.show_gate) + '</span></span></div>'
+        + (String(W.qr || 'on').toLowerCase() === 'off'
+          ? '<div class="q"><span><span class="c">' + e(i.code) + '</span></span></div><a class="ewday-btn" href="' + e(W.app_url) + '">' + e(W.show_app) + '</a>'
+            + (W.no_app ? '<p class="ewday-noapp">' + e(W.no_app) + '</p>' : '')
+            + '<div class="ewday-stores"><a href="' + e(W.ios_url) + '">' + e(W.ios_label) + '</a><a href="' + e(W.android_url) + '">' + e(W.android_label) + '</a></div>'
+          : i.qr_rows && i.qr_rows.length ? '<div class="q"><span class="qr">' + qrSvg(i.qr_rows) + '</span><span><span class="c">' + e(i.code) + '</span><span class="g">' + e(W.show_gate) + '</span></span></div>'
           : '<div class="q"><span><span class="c">' + e(i.code) + '</span><span class="g">' + e(W.show_gate) + '</span></span></div>')
         + '</div>';
     } else {

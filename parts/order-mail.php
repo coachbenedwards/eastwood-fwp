@@ -14,7 +14,7 @@
  * steps are taken out -- otherwise a buyer would get both.
  *
  * Placeholders: {first_name} {greeting} {event} {tickets} {paid} {total}
- * {event_url}
+ * {event_url} {ref} {app_url} {backup}
  *
  * @package eastwood-fwp
  */
@@ -48,7 +48,7 @@ function ew_om_emails() {
 		'signup_done'     => array(
 			'label'   => 'Sign-up (half time show and the rest) – finished',
 			'subject' => "You're in: {event}",
-			'body'    => "Hi {first_name},\n\nYou're in for {event}.\n\nYour booking reference is {ref}.\n\nYour place is in the Eastwood FC app. Download it, sign in with this email and your booking reference, and it's there:\n{app_url}\n\nAny questions, just reply to this email.\n\nEastwood FC",
+			'body'    => "Hi {first_name},\n\nYou're in for {event}.\n\nYour booking reference is {ref}.\n\nYour place is in the Eastwood FC app. Download it, sign in with this email and your booking reference, and it's there:\n{app_url}\n\nAny questions, just reply to this email.\n\nEastwood FC\n\n{backup}",
 		),
 		'signup_reminder' => array(
 			'label'   => 'Sign-up – not finished (an hour later)',
@@ -94,10 +94,17 @@ function ew_om_fill( $text, $booking_id ) {
 		'{event_url}'  => $m( 'url' ),
 		'{ref}'        => function_exists( 'ew_booking_code' ) ? ew_booking_code( $booking_id ) : $m( 'code' ),
 		'{app_url}'    => home_url( '/app/' ),
+		// The QR backup for the day, only where the booking has a pass page (school claims):
+		// "Can't use the app on the day?" then the link, each on its own line.
+		'{backup}'     => ( '' !== $m( 'code' ) && '' !== $m( 'key' ) && $m( 'school' ) !== '' )
+			? "Can't use the app on the day?\nShow your ticket here: " . add_query_arg( array( 'pass' => $m( 'code' ), 'k' => $m( 'key' ) ), home_url( '/claimticket/' ) )
+			: '',
 	);
 	$out = strtr( (string) $text, $map );
 	// "Hi ," when nobody gave a name reads as a mistake; "Hi," does not.
-	return preg_replace( '/ +,/', ',', $out );
+	$out = preg_replace( '/ +,/', ',', $out );
+	// An empty {backup} leaves no blank lines behind.
+	return rtrim( $out );
 }
 
 /** Called for every step the CRM is told about. */
@@ -141,7 +148,7 @@ add_action( 'ew_fwp_after_settings', function () {
 	}
 	echo '<h2>Order emails</h2>';
 	echo '<p>The emails a buyer gets after paying, and an hour after starting checkout without paying. They go from the website through Google. '
-		. 'Placeholders: {first_name} {greeting} {event} {tickets} {paid} {total} {event_url} {ref} {app_url}.</p>';
+		. 'Placeholders: {first_name} {greeting} {event} {tickets} {paid} {total} {event_url} {ref} {app_url} {backup} (the QR backup link, school claims only).</p>';
 	echo '<form method="post">';
 	wp_nonce_field( 'ew_om_save' );
 	echo '<input type="hidden" name="ew_om_save" value="1">';
