@@ -136,6 +136,14 @@ function ew_eb_page() {
 		$start  = time();
 		$more   = 0;
 		$nocode = 0;
+		// One Google sign-in for the whole turn, not one per email: signing in
+		// for every message got the sending account locked out after about 100.
+		$keep = function ( $mail ) {
+			$mail->SMTPKeepAlive = true;
+		};
+		add_action( 'phpmailer_init', $keep, 100 );
+		$row     = 0;
+		$stopped = false;
 		$keys   = ew_eb_keys( $event, $subj );
 		$done   = ew_eb_done( $keys );
 		$sent   = 0;
@@ -175,15 +183,28 @@ function ew_eb_page() {
 				}
 				$done[ $em ] = time();
 				$sent++;
+				$row = 0;
+				usleep( 500000 ); // about two a second, well inside Google's limits
 			} else {
 				$fail[] = $em;
+				// Three failures in a row means Google is refusing: stop rather than fail everyone left.
+				if ( ++$row >= 3 ) {
+					$stopped = true;
+					break;
+				}
 			}
+		}
+		remove_action( 'phpmailer_init', $keep, 100 );
+		global $phpmailer;
+		if ( is_object( $phpmailer ) && method_exists( $phpmailer, 'smtpClose' ) ) {
+			$phpmailer->smtpClose();
 		}
 		echo '<div class="notice notice-' . ( $fail ? 'warning' : 'success' ) . '"><p>Sent ' . (int) $sent . ' from ' . esc_html( $from ) . '.'
 			. ( $skip ? ' ' . (int) $skip . ' already had this email, so were skipped.' : '' )
 			. ( $nocode ? ' ' . (int) $nocode . ' have no claim code, so were not sent it.' : '' )
-			. ( $fail ? ' Could not send to: ' . esc_html( implode( ', ', $fail ) ) . '.' : '' ) . '</p></div>';
-		if ( $more ) {
+			. ( $fail ? ' Could not send to: ' . esc_html( implode( ', ', $fail ) ) . '.' : '' )
+			. ( $stopped ? ' Stopped: Google refused three in a row. Nobody else was tried; press Send again later and it carries on from here.' : '' ) . '</p></div>';
+		if ( $more && ! $fail ) {
 			// Carry on: the same send again; everyone already sent is skipped.
 			echo '<p><strong>' . (int) $more . ' still to send. Carrying on, keep this page open.</strong></p>';
 			echo '<form method="post" id="ewEbMore">';
