@@ -218,6 +218,24 @@ add_action( 'ew_tix_remind', function ( $id ) {
 	if ( 'ewt_booking' !== get_post_type( $id ) || 'started' !== get_post_meta( $id, '_ewt_status', true ) ) {
 		return;
 	}
+	// Somebody who already holds a ticket for this event (they came back to the form after claiming
+	// or paying) is not told they did not finish.
+	$em = (string) get_post_meta( $id, '_ewt_email', true );
+	$ev = (string) get_post_meta( $id, '_ewt_event', true );
+	if ( '' !== $em && '' !== $ev && get_posts( array(
+		'post_type'   => 'ewt_booking',
+		'post_status' => 'any',
+		'numberposts' => 1,
+		'fields'      => 'ids',
+		'exclude'     => array( $id ), // phpcs:ignore WordPressVIPMinimum.Performance.WPQueryParams.PostNotIn_exclude
+		'meta_query'  => array( // phpcs:ignore WordPress.DB.SlowDBQuery
+			array( 'key' => '_ewt_email', 'value' => $em ),
+			array( 'key' => '_ewt_event', 'value' => $ev ),
+			array( 'key' => '_ewt_status', 'value' => array( 'claimed', 'paid', 'merged' ), 'compare' => 'IN' ),
+		),
+	) ) ) {
+		return;
+	}
 	$sid = (string) get_post_meta( $id, '_ewt_open_session', true );
 	if ( '' !== $sid && '' !== ew_tix_sk() ) {
 		$s = ew_tix_stripe( 'GET', 'checkout/sessions/' . rawurlencode( $sid ) );

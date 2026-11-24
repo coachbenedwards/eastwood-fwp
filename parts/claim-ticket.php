@@ -972,6 +972,19 @@ function ew_claim_js() {
  var wordsEl = root.querySelector('.ewc-words'); if(!wordsEl) return;
  var W = JSON.parse(wordsEl.textContent), page = root.getAttribute('data-page');
  var form = root.querySelector('form.ewc-step'), s2 = root.querySelector('[data-step="2"]');
+ /* A claim code typed into the email box (our email said "enter your code") opens the same claim as its link. */
+ (function(){
+   var eb = root.querySelector('[data-ewo-email]'), nb = root.querySelector('[data-ewo-next]');
+   if(!eb || !nb) return;
+   var asCode = function(e){
+     var v = eb.value.trim().toUpperCase().replace(/\s+/g, '');
+     if(v.indexOf('@') > -1 || !/^[A-Z]{1,5}-[A-Z0-9]{4}$/.test(v) || /^EFC-/.test(v)) return;
+     e.preventDefault(); e.stopImmediatePropagation();
+     location.href = location.pathname + '?c=' + encodeURIComponent(v);
+   };
+   nb.addEventListener('click', asCode, true);
+   eb.addEventListener('keydown', function(e){ if(e.key === 'Enter') asCode(e); }, true);
+ })();
  var O = window.ewOptin ? ewOptin(root, W) : {bid: 0, key: '', email: ''};
  var input = root.querySelector('#ewcSchool'), list = root.querySelector('#ewcList'), box = root.querySelector('.ewc-search');
  var school = '', schools = W.schools || [];
