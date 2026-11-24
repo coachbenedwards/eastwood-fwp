@@ -160,8 +160,10 @@ function ew_padel_shortcode( $atts ) {
 	$h  = '<section class="ewpd" data-page="' . (int) ( $post ? $post->ID : 0 ) . '">';
 	$h .= '<form class="ewpd-form" novalidate>';
 	$h .= ew_optin_step_one( 'ewpd', $a );
-	$h .= '<p class="ewpd-legal" data-ewpd-legal>' . esc_html( $a['legal'] ) . ' <button type="button" class="ewpd-i" aria-label="' . esc_attr( $a['legal_tip'] ) . '" aria-expanded="false" data-ewpd-i>' . $info . '</button></p>';
-	$h .= '<p class="ewpd-tip" data-ewpd-tip hidden>' . esc_html( $a['legal_tip'] ) . ( '' !== trim( (string) $a['legal_url'] ) ? ' <a href="' . esc_url( $a['legal_url'] ) . '">' . esc_html( $a['legal_link'] ) . '</a>' : '' ) . '</p>';
+	if ( '' !== trim( (string) $a['legal'] ) ) {
+		$h .= '<p class="ewpd-legal" data-ewpd-legal>' . esc_html( $a['legal'] ) . ' <button type="button" class="ewpd-i" aria-label="' . esc_attr( $a['legal_tip'] ) . '" aria-expanded="false" data-ewpd-i>' . $info . '</button></p>';
+		$h .= '<p class="ewpd-tip" data-ewpd-tip hidden>' . esc_html( $a['legal_tip'] ) . ( '' !== trim( (string) $a['legal_url'] ) ? ' <a href="' . esc_url( $a['legal_url'] ) . '">' . esc_html( $a['legal_link'] ) . '</a>' : '' ) . '</p>';
+	}
 	$h .= '<div class="ewpd-two" data-ewo-two hidden>';
 	$h .= '<p class="ewpd-head">' . esc_html( $a['next_title'] ) . '</p>';
 	if ( '' !== trim( (string) $a['form_note'] ) ) {

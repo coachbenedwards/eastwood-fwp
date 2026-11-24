@@ -214,7 +214,9 @@ add_action( 'rest_api_init', function () {
  */
 function ew_optin_step_one( $p, $a, $opt = array() ) {
 	$h  = '<div class="ewo-one" data-ewo-one>';
-	$h .= '<p class="' . esc_attr( $p ) . '-head">' . esc_html( $a['form_title'] ) . '</p>';
+	if ( '' !== trim( (string) $a['form_title'] ) ) {
+		$h .= '<p class="' . esc_attr( $p ) . '-head">' . esc_html( $a['form_title'] ) . '</p>';
+	}
 	if ( '' !== (string) ( $opt['name'] ?? '' ) ) {
 		$h .= '<label class="' . esc_attr( $p ) . '-lab" for="' . esc_attr( $p ) . 'StartName">' . esc_html( $opt['name'] ) . '</label>';
 		$h .= '<input class="' . esc_attr( $p ) . '-in" id="' . esc_attr( $p ) . 'StartName" type="text" autocomplete="name" required data-ewo-name>';
