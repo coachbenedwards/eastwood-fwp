@@ -186,7 +186,7 @@ add_action( 'rest_api_init', function () {
 			}
 			nocache_headers();
 			header( 'Content-Type: application/vnd.apple.pkpass' );
-			header( 'Content-Disposition: attachment; filename="eastwood-ticket.pkpass"' );
+			header( 'Content-Disposition: inline; filename="eastwood-ticket.pkpass"' );
 			header( 'Content-Length: ' . strlen( $pass ) );
 			echo $pass; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 			exit;
