@@ -98,6 +98,8 @@ function ew_om_fill( $text, $booking_id ) {
 		'{app_url}'    => function_exists( 'ew_booking_key' )
 			? add_query_arg( 'claim', $booking_id . '.' . ew_booking_key( $booking_id ), home_url( '/app/' ) )
 			: home_url( '/app/' ),
+		// Adds the ticket to Apple Wallet (parts/wallet-pass.php).
+		'{wallet_url}' => function_exists( 'ew_wp_link' ) ? ew_wp_link( $booking_id ) : '',
 		// The QR backup for the day, only where the booking has a pass page (school claims):
 		// "Can't use the app on the day?" then the link, each on its own line.
 		'{backup}'     => ( '' !== $m( 'code' ) && '' !== $m( 'key' ) && $m( 'school' ) !== '' )
@@ -152,7 +154,7 @@ add_action( 'ew_fwp_after_settings', function () {
 	}
 	echo '<h2>Order emails</h2>';
 	echo '<p>The emails a buyer gets after paying, and an hour after starting checkout without paying. They go from the website through Google. '
-		. 'Placeholders: {first_name} {greeting} {event} {tickets} {paid} {total} {event_url} {ref} {app_url} {backup} (the QR backup link, school claims only).</p>';
+		. 'Placeholders: {first_name} {greeting} {event} {tickets} {paid} {total} {event_url} {ref} {app_url} {wallet_url} (adds the ticket to Apple Wallet) {backup} (the QR backup link, school claims only).</p>';
 	echo '<form method="post">';
 	wp_nonce_field( 'ew_om_save' );
 	echo '<input type="hidden" name="ew_om_save" value="1">';
