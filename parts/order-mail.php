@@ -93,7 +93,11 @@ function ew_om_fill( $text, $booking_id ) {
 		'{total}'      => number_format( (int) $m( 'total' ) / 100, 2, '.', '' ),
 		'{event_url}'  => $m( 'url' ),
 		'{ref}'        => function_exists( 'ew_booking_code' ) ? ew_booking_code( $booking_id ) : $m( 'code' ),
-		'{app_url}'    => home_url( '/app/' ),
+		// Their own link: on a phone with the app it opens the app with this booking in Tickets,
+		// otherwise the App Store or Google Play (eastwoodfc.com/app/, parts/app-link.php).
+		'{app_url}'    => function_exists( 'ew_booking_key' )
+			? add_query_arg( 'claim', $booking_id . '.' . ew_booking_key( $booking_id ), home_url( '/app/' ) )
+			: home_url( '/app/' ),
 		// The QR backup for the day, only where the booking has a pass page (school claims):
 		// "Can't use the app on the day?" then the link, each on its own line.
 		'{backup}'     => ( '' !== $m( 'code' ) && '' !== $m( 'key' ) && $m( 'school' ) !== '' )

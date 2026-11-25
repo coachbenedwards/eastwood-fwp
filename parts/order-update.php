@@ -145,9 +145,11 @@ function ew_ou_email( $bid, $test_code = '' ) {
 		$logos .= '<img src="' . esc_url( $src ) . '" alt="" height="24" style="height:24px;width:auto;margin:6px 11px;vertical-align:middle;border:0">';
 	}
 	$img   = plugins_url( 'assets/email/', dirname( __DIR__ ) . '/eastwood-fwp.php' );
+	// Their own app link: opens the app with this booking in Tickets, or the right store.
+	$app   = function_exists( 'ew_booking_key' ) ? add_query_arg( 'claim', $bid . '.' . ew_booking_key( $bid ), home_url( '/app/' ) ) : home_url( '/app/' );
 	$store = '<table role="presentation" align="center" cellpadding="0" cellspacing="0" style="margin:0 auto"><tr>'
-		. '<td style="padding:4px"><a href="https://apps.apple.com/app/id6820880105"><img src="' . esc_url( $img . 'app-store.png' ) . '" alt="App Store" width="150" height="46" style="display:block;width:150px;height:46px;border:0"></a></td>'
-		. '<td style="padding:4px"><a href="https://play.google.com/store/apps/details?id=com.eastwoodfc.team"><img src="' . esc_url( $img . 'google-play.png' ) . '" alt="Google Play" width="150" height="46" style="display:block;width:150px;height:46px;border:0"></a></td>'
+		. '<td style="padding:4px"><a href="' . esc_url( $app ) . '"><img src="' . esc_url( $img . 'app-store.png' ) . '" alt="App Store" width="150" height="46" style="display:block;width:150px;height:46px;border:0"></a></td>'
+		. '<td style="padding:4px"><a href="' . esc_url( $app ) . '"><img src="' . esc_url( $img . 'google-play.png' ) . '" alt="Google Play" width="150" height="46" style="display:block;width:150px;height:46px;border:0"></a></td>'
 		. '</tr></table>';
 	$btn = function ( $href, $label, $solid ) use ( $anton ) {
 		return '<a href="' . esc_url( $href ) . '" style="display:block;text-align:center;text-decoration:none;border-radius:10px;padding:15px 10px;margin-top:10px;' . $anton . ';font-size:19px;letter-spacing:.5px;'
@@ -201,7 +203,7 @@ function ew_ou_email( $bid, $test_code = '' ) {
 		. '</td></tr></table></td></tr></table></body></html>';
 
 	$text = $subject . "\n\n" . $ref . "\n" . $email . "\n" . $lines . "\n\n" . $fill( $o['headline'] ) . "\n" . $fill( $o['intro'] )
-		. "\n\n" . $o['yes'] . ': ' . $yes . "\n" . $o['no'] . ': ' . $no . "\n\n" . $o['app_title'] . "\n" . home_url( '/app/' ) . "\n\n" . $o['here'] . "\n" . $o['address'] . "\n";
+		. "\n\n" . $o['yes'] . ': ' . $yes . "\n" . $o['no'] . ': ' . $no . "\n\n" . $o['app_title'] . "\n" . $app . "\n\n" . $o['here'] . "\n" . $o['address'] . "\n";
 	foreach ( preg_split( '/\r?\n/', (string) $o['rows'] ) as $line ) {
 		$text .= str_replace( ' | ', ': ', trim( $line ) ) . "\n";
 	}
