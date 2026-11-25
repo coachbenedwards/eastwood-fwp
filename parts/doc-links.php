@@ -90,12 +90,19 @@ add_action( 'init', function () {
 		return;
 	}
 	$path = (string) wp_parse_url( isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '', PHP_URL_PATH ); // phpcs:ignore
-	if ( ! preg_match( '#^/doc/([a-z0-9][a-z0-9\-_]*)/?$#i', $path, $m ) ) {
+	// eastwoodfc.com/claim is the short address for the ticket claim: a doc link of its own,
+	// so its clicks show on the Doc links screen with the rest.
+	if ( preg_match( '#^/claim/?$#i', $path ) ) {
+		$m = array( '', 'claim' );
+	} elseif ( ! preg_match( '#^/doc/([a-z0-9][a-z0-9\-_]*)/?$#i', $path, $m ) ) {
 		return;
 	}
 
 	$slug = sanitize_key( $m[1] );
 	$rows = ew_doc_links();
+	if ( 'claim' === $slug && ! isset( $rows['claim'] ) ) {
+		$rows['claim'] = ew_doc_row( array( 'dest' => '/claimticket/', 'note' => 'Ticket claim (eastwoodfc.com/claim)' ) );
+	}
 	if ( ! isset( $rows[ $slug ] ) ) {
 		return;
 	}
@@ -129,6 +136,12 @@ add_action( 'init', function () {
 	 * It is on screen for less time than the page takes to paint.
 	 */
 	$dest = add_query_arg( 'ewdoc', $slug, ew_doc_dest_url( $row['dest'] ) );
+	// Anything on the short address carries on to the page (a claim code: /claim?c=HT-7K3P).
+	foreach ( (array) $_GET as $k => $v ) { // phpcs:ignore WordPress.Security.NonceVerification
+		if ( is_string( $v ) && 'ewdoc' !== $k ) {
+			$dest = add_query_arg( sanitize_key( $k ), rawurlencode( sanitize_text_field( wp_unslash( $v ) ) ), $dest );
+		}
+	}
 
 	nocache_headers();
 	wp_redirect( $dest, 302 );
