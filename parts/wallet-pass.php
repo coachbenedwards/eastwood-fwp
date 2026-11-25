@@ -59,6 +59,42 @@ function ew_wp_crest() {
 	return '';
 }
 
+/** The crest at the size Wallet shows it (square, $px), kept for a day; the full file if it can't be resized. */
+function ew_wp_png( $png, $px ) {
+	$ck  = 'ew_wp_png_' . md5( $png ) . '_' . $px;
+	$hit = get_transient( $ck );
+	if ( is_string( $hit ) && '' !== $hit ) {
+		return base64_decode( $hit ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
+	}
+	if ( ! function_exists( 'imagecreatefromstring' ) ) {
+		return $png;
+	}
+	$src = @imagecreatefromstring( $png );
+	if ( ! $src ) {
+		return $png;
+	}
+	$w   = imagesx( $src );
+	$h   = imagesy( $src );
+	$s   = $px / max( $w, $h );
+	$nw  = max( 1, (int) round( $w * $s ) );
+	$nh  = max( 1, (int) round( $h * $s ) );
+	$dst = imagecreatetruecolor( $nw, $nh );
+	imagealphablending( $dst, false );
+	imagesavealpha( $dst, true );
+	imagefill( $dst, 0, 0, imagecolorallocatealpha( $dst, 0, 0, 0, 127 ) );
+	imagecopyresampled( $dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h );
+	ob_start();
+	imagepng( $dst, null, 9 );
+	$out = (string) ob_get_clean();
+	imagedestroy( $src );
+	imagedestroy( $dst );
+	if ( '' === $out ) {
+		return $png;
+	}
+	set_transient( $ck, base64_encode( $out ), DAY_IN_SECONDS ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
+	return $out;
+}
+
 /** pass.json for one booking. */
 function ew_wp_json( $bid ) {
 	$m     = function ( $k ) use ( $bid ) {
@@ -133,8 +169,8 @@ function ew_wp_build( $bid ) {
 	$crest = ew_wp_crest();
 	$files = array( 'pass.json' => wp_json_encode( ew_wp_json( $bid ), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) );
 	if ( '' !== $crest ) {
-		foreach ( array( 'icon.png', 'icon@2x.png', 'logo.png', 'logo@2x.png' ) as $n ) {
-			$files[ $n ] = $crest;
+		foreach ( array( 'icon.png' => 29, 'icon@2x.png' => 58, 'icon@3x.png' => 87, 'logo.png' => 50, 'logo@2x.png' => 100, 'logo@3x.png' => 150 ) as $n => $px ) {
+			$files[ $n ] = ew_wp_png( $crest, $px );
 		}
 	}
 	$manifest = array();
