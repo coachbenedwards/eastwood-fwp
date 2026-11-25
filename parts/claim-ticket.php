@@ -50,7 +50,32 @@ function ew_claim_defaults() {
 		'stub_month'    => 'October 2026',
 		'step_of'       => 'Step {n} of 2',
 		'who_title'     => "Who's coming",
-		'school_label'  => 'Which school gave you the ticket?',
+		'school_label'  => 'Which school do they go to?',
+		/* More than one child: one school box each, so brothers and sisters at different schools are counted. */
+		'schools_label' => 'Which schools do they go to?',
+		'child_label'   => 'Child {n}',
+		'same_q'        => 'Same school?',
+		'same_link'     => 'Use one school for all',
+		/* The code step, after the email. */
+		'cc_skip'       => 'Continue without one',
+		/* One shared code for everyone (case, spaces and dots ignored). The claim is recorded as family_name. Empty = no shared code. */
+		'family_code'   => 'BBC',
+		'family_name'   => 'Big Family Ticket',
+		/* Bring a friend, after claiming. invite_on empty = the step is not shown. */
+		'invite_on'      => 'yes',
+		'invite_title'   => 'Bring a friend',
+		'invite_note'    => 'Invite someone to the same game.',
+		'invite_name'    => 'Their name',
+		'invite_contact' => 'Their mobile or email',
+		'invite_ph_name' => 'Their name',
+		'invite_ph_contact' => 'Mobile or email',
+		'invite_more'    => '+ Invite someone else',
+		'invite_send'    => 'Send the invite',
+		'invite_skip'    => 'Skip for now',
+		'invite_max'     => '5',
+		'invite_subject' => '{inviter} has invited you to {event}',
+		'invite_body'    => "Hi {friend},\n\n{inviter} is coming to {event} and thought you would want to come too.\n\nGet your place here:\n{link}\n\nYou're getting this because {inviter} gave us your email.\n\nThank you,\nEastwood FC",
+		'need_friend'    => 'We need their name, and a mobile number or an email.',
 		'school_add'    => "My school isn't listed, add it",
 		'count_label'   => 'How many are coming?',
 		'adults'        => 'Adults',
@@ -420,6 +445,13 @@ function ew_claim_shortcode( $atts, $content = null ) {
 		'need_phone'  => $a['need_phone'],
 		'failed'      => $a['failed'],
 		'add'         => $a['school_add'],
+		'school_label'  => $a['school_label'],
+		'schools_label' => $a['schools_label'],
+		'child'       => $a['child_label'],
+		'friend'      => '' !== trim( (string) $a['invite_on'] ) ? 1 : 0,
+		'need_friend' => $a['need_friend'],
+		'invite_max'  => max( 1, min( 10, (int) $a['invite_max'] ) ),
+		'ref'         => 1,
 		'tk'          => array( 'title' => $a['ticket_title'], 'home' => $a['home'] ),
 		'one'         => array( $a['adult_one'], $a['child_one'] ),
 		'many'        => array( $a['adult_many'], $a['child_many'] ),
@@ -486,39 +518,36 @@ function ew_claim_shortcode( $atts, $content = null ) {
 	}
 	$h .= '<p class="ewc-big">' . esc_html( $a['stub_day'] ) . '</p><p class="ewc-month">' . esc_html( $a['stub_month'] ) . '</p>';
 
-	/* Step 1: the email on its own, saved the moment the button is pressed. A code from one of our
-	   emails is the other way in: "Enter your code" swaps the email box for the code box, never both. */
+	/* Step 1: the email on its own, saved the moment the button is pressed. The code is asked for next. */
 	$bad = $cc && 'none' === $cc['state'];
 	$h  .= '<form class="ewc-step' . ( $bad ? ' ewc-usecode' : '' ) . '" novalidate>';
 	$h  .= ew_optin_step_one( 'ewc', array_merge( $a, array( 'form_title' => $a['details_title'], 'send' => $a['continue'] ) ) );
-	$h  .= '<div class="ewc-cc" data-ewc-code>';
-	$h  .= '<div class="ewc-ccq" data-ewc-ccq' . ( $bad ? ' hidden' : '' ) . '><p class="ewc-codeq">' . esc_html( $a['cc_q'] ) . '</p>';
-	$h  .= '<p class="ewc-codeq"><button type="button" class="ewc-codelink" data-ewc-codeopen>' . esc_html( $a['cc_link'] ) . '</button></p></div>';
-	$h  .= '<div class="ewc-codebox"' . ( $bad ? '' : ' hidden' ) . '><label class="ewc-lab" for="ewcCode">' . esc_html( $a['cc_label'] ) . '</label>';
-	$h  .= '<input class="ewc-in" id="ewcCode" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" value="' . esc_attr( $bad ? ew_cc_clean( wp_unslash( $_GET['c'] ) ) : '' ) . '">'; // phpcs:ignore WordPress.Security.NonceVerification,WordPress.Security.ValidatedSanitizedInput
-	$h  .= '<p class="ewc-err" role="alert">' . ( $bad ? esc_html( $a['cc_bad'] ) : '' ) . '</p>';
-	$h  .= '<button type="button" class="ewc-btn" data-ewc-codego>' . esc_html( $a['cc_go'] ) . '</button>';
-	$h  .= '<div class="ewc-ccq"><p class="ewc-codeq">' . esc_html( $a['cc_back_q'] ) . '</p><p class="ewc-codeq"><button type="button" class="ewc-codelink" data-ewc-codeback>' . esc_html( $a['cc_back'] ) . '</button></p></div></div>';
-	$h  .= '</div>';
 
-	/* Step 2: the rest on the same stub, each box saved as they leave it. The mobile is asked for in the app. */
+	/* Step 2: the code first (a personal code, or the shared family code), then who's coming. */
 	$h .= '<div class="ewc-step" data-step="2" data-ewo-two hidden>';
+	$h .= '<div data-ewc-panel="code"><label class="ewc-lab" for="ewcCode">' . esc_html( $a['cc_label'] ) . '</label>';
+	$h .= '<input class="ewc-in" id="ewcCode" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" value="' . esc_attr( $bad ? ew_cc_clean( wp_unslash( $_GET['c'] ) ) : '' ) . '">'; // phpcs:ignore WordPress.Security.NonceVerification,WordPress.Security.ValidatedSanitizedInput
+	$h .= '<p class="ewc-err" role="alert">' . ( $bad ? esc_html( $a['cc_bad'] ) : '' ) . '</p>';
+	$h .= '<button type="button" class="ewc-btn" data-ewc-codego>' . esc_html( $a['continue'] ) . '</button>';
+	$h .= '<div class="ewc-ccq"><p class="ewc-codeq">' . esc_html( $a['cc_back_q'] ) . '</p><p class="ewc-codeq"><button type="button" class="ewc-codelink" data-ewc-codeskip>' . esc_html( $a['cc_skip'] ) . '</button></p></div></div>';
+	$h .= '<div data-ewc-panel="who" hidden>';
+	$h .= '<label class="ewc-lab" for="ewcName">' . esc_html( $a['name_label'] ) . '</label><input class="ewc-in" id="ewcName" type="text" autocomplete="name" required data-ewo-save="name">';
 	$h .= '<div class="ewc-head"><span>' . esc_html( $a['who_title'] ) . '</span></div>';
-	$h .= '<label class="ewc-lab" for="ewcSchool">' . esc_html( $a['school_label'] ) . '</label>';
-	$h .= '<div class="ewc-search"><div class="ewc-sbox"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>';
-	$h .= '<input id="ewcSchool" type="text" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="ewcList"></div>';
-	$h .= '<div class="ewc-list" id="ewcList" role="listbox" hidden></div></div>';
 	$h .= '<p class="ewc-lab">' . esc_html( $a['count_label'] ) . '</p><div class="ewc-counts">';
 	foreach ( array( 'adults' => '', 'children' => $a['children_note'] ) as $k => $note ) {
 		$h .= '<div class="ewc-count" data-k="' . esc_attr( $k ) . '"><span><b>' . esc_html( $a[ $k ] ) . '</b>' . ( '' !== $note ? '<small>' . esc_html( $note ) . '</small>' : '' ) . '</span>';
 		$h .= '<span class="ewc-pm"><button type="button" data-d="-1" aria-label="&minus; ' . esc_attr( $a[ $k ] ) . '">&minus;</button><output>' . ( 'adults' === $k ? 1 : 0 ) . '</output><button type="button" data-d="1" aria-label="+ ' . esc_attr( $a[ $k ] ) . '">+</button></span></div>';
 	}
 	$h .= '</div>';
-	$h .= '<label class="ewc-lab" for="ewcName">' . esc_html( $a['name_label'] ) . '</label><input class="ewc-in" id="ewcName" type="text" autocomplete="name" required data-ewo-save="name">';
+	$h .= '<p class="ewc-lab" data-ewc-schlab>' . esc_html( $a['school_label'] ) . '</p><div data-ewc-schools></div>';
+	$h .= '<div class="ewc-ccq ewc-same" data-ewc-same hidden><p class="ewc-codeq">' . esc_html( $a['same_q'] ) . '</p><p class="ewc-codeq"><button type="button" class="ewc-codelink" data-ewc-sameall>' . esc_html( $a['same_link'] ) . '</button></p></div>';
 	$h .= '<label class="ewc-tick"><input type="checkbox" id="ewcConsent" checked><span>' . esc_html( $a['consent'] ) . '</span></label>';
-	$h .= '<p class="ewc-err" role="alert"></p><button type="submit" class="ewc-btn">' . esc_html( $a['claim'] ) . '</button></div>';
+	$h .= '<p class="ewc-err" role="alert"></p><button type="submit" class="ewc-btn">' . esc_html( $a['claim'] ) . '</button></div></div>';
 	$h .= '</form>';
 
+	if ( '' !== trim( (string) $a['invite_on'] ) ) {
+		$h .= ew_claim_friend_html( $a );
+	}
 	if ( 'app' === $a['ending'] ) {
 		/* The last page: a new supporter makes their password first (someone whose
 		   email already has an account is not asked), then their tickets, in the app. */
@@ -546,6 +575,22 @@ function ew_claim_when( $a ) {
 		$date = $m[1] . ' ' . $m[2];
 	}
 	return trim( substr( trim( (string) $a['day'] ), 0, 3 ) . ' ' . $date );
+}
+
+/** Bring a friend: their name and a mobile or email, more than one if they like. */
+function ew_claim_friend_html( $a ) {
+	$h  = '<div class="ewc-acc" data-ewc-friend hidden>';
+	$h .= '<p class="ewc-done ewc-done-s">' . esc_html( $a['invite_title'] ) . '</p>';
+	$h .= '<p class="ewc-who">' . esc_html( $a['invite_note'] ) . '</p>';
+	$h .= '<div class="ewc-card2"><div data-ewc-frows><div class="ewc-frow">';
+	$h .= '<label class="ewc-alab" for="ewcF0n">' . esc_html( $a['invite_name'] ) . '</label><input class="ewc-acin" id="ewcF0n" type="text" autocomplete="off" placeholder="' . esc_attr( $a['invite_ph_name'] ) . '">';
+	$h .= '<label class="ewc-alab" for="ewcF0c">' . esc_html( $a['invite_contact'] ) . '</label><input class="ewc-acin" id="ewcF0c" type="text" autocomplete="off" placeholder="' . esc_attr( $a['invite_ph_contact'] ) . '">';
+	$h .= '</div></div>';
+	$h .= '<p class="ewc-fine"><button type="button" class="ewc-alink" data-ewc-fmore>' . esc_html( $a['invite_more'] ) . '</button></p>';
+	$h .= '<p class="ewc-err" role="alert"></p><button type="button" class="ewc-btn" data-ewc-fsend>' . esc_html( $a['invite_send'] ) . '</button>';
+	$h .= '<p class="ewc-fine"><button type="button" class="ewc-alink" data-ewc-fskip>' . esc_html( $a['invite_skip'] ) . '</button></p>';
+	$h .= '</div></div>';
+	return $h;
 }
 
 /** The last page: You're in, then See my ticket (make or enter the MyEastwood password). */
@@ -705,6 +750,18 @@ add_action( 'rest_api_init', function () {
 			$email    = $bid ? (string) get_post_meta( $bid, '_ewt_email', true ) : sanitize_email( (string) $req->get_param( 'email' ) );
 			$phone    = trim( sanitize_text_field( (string) $req->get_param( 'phone' ) ) );
 			$school   = trim( sanitize_text_field( (string) $req->get_param( 'school' ) ) );
+			// One school per child when there is more than one; the first is the claim's school.
+			$schools  = array_values( array_filter( array_map( function ( $v ) {
+				return trim( sanitize_text_field( (string) $v ) );
+			}, array_slice( (array) $req->get_param( 'schools' ), 0, 20 ) ) ) );
+			if ( '' === $school && $schools ) {
+				$school = $schools[0];
+			}
+			// The shared family code (BBC): kept on the claim and named as its ticket.
+			$promo    = '';
+			if ( '' !== ew_claim_fam( $a['family_code'] ) && ew_claim_fam( (string) $req->get_param( 'promo' ) ) === ew_claim_fam( $a['family_code'] ) ) {
+				$promo = (string) $a['family_code'];
+			}
 			$adults   = max( 0, min( 20, (int) $req->get_param( 'adults' ) ) );
 			$children = max( 0, min( 20, (int) $req->get_param( 'children' ) ) );
 			if ( '' === $name ) {
@@ -761,7 +818,7 @@ add_action( 'rest_api_init', function () {
 				'page'     => $post->ID,
 				'url'      => get_permalink( $post ),
 				'lines'    => $party,
-				'extra'    => $school,
+				'extra'    => $schools ? implode( ', ', array_unique( $schools ) ) : $school,
 				'school'   => $school,
 				'adults'   => $adults,
 				'children' => $children,
@@ -773,6 +830,13 @@ add_action( 'rest_api_init', function () {
 				'hook'     => (string) $a['crm_hook'],
 			) as $k => $v ) {
 				update_post_meta( $id, '_ewt_' . $k, $v );
+			}
+			if ( $schools ) {
+				update_post_meta( $id, '_ewt_schools', $schools );
+			}
+			if ( '' !== $promo ) {
+				update_post_meta( $id, '_ewt_promo', $promo );
+				update_post_meta( $id, '_ewt_ticket_type', (string) $a['family_name'] );
 			}
 			if ( $cc ) {
 				update_post_meta( $cc['id'], '_ewt_cc_used', $id );
@@ -791,6 +855,37 @@ add_action( 'rest_api_init', function () {
 
 	/* The last page asks: does the claim's email have a MyEastwood account yet?
 	   Only with the claim's own private key, and the answer is yes, no or unknown. */
+	/* The code step: a personal code fills the claim from last time; the shared family code just carries on. */
+	register_rest_route( 'eastwood/v1', '/claim/code', array(
+		'methods'             => 'POST',
+		'permission_callback' => '__return_true',
+		'callback'            => function ( $req ) {
+			$post  = get_post( (int) $req->get_param( 'page' ) );
+			$block = $post ? ew_claim_block_on( $post ) : null;
+			if ( ! $block ) {
+				return new WP_REST_Response( array( 'message' => 'no block' ), 400 );
+			}
+			$a    = $block['atts'];
+			$code = (string) $req->get_param( 'code' );
+			if ( '' !== ew_claim_fam( $a['family_code'] ) && ew_claim_fam( $code ) === ew_claim_fam( $a['family_code'] ) ) {
+				return array( 'ok' => 1, 'promo' => (string) $a['family_code'], 'ticket' => (string) $a['family_name'] );
+			}
+			$cc = function_exists( 'ew_cc_state' ) ? ew_cc_state( $code ) : array( 'state' => 'none' );
+			if ( 'ok' === $cc['state'] ) {
+				return array( 'ok' => 1, 'invite' => $cc['fill'] );
+			}
+			$msg = 'used' === $cc['state'] ? $a['cc_used'] : ( 'expired' === $cc['state'] ? $a['cc_expired'] : $a['cc_bad'] );
+			return new WP_REST_Response( array( 'message' => (string) $msg ), 400 );
+		},
+	) );
+
+	/* Bring a friend, after claiming. */
+	register_rest_route( 'eastwood/v1', '/claim/invite', array(
+		'methods'             => 'POST',
+		'permission_callback' => '__return_true',
+		'callback'            => 'ew_claim_invite',
+	) );
+
 	register_rest_route( 'eastwood/v1', '/claim/account', array(
 		'methods'             => 'POST',
 		'permission_callback' => '__return_true',
@@ -869,6 +964,11 @@ function ew_claim_css() {
 .ewc-head small{font-size:13px;font-weight:700;color:#cfcfcf}
 .ewc .ewc-lab{display:block;margin:0 0 8px;font-size:14px;font-weight:700;color:#fff}
 .ewc-search{position:relative;margin-bottom:20px}
+.ewc-kid{font-size:13px}
+.ewc .ewc-same{margin:-6px 0 18px}
+.ewc .ewc-done-s{font-size:40px}
+.ewc-frow+.ewc-frow{margin-top:14px;padding-top:14px;border-top:1px solid #e4e4e8}
+.ewc [data-ewc-friend] .ewc-acin{padding-right:14px;margin-bottom:10px}
 .ewc-sbox{background:#fff;color:#101010;border-radius:8px;padding:0 16px;display:flex;align-items:center;gap:10px}
 .ewc-sbox input{flex:1 1 auto;border:0;outline:0;font:inherit;font-size:15px;padding:13px 0;background:transparent;color:#101010}
 .ewc-search.open .ewc-sbox{border-radius:8px 8px 0 0;border-bottom:1px solid #e4e4e4}
@@ -985,46 +1085,123 @@ function ew_claim_js() {
    nb.addEventListener('click', asCode, true);
    eb.addEventListener('keydown', function(e){ if(e.key === 'Enter') asCode(e); }, true);
  })();
- var O = window.ewOptin ? ewOptin(root, W) : {bid: 0, key: '', email: ''};
- var input = root.querySelector('#ewcSchool'), list = root.querySelector('#ewcList'), box = root.querySelector('.ewc-search');
- var school = '', schools = W.schools || [];
+ /* Step two: the code panel first, then who's coming. */
+ var pCode = root.querySelector('[data-ewc-panel="code"]'), pWho = root.querySelector('[data-ewc-panel="who"]');
+ var cin = root.querySelector('#ewcCode');
+ var promo = '', inviteCode = W.invite ? W.invite.code : '';
+ function panel(n){
+   if(pCode) pCode.hidden = n !== 'code';
+   if(pWho) pWho.hidden = n !== 'who';
+   var f = n === 'code' ? cin : root.querySelector('#ewcName'); if(f && !f.value){ try{ f.focus(); }catch(x){} }
+ }
+ var O = window.ewOptin ? ewOptin(root, W, {open: function(){ panel(inviteCode ? 'who' : 'code'); }}) : {bid: 0, key: '', email: ''};
+ var schools = W.schools || [];
  var count = {adults: 1, children: 0};
+ var sbox = root.querySelector('[data-ewc-schools]'), slab = root.querySelector('[data-ewc-schlab]'), same = root.querySelector('[data-ewc-same]');
+ var picks = [], kept = [];
 
- /* "Got a code?": open the box, and a code typed in opens the same claim as its link. */
- var codeEl = root.querySelector('[data-ewc-code]');
- if(codeEl){
-   var one = root.querySelector('[data-ewo-one]');
-   var hideCode = function(){ if(one && one.hidden) codeEl.hidden = true; };
-   if(one && window.MutationObserver) new MutationObserver(hideCode).observe(one, {attributes: true, attributeFilter: ['hidden']});
-   if(W.invite) codeEl.hidden = true;
-   var cin = codeEl.querySelector('#ewcCode'), form = codeEl.closest('form');
-   var mode = function(code){
-     if(form) form.classList.toggle('ewc-usecode', code);
-     codeEl.querySelector('[data-ewc-ccq]').hidden = code;
-     codeEl.querySelector('.ewc-codebox').hidden = !code;
-     var f = code ? cin : root.querySelector('[data-ewo-email]'); if(f) f.focus();
-   };
-   codeEl.addEventListener('click', function(e){
-     if(e.target.closest('[data-ewc-codeopen]')){ mode(true); return; }
-     if(e.target.closest('[data-ewc-codeback]')){ mode(false); return; }
-     if(e.target.closest('[data-ewc-codego]')){ var v = cin.value.trim().toUpperCase().replace(/[^A-Z0-9-]/g, ''); if(!v){ cin.focus(); return; } location.href = location.pathname + '?c=' + encodeURIComponent(v); }
+ function norm(s){ return String(s).toLowerCase().replace(/&/g,'and').replace(/[^a-z0-9]+/g,' ').trim(); }
+ var ico = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>';
+ /* One school box: type to search the list, pick one, or add a school that isn't there. */
+ function wire(p){
+   var input = p.input, list = p.list, box = p.box;
+   p.close = function(){ list.hidden = true; box.classList.remove('open'); input.setAttribute('aria-expanded','false'); };
+   function show(){
+     var q = norm(input.value);
+     if(q.length < 2){ p.close(); return; }
+     var hits = schools.filter(function(s){ return norm(s).indexOf(q) > -1; }).slice(0, 8);
+     var v = input.value.trim(), h = hits.map(function(s){
+       var i = s.toLowerCase().indexOf(v.toLowerCase());
+       var t = i > -1 ? esc(s.slice(0,i)) + '<strong>' + esc(s.slice(i, i + v.length)) + '</strong>' + esc(s.slice(i + v.length)) : esc(s);
+       return '<button type="button" role="option" data-s="' + esc(s) + '">' + t + '</button>';
+     }).join('');
+     h += '<button type="button" class="ewc-add" data-add="1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>' + esc(W.add) + '</button>';
+     list.innerHTML = h; list.hidden = false; box.classList.add('open'); input.setAttribute('aria-expanded','true');
+   }
+   input.addEventListener('input', function(){ p.school = ''; show(); });
+   /* A school already picked (or filled from a code) doesn't reopen the list on focus; typing does. */
+   input.addEventListener('focus', function(){ if(!p.school) show(); });
+   list.addEventListener('click', function(e){
+     var b = e.target.closest('button'); if(!b) return;
+     if(b.getAttribute('data-add')){
+       var name = input.value.trim(); if(name.length < 3){ input.focus(); return; }
+       b.disabled = true;
+       fetch(W.rest + '/school', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name: name, page: page})})
+         .then(function(r){ return r.json(); }).then(function(j){
+           if(j.school){ p.school = j.school; input.value = j.school; if(schools.indexOf(j.school) < 0) schools.push(j.school); }
+           p.close();
+         }).catch(function(){ b.disabled = false; });
+       return;
+     }
+     p.school = b.getAttribute('data-s'); input.value = p.school; p.close();
    });
-   cin.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); codeEl.querySelector('[data-ewc-codego]').click(); } });
+ }
+ /* One box, or one per child when there is more than one child. */
+ function renderSchools(){
+   if(!sbox) return;
+   picks.forEach(function(p, i){ kept[i] = {v: p.input.value, s: p.school}; });
+   var multi = count.children > 1, n = multi ? count.children : 1, h = '';
+   if(slab) slab.textContent = multi ? W.schools_label : W.school_label;
+   for(var i = 0; i < n; i++){
+     h += '<div class="ewc-schrow">' + (multi ? '<label class="ewc-lab ewc-kid" for="ewcSchool' + (i || '') + '">' + esc(String(W.child || '').replace('{n}', i + 1)) + '</label>' : '')
+       + '<div class="ewc-search"><div class="ewc-sbox">' + ico + '<input id="ewcSchool' + (i || '') + '" type="text" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="ewcList' + i + '"' + (multi ? '' : ' aria-label="' + esc(W.school_label) + '"') + '></div>'
+       + '<div class="ewc-list" id="ewcList' + i + '" role="listbox" hidden></div></div></div>';
+   }
+   sbox.innerHTML = h;
+   picks = [];
+   sbox.querySelectorAll('.ewc-search').forEach(function(box, i){
+     var p = {box: box, input: box.querySelector('input'), list: box.querySelector('.ewc-list'), school: ''};
+     if(kept[i]){ p.input.value = kept[i].v; p.school = kept[i].s; }
+     wire(p); picks.push(p);
+   });
+   if(same) same.hidden = !multi;
+ }
+ document.addEventListener('click', function(e){ picks.forEach(function(p){ if(!p.box.contains(e.target)) p.close(); }); });
+ if(same) same.addEventListener('click', function(e){
+   if(!e.target.closest('[data-ewc-sameall]') || !picks.length) return;
+   var f = picks[0]; picks.forEach(function(p, i){ if(i){ p.input.value = f.input.value; p.school = f.school; } });
+ });
+ function setCount(k, v){ count[k] = v; var o = root.querySelector('.ewc-count[data-k="' + k + '"] output'); if(o) o.textContent = v; }
+ /* What a personal code knows from last time. */
+ function fill(I){
+   var nm = root.querySelector('#ewcName'); if(nm && !nm.value && I.name) nm.value = I.name;
+   ['adults','children'].forEach(function(k){ if(typeof I[k] === 'number') setCount(k, I[k]); });
+   if(count.adults + count.children < 1) setCount('adults', 1);
+   renderSchools();
+   if(I.school && picks[0]){ picks[0].input.value = I.school; picks[0].school = I.school; }
+ }
+ renderSchools();
+
+ /* The code: checked with the site, then on to who's coming. */
+ if(pCode && cin){
+   var cerr = pCode.querySelector('.ewc-err'), cgo = pCode.querySelector('[data-ewc-codego]');
+   var useCode = function(){
+     var raw = cin.value.trim(); if(!raw){ cin.focus(); return; }
+     cerr.textContent = ''; cgo.disabled = true;
+     fetch(W.rest + '/code', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({page: page, code: raw})})
+       .then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); })
+       .then(function(x){
+         cgo.disabled = false;
+         var j = x.j || {};
+         if(!x.ok){ cerr.textContent = j.message || W.failed; return; }
+         promo = j.promo || '';
+         if(j.invite){ inviteCode = j.invite.code; fill(j.invite); }
+         panel('who');
+       }).catch(function(){ cgo.disabled = false; cerr.textContent = W.failed; });
+   };
+   pCode.addEventListener('click', function(e){
+     if(e.target.closest('[data-ewc-codego]')){ useCode(); return; }
+     if(e.target.closest('[data-ewc-codeskip]')){ promo = ''; cerr.textContent = ''; panel('who'); }
+   });
+   cin.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); useCode(); } });
  }
 
- /* A personal claim link: their email in step one; step two filled from last time. */
+ /* A personal claim link: their email in step one; who's coming filled from last time. */
  if(W.invite){
    var I = W.invite, em = root.querySelector('[data-ewo-email]');
    if(em && !em.value) em.value = I.email || '';
-   if(I.school){ school = I.school; input.value = I.school; }
-   ['adults','children'].forEach(function(k){
-     if(typeof I[k] !== 'number') return;
-     count[k] = I[k];
-     var o = root.querySelector('.ewc-count[data-k="' + k + '"] output'); if(o) o.textContent = I[k];
-   });
-   if(count.adults + count.children < 1) { count.adults = 1; var oa = root.querySelector('.ewc-count[data-k="adults"] output'); if(oa) oa.textContent = 1; }
-   var nm = root.querySelector('#ewcName'); if(nm && !nm.value && I.name) nm.value = I.name;
-   /* The code says who they are: no need to ask for the email, carry straight on to step two. */
+   fill(I);
+   /* The code says who they are: no need to ask for the email, carry straight on. */
    var nx = root.querySelector('[data-ewo-next]'); if(nx && em && em.value && !O.bid) setTimeout(function(){ nx.click(); }, 0);
  }
 
@@ -1048,39 +1225,6 @@ function ew_claim_js() {
    turn(); setInterval(turn, 15000);
  }
 
- function norm(s){ return String(s).toLowerCase().replace(/&/g,'and').replace(/[^a-z0-9]+/g,' ').trim(); }
- function close(){ list.hidden = true; box.classList.remove('open'); input.setAttribute('aria-expanded','false'); }
- function show(){
-   var q = norm(input.value);
-   if(q.length < 2){ close(); return; }
-   var hits = schools.filter(function(s){ return norm(s).indexOf(q) > -1; }).slice(0, 8);
-   var h = hits.map(function(s){
-     var i = s.toLowerCase().indexOf(input.value.trim().toLowerCase());
-     var t = i > -1 ? esc(s.slice(0,i)) + '<strong>' + esc(s.slice(i, i + input.value.trim().length)) + '</strong>' + esc(s.slice(i + input.value.trim().length)) : esc(s);
-     return '<button type="button" role="option" data-s="' + esc(s) + '">' + t + '</button>';
-   }).join('');
-   h += '<button type="button" class="ewc-add" data-add="1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>' + esc(W.add) + '</button>';
-   list.innerHTML = h; list.hidden = false; box.classList.add('open'); input.setAttribute('aria-expanded','true');
- }
- input.addEventListener('input', function(){ school = ''; show(); });
- /* A school already picked (or filled from a claim link) doesn't reopen the list on focus; typing does. */
- input.addEventListener('focus', function(){ if(!school) show(); });
- document.addEventListener('click', function(e){ if(!box.contains(e.target)) close(); });
- list.addEventListener('click', function(e){
-   var b = e.target.closest('button'); if(!b) return;
-   if(b.getAttribute('data-add')){
-     var name = input.value.trim(); if(name.length < 3){ input.focus(); return; }
-     b.disabled = true;
-     fetch(W.rest + '/school', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name: name, page: page})})
-       .then(function(r){ return r.json(); }).then(function(j){
-         if(j.school){ school = j.school; input.value = j.school; if(schools.indexOf(j.school) < 0) schools.push(j.school); }
-         close();
-       }).catch(function(){ b.disabled = false; });
-     return;
-   }
-   school = b.getAttribute('data-s'); input.value = school; close();
- });
-
  function party(){
    var bits = [];
    if(count.adults) bits.push(count.adults + ' ' + (count.adults === 1 ? W.one[0] : W.many[0]));
@@ -1090,7 +1234,7 @@ function ew_claim_js() {
  root.querySelectorAll('.ewc-count').forEach(function(row){
    var k = row.getAttribute('data-k'), out = row.querySelector('output'), btns = row.querySelectorAll('button');
    function paint(){ out.textContent = count[k]; btns[0].disabled = count[k] < 1; btns[1].disabled = count[k] > 19; }
-   btns.forEach(function(b){ b.addEventListener('click', function(){ count[k] = Math.max(0, Math.min(20, count[k] + Number(b.getAttribute('data-d')))); paint(); }); });
+   btns.forEach(function(b){ b.addEventListener('click', function(){ count[k] = Math.max(0, Math.min(20, count[k] + Number(b.getAttribute('data-d')))); paint(); if(k === 'children') renderSchools(); }); });
    paint();
  });
 
@@ -1154,30 +1298,62 @@ function ew_claim_js() {
      var v = e.target.closest('[data-view]'); var b = v && v.querySelector('[data-acc-do]'); if(b){ e.preventDefault(); b.click(); }
    });
  }
+ /* Bring a friend: after claiming, before the tickets-in-the-app page. */
+ function friend(claim, then){
+   var fp = root.querySelector('[data-ewc-friend]');
+   if(!W.friend || !fp || !claim){ then(); return; }
+   fp.hidden = false;
+   var rows = fp.querySelector('[data-ewc-frows]'), ferr = fp.querySelector('.ewc-err'), send = fp.querySelector('[data-ewc-fsend]');
+   var tpl = rows.firstElementChild.outerHTML, n = 1;
+   var finish = function(){ fp.hidden = true; then(); };
+   fp.addEventListener('click', function(e){
+     if(e.target.closest('[data-ewc-fskip]')){ finish(); return; }
+     if(e.target.closest('[data-ewc-fmore]')){
+       if(n >= (W.invite_max || 5)) return;
+       rows.insertAdjacentHTML('beforeend', tpl.replace(/ewcF0/g, 'ewcF' + n)); n++;
+       var ins = rows.lastElementChild.querySelectorAll('input'); ins.forEach(function(i){ i.value = ''; }); ins[0].focus();
+       return;
+     }
+     if(e.target.closest('[data-ewc-fsend]')){
+       var list = [];
+       rows.querySelectorAll('.ewc-frow').forEach(function(r){ var i = r.querySelectorAll('input'); var nm = i[0].value.trim(), ct = i[1].value.trim(); if(nm || ct) list.push({name: nm, contact: ct}); });
+       if(!list.length){ ferr.textContent = W.need_friend; return; }
+       ferr.textContent = ''; send.disabled = true;
+       fetch(W.rest + '/invite', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({claim: claim, invites: list})})
+         .then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); })
+         .then(function(x){ send.disabled = false; if(!x.ok){ ferr.textContent = (x.j && x.j.message) || W.failed; return; } finish(); })
+         .catch(function(){ send.disabled = false; ferr.textContent = W.failed; });
+     }
+   });
+ }
  form.addEventListener('submit', function(e){
    e.preventDefault();
-   if(s2.hidden) return;
+   if(s2.hidden || !pWho || pWho.hidden) return;
    var name = root.querySelector('#ewcName').value.trim(), phone = '';
-   if(!school){
-     var typed = norm(input.value), match = schools.filter(function(s){ return norm(s) === typed; })[0];
-     if(match){ school = match; } else { err(s2, W.need_school); input.focus(); return; }
-   }
-   if(count.adults + count.children < 1){ err(s2, W.need_people); return; }
-   if(!name){ err(s2, W.need_name); return; }
-   err(s2, '');
-   var go = s2.querySelector('button[type="submit"]'); go.disabled = true;
+   if(!name){ err(pWho, W.need_name); return; }
+   if(count.adults + count.children < 1){ err(pWho, W.need_people); return; }
+   var list = picks.map(function(p){
+     if(p.school) return p.school;
+     var t = norm(p.input.value); return schools.filter(function(s){ return norm(s) === t; })[0] || '';
+   });
+   var miss = list.indexOf('');
+   if(miss > -1){ err(pWho, W.need_school); picks[miss].input.focus(); return; }
+   picks.forEach(function(p, i){ p.school = list[i]; });
+   err(pWho, '');
+   var go = pWho.querySelector('button[type="submit"]'); go.disabled = true;
    fetch(W.rest, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
-     page: page, bid: O.bid, key: O.key, email: O.email, school: school, adults: count.adults, children: count.children,
-     name: name, phone: phone, consent: root.querySelector('#ewcConsent').checked, invite: W.invite ? W.invite.code : ''})})
+     page: page, bid: O.bid, key: O.key, email: O.email, school: list[0], schools: list, adults: count.adults, children: count.children,
+     name: name, phone: phone, consent: root.querySelector('#ewcConsent').checked, invite: inviteCode, promo: promo})})
    .then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); })
    .then(function(res){
-     if(!res.ok || !res.j || !(res.j.ok || res.j.html)){ err(s2, (res.j && res.j.message) || W.failed); go.disabled = false; return; }
+     if(!res.ok || !res.j || !(res.j.ok || res.j.html)){ err(pWho, (res.j && res.j.message) || W.failed); go.disabled = false; return; }
      root.querySelector('.ewc-big').hidden = true; root.querySelector('.ewc-month').hidden = true;
      form.hidden = true;
      if(O.done) O.done();
-     account(res.j.claim || '');
+     var claim = res.j.claim || '';
+     friend(claim, function(){ account(claim); });
    })
-   .catch(function(){ err(s2, W.failed); go.disabled = false; });
+   .catch(function(){ err(pWho, W.failed); go.disabled = false; });
  });
 })();
 JS;
@@ -1204,3 +1380,90 @@ add_action( 'wp_enqueue_scripts', function () {
 	wp_enqueue_script( 'ew-claim' );
 	wp_add_inline_script( 'ew-claim', ( function_exists( 'ew_optin_js' ) ? ew_optin_js() . ew_inapp_js() : '' ) . ew_claim_js() );
 }, 22 );
+
+/** A code with case, spaces and dots ignored: "b.b.c " is BBC. */
+function ew_claim_fam( $v ) {
+	return strtoupper( preg_replace( '/[^A-Za-z0-9]/', '', (string) $v ) );
+}
+
+/**
+ * Bring a friend on the claim page: {claim, invites: [{name, contact}]}, the same way the
+ * half-time show does it. Each invite is kept on the claim (_ewt_invites) with its own token;
+ * an email address gets one short email with the claim page and ?ref=token, a mobile number
+ * is kept. Someone claiming from that link marks the invite accepted (parts/halftime.php).
+ */
+function ew_claim_invite( $req ) {
+	$bid = function_exists( 'ew_optin_owner' ) ? ew_optin_owner( $req ) : 0;
+	if ( ! $bid || 'claimed' !== get_post_meta( $bid, '_ewt_status', true ) ) {
+		return new WP_REST_Response( array( 'message' => 'no booking' ), 403 );
+	}
+	$post  = get_post( (int) get_post_meta( $bid, '_ewt_page', true ) );
+	$block = $post ? ew_claim_block_on( $post ) : null;
+	$a     = $block ? $block['atts'] : ew_claim_defaults();
+	$have  = get_post_meta( $bid, '_ewt_invites', true );
+	$have  = is_array( $have ) ? $have : array();
+	$room  = max( 0, max( 1, min( 10, (int) $a['invite_max'] ) ) - count( $have ) );
+	$new   = array();
+	foreach ( array_slice( (array) $req->get_param( 'invites' ), 0, 10 ) as $in ) {
+		$nm = trim( sanitize_text_field( (string) ( $in['name'] ?? '' ) ) );
+		$ct = trim( sanitize_text_field( (string) ( $in['contact'] ?? '' ) ) );
+		if ( '' === $nm && '' === $ct ) {
+			continue;
+		}
+		if ( '' !== $nm && function_exists( 'ew_person_name' ) ) {
+			$nm = ew_person_name( $nm );
+		}
+		$type = '';
+		if ( is_email( $ct ) ) {
+			$type = 'email';
+			$ct   = sanitize_email( $ct );
+		} elseif ( preg_match( '/^[0-9 +().-]+$/', $ct ) && strlen( preg_replace( '/\D/', '', $ct ) ) >= 10 ) {
+			$type = 'phone';
+		}
+		if ( '' === $nm || '' === $type ) {
+			return new WP_REST_Response( array( 'message' => (string) $a['need_friend'] ), 400 );
+		}
+		$new[] = array( 'name' => $nm, 'contact' => $ct, 'type' => $type );
+	}
+	if ( ! $new ) {
+		return new WP_REST_Response( array( 'message' => (string) $a['need_friend'] ), 400 );
+	}
+	$new     = array_slice( $new, 0, $room );
+	$inviter = (string) get_post_meta( $bid, '_ewt_name', true );
+	$page    = $post ? get_permalink( $post ) : home_url( '/claimticket/' );
+	$event   = (string) get_post_meta( $bid, '_ewt_event', true );
+	$emailed = 0;
+	foreach ( $new as $n ) {
+		$token = strtolower( wp_generate_password( 20, false, false ) );
+		$sent  = 0;
+		if ( 'email' === $n['type'] ) {
+			$sp   = strpos( $n['name'], ' ' );
+			$vars = array(
+				'{friend}'  => false === $sp ? $n['name'] : substr( $n['name'], 0, $sp ),
+				'{inviter}' => $inviter,
+				'{event}'   => $event,
+				'{link}'    => add_query_arg( 'ref', $token, $page ),
+			);
+			if ( wp_mail( $n['contact'], strtr( (string) $a['invite_subject'], $vars ), strtr( (string) $a['invite_body'], $vars ) ) ) {
+				$sent = time();
+				$emailed++;
+			}
+		}
+		$have[] = array(
+			'name'        => $n['name'],
+			'contact'     => $n['contact'],
+			'type'        => $n['type'],
+			'token'       => $token,
+			'time'        => time(),
+			'sent'        => $sent,
+			'accepted'    => 0,
+			'accepted_by' => 0,
+		);
+		add_post_meta( $bid, '_ewt_invite_token', $token );
+	}
+	update_post_meta( $bid, '_ewt_invites', $have );
+	if ( function_exists( 'ew_tix_crm' ) ) {
+		ew_tix_crm( (string) get_post_meta( $bid, '_ewt_hook', true ), $bid, 'invite' );
+	}
+	return array( 'ok' => 1, 'saved' => count( $new ), 'emailed' => $emailed );
+}
