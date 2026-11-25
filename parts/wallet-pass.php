@@ -227,3 +227,11 @@ function ew_wp_admin() {
 	echo '<p><input type="file" name="ew_wp_file" accept=".pem"></p>';
 	echo '<p><button class="button button-primary" name="ew_wp_go" value="1">Upload signing file</button></p></form></div>';
 }
+
+/* Bookings list: each booking's Apple Wallet pass, for admins (to test, or to send on). */
+add_filter( 'post_row_actions', function ( $actions, $post ) {
+	if ( 'ewt_booking' === $post->post_type && current_user_can( 'manage_options' ) && '' !== (string) get_option( 'ew_wallet_signing', '' ) ) {
+		$actions['ew_wallet'] = '<a href="' . esc_url( ew_wp_link( $post->ID ) ) . '">Apple Wallet pass</a>';
+	}
+	return $actions;
+}, 10, 2 );
