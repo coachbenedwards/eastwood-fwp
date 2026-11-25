@@ -131,7 +131,7 @@ function ew_wp_json( $bid ) {
 		'formatVersion'      => 1,
 		'passTypeIdentifier' => ew_wp_pass_type(),
 		'teamIdentifier'     => ew_wp_team(),
-		'serialNumber'       => $code,
+		'serialNumber'       => (string) $bid,
 		'organizationName'   => 'Eastwood FC',
 		'description'        => '' !== $event ? $event : 'Eastwood FC ticket',
 		'logoText'           => 'Eastwood FC',
@@ -139,6 +139,8 @@ function ew_wp_json( $bid ) {
 		'labelColor'         => 'rgb(229, 57, 43)',
 		'backgroundColor'    => 'rgb(10, 10, 11)',
 		'sharingProhibited'  => true,
+		'webServiceURL'      => function_exists( 'ew_ws_url' ) ? ew_ws_url() : null,
+		'authenticationToken' => function_exists( 'ew_ws_token' ) ? ew_ws_token( $bid ) : null,
 		'barcodes'           => array( array( 'format' => 'PKBarcodeFormatQR', 'message' => $qr, 'messageEncoding' => 'iso-8859-1', 'altText' => $code ) ),
 		'barcode'            => array( 'format' => 'PKBarcodeFormatQR', 'message' => $qr, 'messageEncoding' => 'iso-8859-1', 'altText' => $code ),
 		'eventTicket'        => array(
@@ -261,7 +263,9 @@ function ew_wp_admin() {
 	echo '<form method="post" enctype="multipart/form-data">';
 	wp_nonce_field( 'ew_wp' );
 	echo '<p><input type="file" name="ew_wp_file" accept=".pem"></p>';
-	echo '<p><button class="button button-primary" name="ew_wp_go" value="1">Upload signing file</button></p></form></div>';
+	echo '<p><button class="button button-primary" name="ew_wp_go" value="1">Upload signing file</button></p></form>';
+	do_action( 'ew_wp_admin_after' );
+	echo '</div>';
 }
 
 /* Bookings list: each booking's Apple Wallet pass, for admins (to test, or to send on). */

@@ -28,7 +28,7 @@ function ew_om_emails() {
 		'shop_paid'      => array(
 			'label'   => 'Shirt order – paid',
 			'subject' => 'Thanks for your order',
-			'body'    => "Hi {first_name},\n\nThanks for your order.\n\n{tickets}\nTotal paid: £{paid}\n\nYour booking reference is {ref}. Your tickets are in the Eastwood FC app: download it and sign in with this email and that reference ({app_url}).\n\nYour receipt comes separately from Stripe. We'll be in touch about getting it to you.\n\nAny questions, just reply to this email.\n\nEastwood FC",
+			'body'    => "Hi {first_name},\n\nThanks for your order.\n\n{tickets}\nTotal paid: £{paid}\n\nYour booking reference is {ref}. Your tickets are in the Eastwood FC app: download it and sign in with this email and that reference ({app_url}).\n\n{wallet}\n\nYour receipt comes separately from Stripe. We'll be in touch about getting it to you.\n\nAny questions, just reply to this email.\n\nEastwood FC",
 		),
 		'shop_reminder'  => array(
 			'label'   => 'Shirt order – not finished (an hour later)',
@@ -38,7 +38,7 @@ function ew_om_emails() {
 		'event_paid'     => array(
 			'label'   => 'Event tickets – paid',
 			'subject' => "You're in: {event}",
-			'body'    => "Hi {first_name},\n\nYou're booked for {event}.\n\n{tickets}\nTotal paid: £{paid}\n\nYour booking reference is {ref}. Your tickets are in the Eastwood FC app: download it and sign in with this email and that reference ({app_url}).\n\nYour receipt comes separately from Stripe. On the night, just give your name at the door.\n\nAny questions, just reply to this email.\n\nSee you there,\nEastwood FC",
+			'body'    => "Hi {first_name},\n\nYou're booked for {event}.\n\n{tickets}\nTotal paid: £{paid}\n\nYour booking reference is {ref}. Your tickets are in the Eastwood FC app: download it and sign in with this email and that reference ({app_url}).\n\n{wallet}\n\nYour receipt comes separately from Stripe. On the night, just give your name at the door.\n\nAny questions, just reply to this email.\n\nSee you there,\nEastwood FC",
 		),
 		'event_reminder' => array(
 			'label'   => 'Event tickets – not finished (an hour later)',
@@ -48,7 +48,7 @@ function ew_om_emails() {
 		'signup_done'     => array(
 			'label'   => 'Sign-up (half time show and the rest) – finished',
 			'subject' => "You're in: {event}",
-			'body'    => "Hi {first_name},\n\nYou're in for {event}.\n\nYour booking reference is {ref}.\n\nYour place is in the Eastwood FC app. Download it, sign in with this email and your booking reference, and it's there:\n{app_url}\n\nAny questions, just reply to this email.\n\nEastwood FC\n\n{backup}",
+			'body'    => "Hi {first_name},\n\nYou're in for {event}.\n\nYour booking reference is {ref}.\n\nYour place is in the Eastwood FC app. Download it, sign in with this email and your booking reference, and it's there:\n{app_url}\n\n{wallet}\n\nAny questions, just reply to this email.\n\nEastwood FC\n\n{backup}",
 		),
 		'signup_reminder' => array(
 			'label'   => 'Sign-up – not finished (an hour later)',
@@ -100,6 +100,12 @@ function ew_om_fill( $text, $booking_id ) {
 			: home_url( '/app/' ),
 		// Adds the ticket to Apple Wallet (parts/wallet-pass.php).
 		'{wallet_url}' => function_exists( 'ew_wp_link' ) ? ew_wp_link( $booking_id ) : '',
+		// The whole Apple Wallet line, only for tickets and places (not shirts or the half-time show),
+		// and only once passes can be signed: "On iPhone? Add your ticket to Apple Wallet:" then the link.
+		'{wallet}'     => ( function_exists( 'ew_wp_link' ) && '' !== (string) get_option( 'ew_wallet_signing', '' )
+			&& 'shop' !== ew_om_kind( $booking_id ) && 'halftime' !== $m( 'status' ) )
+			? "On iPhone? Add your ticket to Apple Wallet:\n" . ew_wp_link( $booking_id )
+			: '',
 		// The QR backup for the day, only where the booking has a pass page (school claims):
 		// "Can't use the app on the day?" then the link, each on its own line.
 		'{backup}'     => ( '' !== $m( 'code' ) && '' !== $m( 'key' ) && $m( 'school' ) !== '' )
@@ -109,6 +115,8 @@ function ew_om_fill( $text, $booking_id ) {
 	$out = strtr( (string) $text, $map );
 	// "Hi ," when nobody gave a name reads as a mistake; "Hi," does not.
 	$out = preg_replace( '/ +,/', ',', $out );
+	// An empty {wallet} leaves no gap either.
+	$out = preg_replace( "/\n{3,}/", "\n\n", $out );
 	// An empty {backup} leaves no blank lines behind.
 	return rtrim( $out );
 }
@@ -154,7 +162,7 @@ add_action( 'ew_fwp_after_settings', function () {
 	}
 	echo '<h2>Order emails</h2>';
 	echo '<p>The emails a buyer gets after paying, and an hour after starting checkout without paying. They go from the website through Google. '
-		. 'Placeholders: {first_name} {greeting} {event} {tickets} {paid} {total} {event_url} {ref} {app_url} {wallet_url} (adds the ticket to Apple Wallet) {backup} (the QR backup link, school claims only).</p>';
+		. 'Placeholders: {first_name} {greeting} {event} {tickets} {paid} {total} {event_url} {ref} {app_url} {wallet_url} (adds the ticket to Apple Wallet) {wallet} (the whole On iPhone? Add your ticket to Apple Wallet line, tickets only) {backup} (the QR backup link, school claims only).</p>';
 	echo '<form method="post">';
 	wp_nonce_field( 'ew_om_save' );
 	echo '<input type="hidden" name="ew_om_save" value="1">';
@@ -167,3 +175,32 @@ add_action( 'ew_fwp_after_settings', function () {
 	submit_button( 'Save order emails' );
 	echo '</form>';
 }, 30 );
+
+/*
+ * Once: emails already edited and saved get the Apple Wallet line too, under
+ * the app link (or at the end when there's no app link). Ben asked for it on
+ * 25 Nov 2026; after this the text is his again to change or remove.
+ */
+add_action( 'admin_init', function () {
+	if ( '1' === get_option( 'ew_om_wallet_added', '' ) ) {
+		return;
+	}
+	foreach ( array( 'event_paid', 'signup_done' ) as $k ) {
+		$v = get_option( 'ew_om_' . $k . '_body', null );
+		if ( null === $v || false !== strpos( (string) $v, '{wallet}' ) ) {
+			continue;
+		}
+		$v   = (string) $v;
+		$pos = strpos( $v, '{app_url}' );
+		if ( false !== $pos ) {
+			$end = strpos( $v, "\n", $pos );
+			$end = false === $end ? strlen( $v ) : $end;
+			$v   = substr( $v, 0, $end ) . "\n\n{wallet}" . substr( $v, $end );
+		} else {
+			$v .= "\n\n{wallet}";
+		}
+		update_option( 'ew_om_' . $k . '_body', $v, false );
+	}
+	update_option( 'ew_om_wallet_added', '1', true );
+} );
+
