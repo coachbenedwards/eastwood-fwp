@@ -1246,6 +1246,9 @@ function ew_claim_js() {
    var A = W.acc || {}, sb = null, email = O.email || '', toApp = W.ending === 'app';
    /* The tickets are in the app: the last panel, nothing more to fill in. */
    function done(){ acc.hidden = true; if(window.ewInapp) ewInapp(root, claim); }
+   /* Free claims ending in the app: no password and no sign-in on the website. The ticket is
+      booked under their email, so it's there when they sign in to the app with that email. */
+   if(toApp){ done(); return; }
    acc.querySelector('[data-acc-party]').textContent = party() + (W.when ? ' \u00b7 ' + W.when : '');
    acc.hidden = false;
    function view(n){ acc.querySelectorAll('[data-view]').forEach(function(v){ v.hidden = v.getAttribute('data-view') !== n; }); var f = acc.querySelector('[data-view="' + n + '"] input'); if(f) f.focus(); }
