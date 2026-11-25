@@ -64,6 +64,14 @@ function ew_doc_row( $row ) {
 	);
 }
 
+/** The short addresses that work at the top of the site, and where each goes the first time. */
+function ew_doc_top() {
+	return array(
+		'claim'          => array( 'dest' => '/claimticket/', 'note' => 'Ticket claim (eastwoodfc.com/claim)' ),
+		'thisiseastwood' => array( 'dest' => 'https://www.youtube.com/@eastwoodfootballclub/', 'note' => 'This Is Eastwood on YouTube (eastwoodfc.com/thisiseastwood)' ),
+	);
+}
+
 /** Where a link points, as an address a browser can follow. */
 function ew_doc_dest_url( $dest ) {
 	$dest = trim( (string) $dest );
@@ -90,18 +98,19 @@ add_action( 'init', function () {
 		return;
 	}
 	$path = (string) wp_parse_url( isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '', PHP_URL_PATH ); // phpcs:ignore
-	// eastwoodfc.com/claim is the short address for the ticket claim: a doc link of its own,
+	// Short addresses at the top of the site (eastwoodfc.com/claim), each a doc link of its own
 	// so its clicks show on the Doc links screen with the rest.
-	if ( preg_match( '#^/claim/?$#i', $path ) ) {
-		$m = array( '', 'claim' );
+	$top = ew_doc_top();
+	if ( preg_match( '#^/([a-z0-9][a-z0-9\-_]*)/?$#i', $path, $t ) && isset( $top[ strtolower( $t[1] ) ] ) ) {
+		$m = array( '', strtolower( $t[1] ) );
 	} elseif ( ! preg_match( '#^/doc/([a-z0-9][a-z0-9\-_]*)/?$#i', $path, $m ) ) {
 		return;
 	}
 
 	$slug = sanitize_key( $m[1] );
 	$rows = ew_doc_links();
-	if ( 'claim' === $slug && ! isset( $rows['claim'] ) ) {
-		$rows['claim'] = ew_doc_row( array( 'dest' => '/claimticket/', 'note' => 'Ticket claim (eastwoodfc.com/claim)' ) );
+	if ( isset( $top[ $slug ] ) && ! isset( $rows[ $slug ] ) ) {
+		$rows[ $slug ] = ew_doc_row( $top[ $slug ] );
 	}
 	if ( ! isset( $rows[ $slug ] ) ) {
 		return;
@@ -135,7 +144,11 @@ add_action( 'init', function () {
 	 * does is move that into a cookie and wipe it off the address bar.
 	 * It is on screen for less time than the page takes to paint.
 	 */
-	$dest = add_query_arg( 'ewdoc', $slug, ew_doc_dest_url( $row['dest'] ) );
+	$dest = ew_doc_dest_url( $row['dest'] );
+	// The marker only means something on our own site.
+	if ( 0 === strpos( $dest, home_url( '/' ) ) ) {
+		$dest = add_query_arg( 'ewdoc', $slug, $dest );
+	}
 	// Anything on the short address carries on to the page (a claim code: /claim?c=HT-7K3P).
 	foreach ( (array) $_GET as $k => $v ) { // phpcs:ignore WordPress.Security.NonceVerification
 		if ( is_string( $v ) && 'ewdoc' !== $k ) {

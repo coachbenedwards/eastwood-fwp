@@ -60,22 +60,22 @@ function ew_claim_defaults() {
 		'cc_skip'       => 'Continue without one',
 		/* One shared code for everyone (case, spaces and dots ignored). The claim is recorded as family_name. Empty = no shared code. */
 		'family_code'   => 'BBC',
-		'family_name'   => 'Big Family Ticket',
-		/* Bring a friend, after claiming. invite_on empty = the step is not shown. */
+		'family_name'   => 'Big BBC Family Ticket',
+		/* Bring a friend, after claiming, by email. invite_on empty = the step is not shown. invite_max empty = no limit. */
 		'invite_on'      => 'yes',
 		'invite_title'   => 'Bring a friend',
 		'invite_note'    => 'Invite someone to the same game.',
 		'invite_name'    => 'Their name',
-		'invite_contact' => 'Their mobile or email',
+		'invite_contact' => 'Their email',
 		'invite_ph_name' => 'Their name',
-		'invite_ph_contact' => 'Mobile or email',
+		'invite_ph_contact' => 'Email',
 		'invite_more'    => '+ Invite someone else',
 		'invite_send'    => 'Send the invite',
 		'invite_skip'    => 'Skip for now',
-		'invite_max'     => '5',
+		'invite_max'     => '',
 		'invite_subject' => '{inviter} has invited you to {event}',
 		'invite_body'    => "Hi {friend},\n\n{inviter} is coming to {event} and thought you would want to come too.\n\nGet your place here:\n{link}\n\nYou're getting this because {inviter} gave us your email.\n\nThank you,\nEastwood FC",
-		'need_friend'    => 'We need their name, and a mobile number or an email.',
+		'need_friend'    => 'We need their name and email.',
 		'school_add'    => "My school isn't listed, add it",
 		'count_label'   => 'How many are coming?',
 		'adults'        => 'Adults',
@@ -450,7 +450,7 @@ function ew_claim_shortcode( $atts, $content = null ) {
 		'child'       => $a['child_label'],
 		'friend'      => '' !== trim( (string) $a['invite_on'] ) ? 1 : 0,
 		'need_friend' => $a['need_friend'],
-		'invite_max'  => max( 1, min( 10, (int) $a['invite_max'] ) ),
+		'invite_max'  => max( 0, (int) $a['invite_max'] ),
 		'ref'         => 1,
 		'tk'          => array( 'title' => $a['ticket_title'], 'home' => $a['home'] ),
 		'one'         => array( $a['adult_one'], $a['child_one'] ),
@@ -584,7 +584,7 @@ function ew_claim_friend_html( $a ) {
 	$h .= '<p class="ewc-who">' . esc_html( $a['invite_note'] ) . '</p>';
 	$h .= '<div class="ewc-card2"><div data-ewc-frows><div class="ewc-frow">';
 	$h .= '<label class="ewc-alab" for="ewcF0n">' . esc_html( $a['invite_name'] ) . '</label><input class="ewc-acin" id="ewcF0n" type="text" autocomplete="off" placeholder="' . esc_attr( $a['invite_ph_name'] ) . '">';
-	$h .= '<label class="ewc-alab" for="ewcF0c">' . esc_html( $a['invite_contact'] ) . '</label><input class="ewc-acin" id="ewcF0c" type="text" autocomplete="off" placeholder="' . esc_attr( $a['invite_ph_contact'] ) . '">';
+	$h .= '<label class="ewc-alab" for="ewcF0c">' . esc_html( $a['invite_contact'] ) . '</label><input class="ewc-acin" id="ewcF0c" type="email" autocomplete="off" placeholder="' . esc_attr( $a['invite_ph_contact'] ) . '">';
 	$h .= '</div></div>';
 	$h .= '<p class="ewc-fine"><button type="button" class="ewc-alink" data-ewc-fmore>' . esc_html( $a['invite_more'] ) . '</button></p>';
 	$h .= '<p class="ewc-err" role="alert"></p><button type="button" class="ewc-btn" data-ewc-fsend>' . esc_html( $a['invite_send'] ) . '</button>';
@@ -1309,7 +1309,7 @@ function ew_claim_js() {
    fp.addEventListener('click', function(e){
      if(e.target.closest('[data-ewc-fskip]')){ finish(); return; }
      if(e.target.closest('[data-ewc-fmore]')){
-       if(n >= (W.invite_max || 5)) return;
+       if(W.invite_max && n >= W.invite_max) return;
        rows.insertAdjacentHTML('beforeend', tpl.replace(/ewcF0/g, 'ewcF' + n)); n++;
        var ins = rows.lastElementChild.querySelectorAll('input'); ins.forEach(function(i){ i.value = ''; }); ins[0].focus();
        return;
@@ -1387,10 +1387,10 @@ function ew_claim_fam( $v ) {
 }
 
 /**
- * Bring a friend on the claim page: {claim, invites: [{name, contact}]}, the same way the
- * half-time show does it. Each invite is kept on the claim (_ewt_invites) with its own token;
- * an email address gets one short email with the claim page and ?ref=token, a mobile number
- * is kept. Someone claiming from that link marks the invite accepted (parts/halftime.php).
+ * Bring a friend on the claim page: {claim, invites: [{name, contact}]}, by email. Each invite
+ * is kept on the claim (_ewt_invites) with its own token and gets one short email with the
+ * claim page and ?ref=token. Someone claiming from that link marks the invite accepted
+ * (parts/halftime.php). No limit unless invite_max is set on the block.
  */
 function ew_claim_invite( $req ) {
 	$bid = function_exists( 'ew_optin_owner' ) ? ew_optin_owner( $req ) : 0;
@@ -1402,9 +1402,10 @@ function ew_claim_invite( $req ) {
 	$a     = $block ? $block['atts'] : ew_claim_defaults();
 	$have  = get_post_meta( $bid, '_ewt_invites', true );
 	$have  = is_array( $have ) ? $have : array();
-	$room  = max( 0, max( 1, min( 10, (int) $a['invite_max'] ) ) - count( $have ) );
+	$max   = (int) $a['invite_max'];
+	$room  = $max > 0 ? max( 0, $max - count( $have ) ) : PHP_INT_MAX;
 	$new   = array();
-	foreach ( array_slice( (array) $req->get_param( 'invites' ), 0, 10 ) as $in ) {
+	foreach ( (array) $req->get_param( 'invites' ) as $in ) {
 		$nm = trim( sanitize_text_field( (string) ( $in['name'] ?? '' ) ) );
 		$ct = trim( sanitize_text_field( (string) ( $in['contact'] ?? '' ) ) );
 		if ( '' === $nm && '' === $ct ) {
@@ -1413,13 +1414,9 @@ function ew_claim_invite( $req ) {
 		if ( '' !== $nm && function_exists( 'ew_person_name' ) ) {
 			$nm = ew_person_name( $nm );
 		}
-		$type = '';
-		if ( is_email( $ct ) ) {
-			$type = 'email';
-			$ct   = sanitize_email( $ct );
-		} elseif ( preg_match( '/^[0-9 +().-]+$/', $ct ) && strlen( preg_replace( '/\D/', '', $ct ) ) >= 10 ) {
-			$type = 'phone';
-		}
+		// Email only: there is no text message sending yet.
+		$type = is_email( $ct ) ? 'email' : '';
+		$ct   = sanitize_email( $ct );
 		if ( '' === $nm || '' === $type ) {
 			return new WP_REST_Response( array( 'message' => (string) $a['need_friend'] ), 400 );
 		}
