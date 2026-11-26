@@ -403,6 +403,9 @@ body.ewpd-page{background:#000}
 .ewpd-home{position:relative!important;overflow:hidden;font-family:"DM Sans",system-ui,sans-serif;color:#ededf0;--ewpd-pad:60px}
 .ewpd-home .elementor-widget,.ewpd-home .e-con{margin:0!important}
 .ewpd-home p{margin:0}
+.ewpd-home .elementor-widget-text-editor,.ewpd-home .elementor-widget-text-editor p,.ewpd-home .elementor-widget-text-editor a{font-family:"DM Sans",system-ui,sans-serif!important}
+.ewpd-home .ewpd-eye p,.ewpd-home .ewpd-fhead p,.ewpd-home .ewpd-pinlabel p{font-family:"Geist Mono",monospace!important}
+.ewpd-home .ewpd-tab p:nth-of-type(2){font-family:"Bebas Neue",sans-serif!important}
 .ewpd-home .elementor-widget-text-editor p{margin:0}
 .ewpd-home .elementor-heading-title.elementor-heading-title{background:none!important;padding:0!important;margin:0!important;width:auto!important;text-transform:none;font-family:"Bebas Neue",sans-serif!important;font-weight:400!important;letter-spacing:0;color:#fff}
 .ewpd-home .elementor-widget-image img{display:block}
@@ -566,8 +569,8 @@ body.ewpd-page{background:#000}
 .ewpd-joincopy .elementor-heading-title.elementor-heading-title{margin-top:16px!important;font-size:84px!important}
 .ewpd-joincopy .ewpd-uline{margin-top:22px!important}
 .ewpd-home .ewpd-uline .elementor-button{font-size:30px!important;height:44px}
-.ewpd-app{margin-top:90px!important;flex-direction:column!important;align-items:stretch!important;gap:24px!important}
-.ewpd-app::before{left:2px;top:-80px;height:90px}
+.ewpd-app{margin-top:130px!important;flex-direction:column!important;align-items:stretch!important;gap:24px!important}
+.ewpd-app::before{left:2px;top:-100px;height:80px}
 .ewpd-appcopy{flex:none;padding-top:20px!important}
 .ewpd-appcopy .elementor-heading-title.elementor-heading-title{margin-top:16px!important;font-size:64px!important;line-height:.9!important}
 .ewpd-appcopy .ewpd-lead{margin-top:18px!important}
