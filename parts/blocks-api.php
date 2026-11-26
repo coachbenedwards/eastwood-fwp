@@ -135,6 +135,16 @@ function ew_blocks_build( $block, $fields, $lines = '' ) {
 	return $out;
 }
 
+/** A link as Elementor stores it. */
+function ew_blocks_link( $url ) {
+	$url = trim( (string) $url );
+	return array(
+		'url'         => '#' === substr( $url, 0, 1 ) ? sanitize_text_field( $url ) : esc_url_raw( $url ),
+		'is_external' => '',
+		'nofollow'    => '',
+	);
+}
+
 /**
  * One widget, from a plain description of it.
  *
@@ -146,12 +156,16 @@ function ew_blocks_build( $block, $fields, $lines = '' ) {
  *
  *   { "widget": "heading",     "fields": { "title": "Trials", "tag": "h2" } }
  *   { "widget": "text-editor", "fields": { "editor": "<p>...</p>" } }
+ *   { "widget": "button",      "fields": { "text": "Book", "url": "/book/" } }
+ *   { "widget": "image",       "fields": { "url": "...", "id": 12, "url_to": "/" } }
+ *   { "widget": "row",         "class": "cols", "widgets": [ ... ] }
  *   { "block":  "eastwood_gate" }
  */
 function ew_blocks_widget( $spec ) {
 	$w = ew_blocks_widget_inner( $spec );
 	// A class on the widget, for layouts that place each widget themselves.
-	if ( $w && ! empty( $spec['class'] ) ) {
+	// A row carries its class already, on the container.
+	if ( $w && ! empty( $spec['class'] ) && 'row' !== ( $spec['widget'] ?? '' ) ) {
 		$w['settings']['_css_classes'] = sanitize_text_field( (string) $spec['class'] );
 	}
 	return $w;
@@ -178,17 +192,22 @@ function ew_blocks_widget_inner( $spec ) {
 
 	if ( 'heading' === $kind ) {
 		$tag = strtolower( (string) ( $fields['tag'] ?? 'h2' ) );
-		if ( ! in_array( $tag, array( 'h1', 'h2', 'h3', 'h4', 'h5', 'h6' ), true ) ) {
+		if ( ! in_array( $tag, array( 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'span', 'p' ), true ) ) {
 			$tag = 'h2';
+		}
+		$set = array(
+			'title'       => (string) ( $fields['title'] ?? '' ),
+			'header_size' => $tag,
+		);
+		// A heading that is also a link, such as a name that goes home.
+		if ( ! empty( $fields['url'] ) ) {
+			$set['link'] = ew_blocks_link( $fields['url'] );
 		}
 		return array(
 			'id'         => $id,
 			'elType'     => 'widget',
 			'widgetType' => 'heading',
-			'settings'   => array(
-				'title'       => (string) ( $fields['title'] ?? '' ),
-				'header_size' => $tag,
-			),
+			'settings'   => $set,
 		);
 	}
 
@@ -214,8 +233,56 @@ function ew_blocks_widget_inner( $spec ) {
 					'alt' => (string) ( $fields['alt'] ?? '' ),
 				),
 				'image_size' => 'full',
+			) + ( ! empty( $fields['url_to'] ) ? array(
+				'link_to' => 'custom',
+				'link'    => ew_blocks_link( $fields['url_to'] ),
+			) : array() ),
+		);
+	}
+
+	// A button, as Elementor's own button widget: its words and where it goes.
+	if ( 'button' === $kind ) {
+		return array(
+			'id'         => $id,
+			'elType'     => 'widget',
+			'widgetType' => 'button',
+			'settings'   => array(
+				'text' => (string) ( $fields['text'] ?? '' ),
+				'link' => ew_blocks_link( $fields['url'] ?? '' ),
 			),
 		);
+	}
+
+	/*
+	 * A container inside a row, holding widgets of its own, so a section can
+	 * have columns and groups a person can move about in the builder.
+	 *   { "widget": "row", "class": "x-cols", "widgets": [ ... ] }
+	 */
+	if ( 'row' === $kind ) {
+		$kids = array();
+		foreach ( (array) ( $spec['widgets'] ?? array() ) as $child ) {
+			$child = (array) $child;
+			if ( ! empty( $child['block'] ) ) {
+				if ( ! in_array( (string) $child['block'], ew_blocks_allowed(), true )
+					|| ew_blocks_bad( (array) ( $child['fields'] ?? array() ) ) ) {
+					return null;
+				}
+			}
+			$w = ew_blocks_widget( $child );
+			if ( null === $w ) {
+				return null;
+			}
+			$kids[] = $w;
+		}
+		if ( ! $kids ) {
+			return null;
+		}
+		$row            = ew_blocks_row( $kids, (string) ( $spec['class'] ?? '' ) );
+		$row['isInner'] = true;
+		if ( ! empty( $spec['anchor'] ) ) {
+			$row['settings']['_element_id'] = sanitize_key( (string) $spec['anchor'] );
+		}
+		return $row;
 	}
 
 	if ( 'html' === $kind ) {
