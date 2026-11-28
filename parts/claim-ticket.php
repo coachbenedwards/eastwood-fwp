@@ -533,6 +533,8 @@ function ew_claim_shortcode( $atts, $content = null ) {
 	$h .= '<button type="button" class="ewc-btn" data-ewc-codego>' . esc_html( $a['continue'] ) . '</button>';
 	$h .= '<div class="ewc-ccq"><p class="ewc-codeq">' . esc_html( $a['cc_back_q'] ) . '</p><p class="ewc-codeq"><button type="button" class="ewc-codelink" data-ewc-codeskip>' . esc_html( $a['cc_skip'] ) . '</button></p></div></div>';
 	$h .= '<div data-ewc-panel="who" hidden>';
+	/* Ben, 28 Nov 2026: step two opens on who's coming; a code is a small link for the few who have one. */
+	$h .= '<div class="ewc-ccq ewc-gotcode"><p class="ewc-codeq">' . esc_html( $a['cc_q'] ) . '</p><p class="ewc-codeq"><button type="button" class="ewc-codelink" data-ewc-codeopen>' . esc_html( $a['cc_link'] ) . '</button></p></div>';
 	$h .= '<label class="ewc-lab" for="ewcName">' . esc_html( $a['name_label'] ) . '</label><input class="ewc-in" id="ewcName" type="text" autocomplete="name" required data-ewo-save="name">';
 	$h .= '<div class="ewc-head"><span>' . esc_html( $a['who_title'] ) . '</span></div>';
 	$h .= '<p class="ewc-lab">' . esc_html( $a['count_label'] ) . '</p><div class="ewc-counts">';
@@ -1009,6 +1011,7 @@ function ew_claim_css() {
 .ewc-letin{margin-top:16px}
 .ewc-grow{flex:1 1 auto;min-height:16px}
 .ewc-cc{margin-top:18px;text-align:center}.ewc .ewc-codeq{margin:0;font-family:\'Instrument Sans\',system-ui,sans-serif;font-size:14px;font-weight:400;letter-spacing:0;text-transform:none;line-height:1.8;color:#e6e6e6}.ewc-cc .ewc-in{font-family:\'Instrument Sans\',system-ui,sans-serif;letter-spacing:.5px}
+.ewc-gotcode{margin:0 0 18px;text-align:center}
 .ewc-codelink{background:none;border:0;padding:0;font:inherit;color:#fff;text-decoration:underline;cursor:pointer}
 .ewc-codebox{text-align:left}.ewc-codebox .ewc-ccq{margin-top:14px;text-align:center}.ewc-usecode [data-ewo-one]>:not(.ewc-head){display:none!important}.ewc-usecode .ewc-cc{margin-top:0}.ewc-btn2{background:transparent;border:1px solid rgba(255,255,255,.6)}
 .ewc .ewc-small{margin:0;font-size:15px;line-height:1.5;color:#e6e6e6;text-align:center}
@@ -1094,7 +1097,7 @@ function ew_claim_js() {
    if(pWho) pWho.hidden = n !== 'who';
    var f = n === 'code' ? cin : root.querySelector('#ewcName'); if(f && !f.value){ try{ f.focus(); }catch(x){} }
  }
- var O = window.ewOptin ? ewOptin(root, W, {open: function(){ panel(inviteCode ? 'who' : 'code'); }}) : {bid: 0, key: '', email: ''};
+ var O = window.ewOptin ? ewOptin(root, W, {open: function(){ panel(!inviteCode && root.querySelector('form.ewc-usecode') ? 'code' : 'who'); }}) : {bid: 0, key: '', email: ''};
  var schools = W.schools || [];
  var count = {adults: 1, children: 0};
  var sbox = root.querySelector('[data-ewc-schools]'), slab = root.querySelector('[data-ewc-schlab]'), same = root.querySelector('[data-ewc-same]');
@@ -1194,6 +1197,7 @@ function ew_claim_js() {
      if(e.target.closest('[data-ewc-codeskip]')){ promo = ''; cerr.textContent = ''; panel('who'); }
    });
    cin.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); useCode(); } });
+   if(pWho) pWho.addEventListener('click', function(e){ if(e.target.closest('[data-ewc-codeopen]')){ cerr.textContent = ''; panel('code'); } });
  }
 
  /* A personal claim link: their email in step one; who's coming filled from last time. */
