@@ -51,6 +51,8 @@ function ew_claim_defaults() {
 		'step_of'       => 'Step {n} of 2',
 		'who_title'     => "Who's coming",
 		'school_label'  => 'Which school do they go to?',
+		/* Ben, 28 Nov 2026: the school is good to know but not a must; shown beside the school label. */
+		'school_optional' => 'Optional',
 		/* More than one child: one school box each, so brothers and sisters at different schools are counted. */
 		'schools_label' => 'Which schools do they go to?',
 		'child_label'   => 'Child {n}',
@@ -365,7 +367,7 @@ function ew_claim_pass_html( $a, $id ) {
 	$url   = add_query_arg( array( 'pass' => $code, 'k' => $m( 'key' ) ), get_permalink( (int) $m( 'page' ) ) );
 	$party = ew_claim_party( $a, (int) $m( 'adults' ), (int) $m( 'children' ) );
 	$h     = '<p class="ewc-done">' . esc_html( $a['done_title'] ) . '</p>';
-	$h    .= '<p class="ewc-who">' . esc_html( $m( 'name' ) ) . '<br>' . esc_html( $party ) . ' &middot; ' . esc_html( $m( 'school' ) ) . '</p>';
+	$h    .= '<p class="ewc-who">' . esc_html( $m( 'name' ) ) . '<br>' . esc_html( $party ) . ( '' !== $m( 'school' ) ? ' &middot; ' . esc_html( $m( 'school' ) ) : '' ) . '</p>';
 	$h    .= '<div class="ewc-qr" data-qr="' . esc_attr( $url ) . '" role="img" aria-label="' . esc_attr( $code ) . '"></div>';
 	$h    .= '<p class="ewc-code">' . esc_html( $code ) . '</p>';
 	$in    = (int) $m( 'in' );
@@ -539,7 +541,7 @@ function ew_claim_shortcode( $atts, $content = null ) {
 		$h .= '<span class="ewc-pm"><button type="button" data-d="-1" aria-label="&minus; ' . esc_attr( $a[ $k ] ) . '">&minus;</button><output>' . ( 'adults' === $k ? 1 : 0 ) . '</output><button type="button" data-d="1" aria-label="+ ' . esc_attr( $a[ $k ] ) . '">+</button></span></div>';
 	}
 	$h .= '</div>';
-	$h .= '<p class="ewc-lab" data-ewc-schlab>' . esc_html( $a['school_label'] ) . '</p><div data-ewc-schools></div>';
+	$h .= '<p class="ewc-lab"><span data-ewc-schlab>' . esc_html( $a['school_label'] ) . '</span> <small class="ewc-opt">' . esc_html( $a['school_optional'] ) . '</small></p><div data-ewc-schools></div>';
 	$h .= '<div class="ewc-ccq ewc-same" data-ewc-same hidden><p class="ewc-codeq">' . esc_html( $a['same_q'] ) . '</p><p class="ewc-codeq"><button type="button" class="ewc-codelink" data-ewc-sameall>' . esc_html( $a['same_link'] ) . '</button></p></div>';
 	$h .= '<label class="ewc-tick"><input type="checkbox" id="ewcConsent" checked><span>' . esc_html( $a['consent'] ) . '</span></label>';
 	$h .= '<p class="ewc-err" role="alert"></p><button type="submit" class="ewc-btn">' . esc_html( $a['claim'] ) . '</button></div></div>';
@@ -783,9 +785,6 @@ add_action( 'rest_api_init', function () {
 					$school = (string) $cc['fill']['school'];
 				}
 			}
-			if ( '' === $school ) {
-				return new WP_REST_Response( array( 'message' => $a['need_school'] ), 400 );
-			}
 			if ( $adults + $children < 1 ) {
 				return new WP_REST_Response( array( 'message' => $a['need_people'] ), 400 );
 			}
@@ -963,6 +962,7 @@ function ew_claim_css() {
 .ewc-head span{font-family:Anton,Impact,sans-serif;font-size:28px;text-transform:uppercase}
 .ewc-head small{font-size:13px;font-weight:700;color:#cfcfcf}
 .ewc .ewc-lab{display:block;margin:0 0 8px;font-size:14px;font-weight:700;color:#fff}
+.ewc .ewc-opt{font-size:12px;font-weight:400;color:rgba(255,255,255,.55)}
 .ewc-search{position:relative;margin-bottom:20px}
 .ewc-kid{font-size:13px}
 .ewc .ewc-same{margin:-6px 0 18px}
@@ -1337,11 +1337,10 @@ function ew_claim_js() {
    if(count.adults + count.children < 1){ err(pWho, W.need_people); return; }
    var list = picks.map(function(p){
      if(p.school) return p.school;
-     var t = norm(p.input.value); return schools.filter(function(s){ return norm(s) === t; })[0] || '';
+     var t = norm(p.input.value); return schools.filter(function(s){ return norm(s) === t; })[0] || p.input.value.trim();
    });
-   var miss = list.indexOf('');
-   if(miss > -1){ err(pWho, W.need_school); picks[miss].input.focus(); return; }
    picks.forEach(function(p, i){ p.school = list[i]; });
+   list = list.filter(function(s){ return s !== ''; });
    err(pWho, '');
    var go = pWho.querySelector('button[type="submit"]'); go.disabled = true;
    fetch(W.rest, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
